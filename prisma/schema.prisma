@@ -1,0 +1,111 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SurveyType: "FLORA" | "FAUNA"
+// StationType: "PARCELA" | "TRANSECTO"
+// ProjectStatus: "ACTIVE" | "INACTIVE" | "COMPLETED"
+// CampaignStatus: "ACTIVE" | "COMPLETED" | "CANCELLED"
+
+model User {
+  id          String       @id @default(cuid())
+  email       String       @unique
+  name        String
+  password    String
+  active      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  occurrences Occurrence[]
+}
+
+model Project {
+  id          String     @id @default(cuid())
+  name        String
+  region      String
+  commune     String
+  responsible String
+  description String?
+  status      String     @default("ACTIVE")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  campaigns   Campaign[]
+}
+
+model Campaign {
+  id          String    @id @default(cuid())
+  projectId   String
+  name        String
+  surveyType  String
+  methodology String
+  startDate   DateTime
+  endDate     DateTime
+  status      String    @default("ACTIVE")
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stations    Station[]
+}
+
+model Station {
+  id          String       @id @default(cuid())
+  campaignId  String
+  name        String
+  type        String
+  area        Float?
+  length      Float?
+  width       Float?
+  latitude    Float?
+  longitude   Float?
+  notes       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  campaign    Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  occurrences Occurrence[]
+}
+
+model Species {
+  id                 String       @id @default(cuid())
+  family             String
+  genus              String
+  species            String
+  commonName         String?
+  type               String
+  category           String?
+  conservationStatus String?
+  endemic            Boolean      @default(false)
+  occurrences        Occurrence[]
+}
+
+model Occurrence {
+  id              String   @id @default(cuid())
+  stationId       String
+  speciesId       String
+  userId          String
+  date            DateTime @default(now())
+  latitude        Float?
+  longitude       Float?
+  abundance       Int?
+  cover           Float?
+  height          Float?
+  stratum         String?
+  phenology       String?
+  distance        Float?
+  bearing         Float?
+  groupSize       Int?
+  behavior        String?
+  detectionMethod String?
+  notes           String?
+  methodologyData String?
+  synced          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  station         Station  @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  species         Species  @relation(fields: [speciesId], references: [id])
+  user            User     @relation(fields: [userId], references: [id])
+}
