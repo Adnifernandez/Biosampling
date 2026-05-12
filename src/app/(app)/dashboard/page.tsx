@@ -29,11 +29,21 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Hola, {session?.user?.name?.split(" ")[0]} 👋
-        </h1>
-        <p className="text-gray-500 text-sm mt-1">Resumen de actividad en campo</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Hola, {session?.user?.name?.split(" ")[0]} 👋
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">Resumen de actividad en campo</p>
+        </div>
+        <div className="text-right">
+          <p className="text-sm font-medium text-gray-700">
+            {new Date().toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })}
+          </p>
+          <p className="text-xs text-gray-400">
+            {new Date().toLocaleDateString("es-CL", { year: "numeric" })}
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
