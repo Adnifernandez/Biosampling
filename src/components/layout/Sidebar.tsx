@@ -11,12 +11,14 @@ import {
   Leaf,
   Users,
   FileBarChart2,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/proyectos", label: "Proyectos", icon: FolderOpen },
+  { href: "/campanas", label: "Campañas", icon: Layers },
   { href: "/reportes", label: "Reportes", icon: FileBarChart2 },
   { href: "/admin/usuarios", label: "Usuarios", icon: Users },
 ];
