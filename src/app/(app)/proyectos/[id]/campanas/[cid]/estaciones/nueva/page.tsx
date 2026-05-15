@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import { StationForm } from "@/components/estaciones/StationForm";
+import { NuevasEstacionesForm } from "@/components/estaciones/NuevasEstacionesForm";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
@@ -12,8 +12,18 @@ export default async function NuevaEstacionPage({ params }: { params: Promise<{ 
   });
   if (!campaign || campaign.projectId !== id) notFound();
 
+  const prefix = campaign.surveyType === "FLORA" ? "P" : "T";
+  const existing = await prisma.station.findMany({
+    where: { campaignId: cid },
+    select: { name: true },
+  });
+  const maxNum = existing.reduce((max, s) => {
+    const m = s.name.match(new RegExp(`^${prefix}(\\d+)$`));
+    return m ? Math.max(max, parseInt(m[1])) : max;
+  }, 0);
+
   return (
-    <div className="max-w-xl space-y-4">
+    <div className="max-w-lg space-y-5">
       <div className="flex items-center gap-2">
         <Link href={`/proyectos/${id}/campanas/${cid}`} className="text-gray-400 hover:text-gray-600">
           <ArrowLeft className="h-5 w-5" />
@@ -25,10 +35,12 @@ export default async function NuevaEstacionPage({ params }: { params: Promise<{ 
           <p className="text-sm text-gray-500">{campaign.name}</p>
         </div>
       </div>
-      <StationForm
-        projectId={id}
+      <NuevasEstacionesForm
         campaignId={cid}
+        projectId={id}
         surveyType={campaign.surveyType as "FLORA" | "FAUNA"}
+        nextNumber={maxNum + 1}
+        campaignName={campaign.name}
       />
     </div>
   );
