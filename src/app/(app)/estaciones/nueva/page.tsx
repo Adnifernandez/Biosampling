@@ -49,7 +49,7 @@ export default async function NuevaEstacionPage({
     <div className="max-w-xl space-y-5">
       <div className="flex items-center gap-2">
         <Link
-          href={`/proyectos/${projectId}/campanas/${campaignId}`}
+          href={`/estaciones?projectId=${projectId}&campaignId=${campaignId}`}
           className="text-gray-400 hover:text-gray-600"
         >
           <ArrowLeft className="h-5 w-5" />

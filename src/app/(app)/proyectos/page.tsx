@@ -2,7 +2,6 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button-link";
-import { Button } from "@/components/ui/button";
 import { Plus, FolderOpen, MapPin, User } from "lucide-react";
 import { PROJECT_STATUS_LABELS, type ProjectStatus } from "@/lib/types";
 
@@ -15,11 +14,6 @@ const STATUS_COLORS: Record<ProjectStatus, string> = {
 export default async function ProyectosPage() {
   const projects = await prisma.project.findMany({
     orderBy: { createdAt: "desc" },
-    include: {
-      campaigns: {
-        select: { id: true, surveyType: true, status: true },
-      },
-    },
   });
 
   return (
@@ -48,44 +42,28 @@ export default async function ProyectosPage() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {projects.map((p) => {
-            const activeCampaigns = p.campaigns.filter((c) => c.status === "ACTIVE").length;
-            return (
-              <Link key={p.id} href={`/proyectos/${p.id}`}>
-                <Card className="hover:shadow-md transition-shadow">
-                  <CardContent className="py-4 px-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h2 className="font-semibold text-gray-900 truncate">{p.name}</h2>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[p.status as ProjectStatus]}`}>
-                            {PROJECT_STATUS_LABELS[p.status as ProjectStatus]}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-500">
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" /> {p.region} · {p.commune}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <User className="h-3 w-3" /> {p.responsible}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-xl font-bold text-gray-800">{p.campaigns.length}</p>
-                        <p className="text-xs text-gray-400">
-                          campaña{p.campaigns.length !== 1 ? "s" : ""}
-                        </p>
-                        {activeCampaigns > 0 && (
-                          <span className="text-xs text-green-600">{activeCampaigns} activa{activeCampaigns !== 1 ? "s" : ""}</span>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
+          {projects.map((p) => (
+            <Link key={p.id} href={`/proyectos/${p.id}`}>
+              <Card className="hover:shadow-md transition-shadow">
+                <CardContent className="py-4 px-4">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="font-semibold text-gray-900 truncate">{p.name}</h2>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[p.status as ProjectStatus]}`}>
+                      {PROJECT_STATUS_LABELS[p.status as ProjectStatus]}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3" /> {p.region} · {p.commune}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <User className="h-3 w-3" /> {p.responsible}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
         </div>
       )}
     </div>

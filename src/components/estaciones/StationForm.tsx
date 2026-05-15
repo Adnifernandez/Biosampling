@@ -86,7 +86,7 @@ export function StationForm({ projectId, campaignId, surveyType, stationId, defa
         toast.error(result.error);
       } else {
         toast.success(`${label} actualizada`);
-        router.push(`/proyectos/${projectId}/campanas/${campaignId}/estaciones/${stationId}`);
+        router.push(`/estaciones/${stationId}`);
       }
     } else {
       const result = await createStation(projectId, campaignId, fd);
@@ -94,7 +94,7 @@ export function StationForm({ projectId, campaignId, surveyType, stationId, defa
         toast.error(result.error);
       } else if (result.success && result.id) {
         toast.success(`${label} creada`);
-        router.push(`/proyectos/${projectId}/campanas/${campaignId}/estaciones/${result.id}`);
+        router.push(`/estaciones/${result.id}`);
       }
     }
   }

@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
+import Link from "next/link";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Card, CardContent } from "@/components/ui/card";
-import { LayoutList, Plus, MapPin, Leaf, Bird } from "lucide-react";
+import { LayoutList, Plus, MapPin, Leaf, Bird, ChevronRight } from "lucide-react";
 import { EstacionesFiltro } from "@/components/estaciones/EstacionesFiltro";
 import { STATION_TYPE_LABELS, type StationType } from "@/lib/types";
 
@@ -112,39 +113,42 @@ export default async function EstacionesPage({
       ) : (
         <div className="space-y-2">
           {stations.map((s) => (
-            <Card key={s.id} className="hover:shadow-sm transition-shadow">
-              <CardContent className="py-3 px-4 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className={`text-xs font-bold px-2 py-1 rounded font-mono shrink-0 ${
-                    s.type === "PARCELA"
-                      ? "bg-green-100 text-green-800"
-                      : "bg-blue-100 text-blue-800"
-                  }`}>
-                    {s.name}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900">
-                      {STATION_TYPE_LABELS[s.type as StationType]}
-                    </p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {s.type === "PARCELA" ? (
-                        s.area
-                          ? `${s.area} m²`
-                          : s.length && s.width
-                          ? `${s.length} × ${s.width} m`
-                          : "Sin dimensiones"
-                      ) : (
-                        s.length ? `${s.length} m largo` : "Sin dimensiones"
+            <Link key={s.id} href={`/estaciones/${s.id}`}>
+              <Card className="hover:shadow-sm transition-shadow">
+                <CardContent className="py-3 px-4 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className={`text-xs font-bold px-2 py-1 rounded font-mono shrink-0 ${
+                      s.type === "PARCELA"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-blue-100 text-blue-800"
+                    }`}>
+                      {s.name}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900">
+                        {STATION_TYPE_LABELS[s.type as StationType]}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {s.type === "PARCELA" ? (
+                          s.area
+                            ? `${s.area} m²`
+                            : s.length && s.width
+                            ? `${s.length} × ${s.width} m`
+                            : "Sin dimensiones"
+                        ) : (
+                          s.length ? `${s.length} m largo` : "Sin dimensiones"
+                        )}
+                        {s.latitude && s.longitude && " · GPS ✓"}
+                      </p>
+                      {s.notes && (
+                        <p className="text-xs text-gray-400 truncate mt-0.5">{s.notes}</p>
                       )}
-                      {s.latitude && s.longitude && " · GPS ✓"}
-                    </p>
-                    {s.notes && (
-                      <p className="text-xs text-gray-400 truncate mt-0.5">{s.notes}</p>
-                    )}
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                  <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
       )}

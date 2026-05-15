@@ -25,7 +25,7 @@ export function DeleteStationButton({
     setLoading(true);
     await deleteStation(projectId, campaignId, stationId);
     toast.success("Estación eliminada");
-    router.push(`/proyectos/${projectId}/campanas/${campaignId}`);
+    router.push(`/estaciones`);
   }
 
   return (

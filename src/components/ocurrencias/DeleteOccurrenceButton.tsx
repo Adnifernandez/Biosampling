@@ -27,7 +27,7 @@ export function DeleteOccurrenceButton({
     setLoading(true);
     await deleteOccurrence(projectId, campaignId, stationId, occurrenceId);
     toast.success("Ocurrencia eliminada");
-    router.push(`/proyectos/${projectId}/campanas/${campaignId}/estaciones/${stationId}`);
+    router.push(`/estaciones/${stationId}`);
   }
 
   return (

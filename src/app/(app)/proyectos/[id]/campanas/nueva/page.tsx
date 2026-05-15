@@ -1,26 +1,5 @@
-import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
-import { NuevaCampanaForm } from "@/components/campanas/NuevaCampanaForm";
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import { redirect } from "next/navigation";
 
-export default async function NuevaCampanaPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const project = await prisma.project.findUnique({ where: { id }, select: { id: true, name: true } });
-  if (!project) notFound();
-
-  return (
-    <div className="max-w-lg space-y-5">
-      <div className="flex items-center gap-2">
-        <Link href={`/proyectos/${project.id}`} className="text-gray-400 hover:text-gray-600">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Nueva Campaña</h1>
-          <p className="text-sm text-gray-500">{project.name}</p>
-        </div>
-      </div>
-      <NuevaCampanaForm projects={[]} preselectedProject={project} />
-    </div>
-  );
+export default async function LegacyNuevaCampanaPage() {
+  redirect("/campanas/nueva");
 }

@@ -115,7 +115,7 @@ export function OccurrenceForm({
       toast.error("Error al guardar");
     } else {
       toast.success(occurrenceId ? "Ocurrencia actualizada" : "Ocurrencia registrada");
-      router.push(`/proyectos/${projectId}/campanas/${campaignId}/estaciones/${stationId}`);
+      router.push(`/estaciones/${stationId}`);
     }
   }
 

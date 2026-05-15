@@ -55,7 +55,7 @@ export default async function CampanasPage({
       ) : (
         <div className="space-y-2">
           {campaigns.map((c) => (
-            <Link key={c.id} href={`/proyectos/${c.project.id}/campanas/${c.id}`}>
+            <Link key={c.id} href={`/campanas/${c.id}`}>
               <Card className="hover:shadow-sm transition-shadow">
                 <CardContent className="py-3 px-4 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">

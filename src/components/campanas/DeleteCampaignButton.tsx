@@ -17,7 +17,7 @@ export function DeleteCampaignButton({ projectId, campaignId }: { projectId: str
     setLoading(true);
     await deleteCampaign(projectId, campaignId);
     toast.success("Campaña eliminada");
-    router.push(`/proyectos/${projectId}`);
+    router.push(`/campanas`);
   }
 
   return (

@@ -101,7 +101,7 @@ export function NuevasEstacionesForm({
       toast.success(
         `${result.count} ${stationType === "PARCELA" ? (result.count === 1 ? "parcela creada" : "parcelas creadas") : (result.count === 1 ? "transecto creado" : "transectos creados")}`
       );
-      router.push(`/proyectos/${projectId}/campanas/${campaignId}`);
+      router.push(`/estaciones?projectId=${projectId}&campaignId=${campaignId}`);
     }
   }
 
