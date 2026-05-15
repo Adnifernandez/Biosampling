@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sun, Leaf, Snowflake, Flower2, Bird } from "lucide-react";
+import { Sun, Leaf, Snowflake, Flower2, Bird, FolderOpen } from "lucide-react";
 import { METHODOLOGIES } from "@/lib/methodologies";
 import { createCampana } from "@/app/(app)/campanas/actions";
 import { toast } from "sonner";
@@ -23,11 +23,16 @@ const SEASONS = [
 
 type Project = { id: string; name: string };
 
-export function NuevaCampanaForm({ projects }: { projects: Project[] }) {
+interface NuevaCampanaFormProps {
+  projects: Project[];
+  preselectedProject?: Project;
+}
+
+export function NuevaCampanaForm({ projects, preselectedProject }: NuevaCampanaFormProps) {
   const router = useRouter();
   const year = new Date().getFullYear();
 
-  const [projectId, setProjectId] = useState("");
+  const [projectId, setProjectId] = useState(preselectedProject?.id ?? "");
   const [season, setSeason] = useState("Verano");
   const [suffix, setSuffix] = useState("");
   const [surveyType, setSurveyType] = useState<"FLORA" | "FAUNA">("FLORA");
@@ -71,21 +76,28 @@ export function NuevaCampanaForm({ projects }: { projects: Project[] }) {
           {/* Proyecto */}
           <div className="space-y-1.5">
             <Label>Proyecto <span className="text-red-500">*</span></Label>
-            <Select value={projectId} onValueChange={(v) => setProjectId(v ?? "")}>
-              <SelectTrigger>
-                <SelectValue>
-                  {projectId
-                    ? projects.find((p) => p.id === projectId)?.name ?? projectId
-                    : <span className="text-gray-400">Seleccionar proyecto...</span>}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {projects.length === 0 && (
+            {preselectedProject ? (
+              <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border rounded-lg text-sm text-gray-700">
+                <FolderOpen className="h-4 w-4 text-gray-400 shrink-0" />
+                {preselectedProject.name}
+              </div>
+            ) : (
+              <Select value={projectId} onValueChange={(v) => setProjectId(v ?? "")}>
+                <SelectTrigger>
+                  <SelectValue>
+                    {projectId
+                      ? projects.find((p) => p.id === projectId)?.name ?? projectId
+                      : <span className="text-gray-400">Seleccionar proyecto...</span>}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {!preselectedProject && projects.length === 0 && (
               <p className="text-xs text-orange-500">No hay proyectos activos. Crea uno primero.</p>
             )}
           </div>

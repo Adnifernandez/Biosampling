@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import { CampaignForm } from "@/components/campanas/CampaignForm";
+import { NuevaCampanaForm } from "@/components/campanas/NuevaCampanaForm";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
@@ -10,7 +10,7 @@ export default async function NuevaCampanaPage({ params }: { params: Promise<{ i
   if (!project) notFound();
 
   return (
-    <div className="max-w-xl space-y-4">
+    <div className="max-w-lg space-y-5">
       <div className="flex items-center gap-2">
         <Link href={`/proyectos/${project.id}`} className="text-gray-400 hover:text-gray-600">
           <ArrowLeft className="h-5 w-5" />
@@ -20,7 +20,7 @@ export default async function NuevaCampanaPage({ params }: { params: Promise<{ i
           <p className="text-sm text-gray-500">{project.name}</p>
         </div>
       </div>
-      <CampaignForm projectId={project.id} />
+      <NuevaCampanaForm projects={[]} preselectedProject={project} />
     </div>
   );
 }
