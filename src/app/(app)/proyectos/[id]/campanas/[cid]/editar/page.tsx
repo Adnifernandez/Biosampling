@@ -1,17 +1,20 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import { CampaignForm } from "@/components/campanas/CampaignForm";
+import { NuevaCampanaForm } from "@/components/campanas/NuevaCampanaForm";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 
 export default async function EditarCampanaPage({ params }: { params: Promise<{ id: string; cid: string }> }) {
   const { id, cid } = await params;
-  const campaign = await prisma.campaign.findUnique({ where: { id: cid } });
-  if (!campaign || campaign.projectId !== id) notFound();
+  const [campaign, project] = await Promise.all([
+    prisma.campaign.findUnique({ where: { id: cid } }),
+    prisma.project.findUnique({ where: { id }, select: { id: true, name: true } }),
+  ]);
+  if (!campaign || campaign.projectId !== id || !project) notFound();
 
   return (
-    <div className="max-w-xl space-y-4">
+    <div className="max-w-lg space-y-5">
       <div className="flex items-center gap-2">
         <Link href={`/proyectos/${id}/campanas/${cid}`} className="text-gray-400 hover:text-gray-600">
           <ArrowLeft className="h-5 w-5" />
@@ -21,8 +24,9 @@ export default async function EditarCampanaPage({ params }: { params: Promise<{ 
           <p className="text-sm text-gray-500">{campaign.name}</p>
         </div>
       </div>
-      <CampaignForm
-        projectId={id}
+      <NuevaCampanaForm
+        projects={[]}
+        preselectedProject={project}
         campaignId={campaign.id}
         defaultValues={{
           name: campaign.name,

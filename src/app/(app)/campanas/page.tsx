@@ -4,33 +4,49 @@ import { ButtonLink } from "@/components/ui/button-link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Layers, Plus, Leaf, Bird } from "lucide-react";
 import { CAMPAIGN_STATUS_LABELS, type CampaignStatus } from "@/lib/types";
+import { CampanasFilter } from "@/components/campanas/CampanasFilter";
 
-export default async function CampanasPage() {
-  const campaigns = await prisma.campaign.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      project: { select: { id: true, name: true } },
-      stations: { select: { id: true } },
-    },
-  });
+export default async function CampanasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ projectId?: string }>;
+}) {
+  const { projectId } = await searchParams;
+
+  const [projects, campaigns] = await Promise.all([
+    prisma.project.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    prisma.campaign.findMany({
+      where: projectId ? { projectId } : undefined,
+      orderBy: { createdAt: "desc" },
+      include: {
+        project: { select: { id: true, name: true } },
+        stations: { select: { id: true } },
+      },
+    }),
+  ]);
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Campañas</h1>
-          <p className="text-gray-500 text-sm mt-0.5">{campaigns.length} campaña{campaigns.length !== 1 ? "s" : ""} en total</p>
+          <p className="text-gray-500 text-sm mt-0.5">{campaigns.length} campaña{campaigns.length !== 1 ? "s" : ""}</p>
         </div>
         <ButtonLink href="/campanas/nueva" className="bg-green-700 hover:bg-green-800 text-white gap-2">
           <Plus className="h-4 w-4" /> Nueva
         </ButtonLink>
       </div>
 
+      <CampanasFilter projects={projects} selectedProjectId={projectId ?? ""} />
+
       {campaigns.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-gray-400">
             <Layers className="h-10 w-10 mx-auto mb-2 opacity-30" />
-            <p>No hay campañas todavía.</p>
+            <p>{projectId ? "No hay campañas en este proyecto." : "No hay campañas todavía."}</p>
             <ButtonLink href="/campanas/nueva" size="sm" className="mt-3 inline-flex bg-green-700 hover:bg-green-800 text-white">
               <Plus className="h-4 w-4 mr-1" /> Crear campaña
             </ButtonLink>

@@ -10,9 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sun, Leaf, Snowflake, Flower2, Bird, FolderOpen } from "lucide-react";
 import { METHODOLOGIES } from "@/lib/methodologies";
-import { createCampana } from "@/app/(app)/campanas/actions";
+import { createCampana, updateCampana } from "@/app/(app)/campanas/actions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
 const SEASONS = [
   { id: "Verano",    label: "Verano",    icon: Sun,       color: "text-yellow-500" },
@@ -21,22 +22,42 @@ const SEASONS = [
   { id: "Primavera", label: "Primavera", icon: Flower2,   color: "text-pink-400"   },
 ];
 
+function parseName(name: string): { season: string; suffix: string } {
+  const match = name.match(/^(Verano|Otoño|Invierno|Primavera)\s+\d{4}(?:\s+—\s+(.+))?$/);
+  if (match) return { season: match[1], suffix: match[2] ?? "" };
+  return { season: "Verano", suffix: "" };
+}
+
 type Project = { id: string; name: string };
+
+interface DefaultValues {
+  name?: string;
+  surveyType?: "FLORA" | "FAUNA";
+  methodology?: string;
+  startDate?: string;
+  endDate?: string;
+  notes?: string;
+}
 
 interface NuevaCampanaFormProps {
   projects: Project[];
   preselectedProject?: Project;
+  campaignId?: string;
+  defaultValues?: DefaultValues;
 }
 
-export function NuevaCampanaForm({ projects, preselectedProject }: NuevaCampanaFormProps) {
+export function NuevaCampanaForm({ projects, preselectedProject, campaignId, defaultValues }: NuevaCampanaFormProps) {
   const router = useRouter();
   const year = new Date().getFullYear();
+  const isEdit = !!campaignId;
+
+  const parsed = defaultValues?.name ? parseName(defaultValues.name) : { season: "Verano", suffix: "" };
 
   const [projectId, setProjectId] = useState(preselectedProject?.id ?? "");
-  const [season, setSeason] = useState("Verano");
-  const [suffix, setSuffix] = useState("");
-  const [surveyType, setSurveyType] = useState<"FLORA" | "FAUNA">("FLORA");
-  const [methodology, setMethodology] = useState("");
+  const [season, setSeason] = useState(parsed.season);
+  const [suffix, setSuffix] = useState(parsed.suffix);
+  const [surveyType, setSurveyType] = useState<"FLORA" | "FAUNA">(defaultValues?.surveyType ?? "FLORA");
+  const [methodology, setMethodology] = useState(defaultValues?.methodology ?? "");
   const [submitting, setSubmitting] = useState(false);
 
   const finalName = suffix.trim()
@@ -47,7 +68,7 @@ export function NuevaCampanaForm({ projects, preselectedProject }: NuevaCampanaF
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!projectId) { toast.error("Selecciona un proyecto"); return; }
+    if (!isEdit && !projectId) { toast.error("Selecciona un proyecto"); return; }
     if (!methodology) { toast.error("Selecciona una metodología"); return; }
 
     setSubmitting(true);
@@ -57,13 +78,16 @@ export function NuevaCampanaForm({ projects, preselectedProject }: NuevaCampanaF
     fd.set("surveyType", surveyType);
     fd.set("methodology", methodology);
 
-    const result = await createCampana(fd);
+    const result = isEdit
+      ? await updateCampana(campaignId, fd)
+      : await createCampana(fd);
+
     setSubmitting(false);
 
     if (result.error) {
       toast.error(result.error);
     } else if (result.success) {
-      toast.success("Campaña creada");
+      toast.success(isEdit ? "Campaña actualizada" : "Campaña creada");
       router.push(`/proyectos/${result.projectId}/campanas/${result.id}`);
     }
   }
@@ -124,7 +148,6 @@ export function NuevaCampanaForm({ projects, preselectedProject }: NuevaCampanaF
               ))}
             </div>
 
-            {/* Sufijo */}
             <Input
               name="suffix"
               placeholder="Sufijo opcional — ej: Sector Norte, Fase 2..."
@@ -172,7 +195,7 @@ export function NuevaCampanaForm({ projects, preselectedProject }: NuevaCampanaF
               <SelectTrigger>
                 <SelectValue>
                   {methodology
-                    ? methodologies.find((m) => m.id === methodology)?.name ?? methodology
+                    ? (METHODOLOGIES.find((m) => m.id === methodology)?.name ?? methodology)
                     : <span className="text-gray-400">Seleccionar metodología...</span>}
                 </SelectValue>
               </SelectTrigger>
@@ -188,18 +211,36 @@ export function NuevaCampanaForm({ projects, preselectedProject }: NuevaCampanaF
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="startDate">Fecha inicio <span className="text-red-500">*</span></Label>
-              <Input id="startDate" name="startDate" type="date" required />
+              <Input
+                id="startDate"
+                name="startDate"
+                type="date"
+                required
+                defaultValue={defaultValues?.startDate}
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="endDate">Fecha término <span className="text-red-500">*</span></Label>
-              <Input id="endDate" name="endDate" type="date" required />
+              <Input
+                id="endDate"
+                name="endDate"
+                type="date"
+                required
+                defaultValue={defaultValues?.endDate}
+              />
             </div>
           </div>
 
           {/* Comentarios */}
           <div className="space-y-1.5">
             <Label htmlFor="notes">Comentarios (opcional)</Label>
-            <Textarea id="notes" name="notes" placeholder="Observaciones generales de la campaña..." rows={2} />
+            <Textarea
+              id="notes"
+              name="notes"
+              placeholder="Observaciones generales de la campaña..."
+              rows={2}
+              defaultValue={defaultValues?.notes}
+            />
           </div>
 
           <div className="flex gap-2 pt-1">
@@ -207,7 +248,7 @@ export function NuevaCampanaForm({ projects, preselectedProject }: NuevaCampanaF
               Cancelar
             </Button>
             <Button type="submit" className="flex-1 bg-green-700 hover:bg-green-800" disabled={submitting}>
-              {submitting ? "Creando..." : "Crear campaña"}
+              {submitting ? "Guardando..." : isEdit ? "Actualizar campaña" : "Crear campaña"}
             </Button>
           </div>
         </form>
