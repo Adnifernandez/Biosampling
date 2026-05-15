@@ -4,17 +4,18 @@ import { StationForm } from "@/components/estaciones/StationForm";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-export default async function NuevaEstacionPage({ params }: { params: { id: string; cid: string } }) {
+export default async function NuevaEstacionPage({ params }: { params: Promise<{ id: string; cid: string }> }) {
+  const { id, cid } = await params;
   const campaign = await prisma.campaign.findUnique({
-    where: { id: params.cid },
+    where: { id: cid },
     select: { id: true, name: true, surveyType: true, projectId: true },
   });
-  if (!campaign || campaign.projectId !== params.id) notFound();
+  if (!campaign || campaign.projectId !== id) notFound();
 
   return (
     <div className="max-w-xl space-y-4">
       <div className="flex items-center gap-2">
-        <Link href={`/proyectos/${params.id}/campanas/${params.cid}`} className="text-gray-400 hover:text-gray-600">
+        <Link href={`/proyectos/${id}/campanas/${cid}`} className="text-gray-400 hover:text-gray-600">
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div>
@@ -25,8 +26,8 @@ export default async function NuevaEstacionPage({ params }: { params: { id: stri
         </div>
       </div>
       <StationForm
-        projectId={params.id}
-        campaignId={params.cid}
+        projectId={id}
+        campaignId={cid}
         surveyType={campaign.surveyType as "FLORA" | "FAUNA"}
       />
     </div>

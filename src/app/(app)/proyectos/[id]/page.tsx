@@ -9,9 +9,10 @@ import { PROJECT_STATUS_LABELS, CAMPAIGN_STATUS_LABELS, SURVEY_TYPE_LABELS, type
 import { REGIONS } from "@/lib/chile-data";
 import { DeleteProjectButton } from "@/components/proyectos/DeleteProjectButton";
 
-export default async function ProyectoDetailPage({ params }: { params: { id: string } }) {
+export default async function ProyectoDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const project = await prisma.project.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       campaigns: {
         orderBy: { createdAt: "desc" },

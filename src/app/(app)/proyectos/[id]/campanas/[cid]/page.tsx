@@ -13,10 +13,11 @@ import { es } from "date-fns/locale";
 export default async function CampanaDetailPage({
   params,
 }: {
-  params: { id: string; cid: string };
+  params: Promise<{ id: string; cid: string }>;
 }) {
+  const { id, cid } = await params;
   const campaign = await prisma.campaign.findUnique({
-    where: { id: params.cid },
+    where: { id: cid },
     include: {
       project: { select: { id: true, name: true } },
       stations: {
@@ -25,7 +26,7 @@ export default async function CampanaDetailPage({
       },
     },
   });
-  if (!campaign || campaign.projectId !== params.id) notFound();
+  if (!campaign || campaign.projectId !== id) notFound();
 
   const methodology = METHODOLOGIES.find((m) => m.id === campaign.methodology);
 

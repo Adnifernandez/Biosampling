@@ -4,8 +4,9 @@ import { CampaignForm } from "@/components/campanas/CampaignForm";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-export default async function NuevaCampanaPage({ params }: { params: { id: string } }) {
-  const project = await prisma.project.findUnique({ where: { id: params.id }, select: { id: true, name: true } });
+export default async function NuevaCampanaPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const project = await prisma.project.findUnique({ where: { id }, select: { id: true, name: true } });
   if (!project) notFound();
 
   return (

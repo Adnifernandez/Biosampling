@@ -11,10 +11,11 @@ import { DeleteStationButton } from "@/components/estaciones/DeleteStationButton
 export default async function EstacionDetailPage({
   params,
 }: {
-  params: { id: string; cid: string; sid: string };
+  params: Promise<{ id: string; cid: string; sid: string }>;
 }) {
+  const { id, cid, sid } = await params;
   const station = await prisma.station.findUnique({
-    where: { id: params.sid },
+    where: { id: sid },
     include: {
       campaign: {
         select: {
@@ -35,7 +36,7 @@ export default async function EstacionDetailPage({
     },
   });
 
-  if (!station || station.campaign.projectId !== params.id || station.campaignId !== params.cid)
+  if (!station || station.campaign.projectId !== id || station.campaignId !== cid)
     notFound();
 
   const isFlora = station.campaign.surveyType === "FLORA";
@@ -46,7 +47,7 @@ export default async function EstacionDetailPage({
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-start gap-2">
           <Link
-            href={`/proyectos/${params.id}/campanas/${params.cid}`}
+            href={`/proyectos/${id}/campanas/${cid}`}
             className="text-gray-400 hover:text-gray-600 mt-1"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -77,13 +78,13 @@ export default async function EstacionDetailPage({
         </div>
         <div className="flex gap-1 shrink-0">
           <ButtonLink
-            href={`/proyectos/${params.id}/campanas/${params.cid}/estaciones/${params.sid}/editar`}
+            href={`/proyectos/${id}/campanas/${cid}/estaciones/${sid}/editar`}
             variant="outline"
             size="sm"
           >
             <Pencil className="h-4 w-4" />
           </ButtonLink>
-          <DeleteStationButton projectId={params.id} campaignId={params.cid} stationId={params.sid} />
+          <DeleteStationButton projectId={id} campaignId={cid} stationId={sid} />
         </div>
       </div>
 
@@ -100,7 +101,7 @@ export default async function EstacionDetailPage({
             </h2>
           </div>
           <ButtonLink
-            href={`/proyectos/${params.id}/campanas/${params.cid}/estaciones/${params.sid}/ocurrencias/nueva`}
+            href={`/proyectos/${id}/campanas/${cid}/estaciones/${sid}/ocurrencias/nueva`}
             size="sm"
             className="bg-green-700 hover:bg-green-800 text-white"
           >
@@ -114,7 +115,7 @@ export default async function EstacionDetailPage({
               <FileText className="h-10 w-10 mx-auto mb-2 text-gray-300" />
               <p className="text-gray-500 text-sm">No hay ocurrencias registradas</p>
               <ButtonLink
-                href={`/proyectos/${params.id}/campanas/${params.cid}/estaciones/${params.sid}/ocurrencias/nueva`}
+                href={`/proyectos/${id}/campanas/${cid}/estaciones/${sid}/ocurrencias/nueva`}
                 size="sm"
                 className="mt-3 inline-flex bg-green-700 hover:bg-green-800 text-white"
               >
@@ -127,7 +128,7 @@ export default async function EstacionDetailPage({
             {station.occurrences.map((o) => (
               <Link
                 key={o.id}
-                href={`/proyectos/${params.id}/campanas/${params.cid}/estaciones/${params.sid}/ocurrencias/${o.id}/editar`}
+                href={`/proyectos/${id}/campanas/${cid}/estaciones/${sid}/ocurrencias/${o.id}/editar`}
               >
                 <Card className="hover:shadow-sm transition-shadow">
                   <CardContent className="py-3 px-4">

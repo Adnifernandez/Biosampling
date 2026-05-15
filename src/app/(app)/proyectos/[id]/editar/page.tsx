@@ -4,8 +4,9 @@ import { ProjectForm } from "@/components/proyectos/ProjectForm";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-export default async function EditarProyectoPage({ params }: { params: { id: string } }) {
-  const project = await prisma.project.findUnique({ where: { id: params.id } });
+export default async function EditarProyectoPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const project = await prisma.project.findUnique({ where: { id } });
   if (!project) notFound();
 
   return (

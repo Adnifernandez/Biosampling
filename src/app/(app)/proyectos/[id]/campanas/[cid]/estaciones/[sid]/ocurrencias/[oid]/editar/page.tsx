@@ -9,10 +9,11 @@ import { DeleteOccurrenceButton } from "@/components/ocurrencias/DeleteOccurrenc
 export default async function EditarOcurrenciaPage({
   params,
 }: {
-  params: { id: string; cid: string; sid: string; oid: string };
+  params: Promise<{ id: string; cid: string; sid: string; oid: string }>;
 }) {
+  const { id, cid, sid, oid } = await params;
   const occurrence = await prisma.occurrence.findUnique({
-    where: { id: params.oid },
+    where: { id: oid },
     include: {
       station: {
         include: {
@@ -25,7 +26,7 @@ export default async function EditarOcurrenciaPage({
     },
   });
 
-  if (!occurrence || occurrence.station.campaign.projectId !== params.id) notFound();
+  if (!occurrence || occurrence.station.campaign.projectId !== id) notFound();
 
   const defaultValues: Record<string, string> = {
     speciesId: occurrence.speciesId,
@@ -50,7 +51,7 @@ export default async function EditarOcurrenciaPage({
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           <Link
-            href={`/proyectos/${params.id}/campanas/${params.cid}/estaciones/${params.sid}`}
+            href={`/proyectos/${id}/campanas/${cid}/estaciones/${sid}`}
             className="text-gray-400 hover:text-gray-600"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -63,16 +64,16 @@ export default async function EditarOcurrenciaPage({
           </div>
         </div>
         <DeleteOccurrenceButton
-          projectId={params.id}
-          campaignId={params.cid}
-          stationId={params.sid}
-          occurrenceId={params.oid}
+          projectId={id}
+          campaignId={cid}
+          stationId={sid}
+          occurrenceId={oid}
         />
       </div>
       <OccurrenceForm
-        projectId={params.id}
-        campaignId={params.cid}
-        stationId={params.sid}
+        projectId={id}
+        campaignId={cid}
+        stationId={sid}
         surveyType={occurrence.station.campaign.surveyType as "FLORA" | "FAUNA"}
         methodology={occurrence.station.campaign.methodology}
         occurrenceId={occurrence.id}

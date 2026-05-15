@@ -7,19 +7,20 @@ import Link from "next/link";
 export default async function EditarEstacionPage({
   params,
 }: {
-  params: { id: string; cid: string; sid: string };
+  params: Promise<{ id: string; cid: string; sid: string }>;
 }) {
+  const { id, cid, sid } = await params;
   const station = await prisma.station.findUnique({
-    where: { id: params.sid },
+    where: { id: sid },
     include: { campaign: { select: { surveyType: true, projectId: true } } },
   });
-  if (!station || station.campaign.projectId !== params.id) notFound();
+  if (!station || station.campaign.projectId !== id) notFound();
 
   return (
     <div className="max-w-xl space-y-4">
       <div className="flex items-center gap-2">
         <Link
-          href={`/proyectos/${params.id}/campanas/${params.cid}/estaciones/${params.sid}`}
+          href={`/proyectos/${id}/campanas/${cid}/estaciones/${sid}`}
           className="text-gray-400 hover:text-gray-600"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -30,8 +31,8 @@ export default async function EditarEstacionPage({
         </div>
       </div>
       <StationForm
-        projectId={params.id}
-        campaignId={params.cid}
+        projectId={id}
+        campaignId={cid}
         surveyType={station.campaign.surveyType as "FLORA" | "FAUNA"}
         stationId={station.id}
         defaultValues={{
