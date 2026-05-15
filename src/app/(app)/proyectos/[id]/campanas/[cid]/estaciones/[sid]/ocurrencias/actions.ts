@@ -129,13 +129,21 @@ export async function searchSpecies(query: string, surveyType: string) {
     where: {
       type: surveyType,
       OR: [
-        { genus: { contains: query } },
-        { species: { contains: query } },
-        { commonName: { contains: query } },
-        { family: { contains: query } },
+        { genus: { contains: query, mode: "insensitive" } },
+        { species: { contains: query, mode: "insensitive" } },
+        { commonName: { contains: query, mode: "insensitive" } },
+        { family: { contains: query, mode: "insensitive" } },
       ],
     },
-    take: 20,
+    select: {
+      id: true,
+      genus: true,
+      species: true,
+      commonName: true,
+      family: true,
+      conservationStatus: true,
+    },
+    take: 15,
     orderBy: { genus: "asc" },
   });
   return species;

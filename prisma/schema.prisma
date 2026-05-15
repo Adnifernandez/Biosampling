@@ -51,6 +51,9 @@ model Campaign {
   updatedAt   DateTime  @updatedAt
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   stations    Station[]
+
+  @@index([projectId])
+  @@index([status])
 }
 
 model Station {
@@ -68,6 +71,8 @@ model Station {
   updatedAt   DateTime     @updatedAt
   campaign    Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   occurrences Occurrence[]
+
+  @@index([campaignId])
 }
 
 model Species {
@@ -81,6 +86,10 @@ model Species {
   conservationStatus String?
   endemic            Boolean      @default(false)
   occurrences        Occurrence[]
+
+  @@index([type])
+  @@index([genus])
+  @@index([species])
 }
 
 model Occurrence {
@@ -109,4 +118,8 @@ model Occurrence {
   station         Station  @relation(fields: [stationId], references: [id], onDelete: Cascade)
   species         Species  @relation(fields: [speciesId], references: [id])
   user            User     @relation(fields: [userId], references: [id])
+
+  @@index([stationId])
+  @@index([speciesId])
+  @@index([userId])
 }
