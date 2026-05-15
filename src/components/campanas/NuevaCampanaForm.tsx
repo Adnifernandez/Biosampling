@@ -47,6 +47,7 @@ export function NuevaCampanaForm({ projects }: { projects: Project[] }) {
 
     setSubmitting(true);
     const fd = new FormData(e.currentTarget);
+    fd.set("projectId", projectId);
     fd.set("season", season);
     fd.set("surveyType", surveyType);
     fd.set("methodology", methodology);
@@ -72,7 +73,11 @@ export function NuevaCampanaForm({ projects }: { projects: Project[] }) {
             <Label>Proyecto <span className="text-red-500">*</span></Label>
             <Select value={projectId} onValueChange={(v) => setProjectId(v ?? "")}>
               <SelectTrigger>
-                <SelectValue placeholder="Seleccionar proyecto..." />
+                <SelectValue>
+                  {projectId
+                    ? projects.find((p) => p.id === projectId)?.name ?? projectId
+                    : <span className="text-gray-400">Seleccionar proyecto...</span>}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {projects.map((p) => (
@@ -153,7 +158,11 @@ export function NuevaCampanaForm({ projects }: { projects: Project[] }) {
             <Label>Metodología <span className="text-red-500">*</span></Label>
             <Select value={methodology} onValueChange={(v) => setMethodology(v ?? "")}>
               <SelectTrigger>
-                <SelectValue placeholder="Seleccionar metodología..." />
+                <SelectValue>
+                  {methodology
+                    ? methodologies.find((m) => m.id === methodology)?.name ?? methodology
+                    : <span className="text-gray-400">Seleccionar metodología...</span>}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {methodologies.map((m) => (
