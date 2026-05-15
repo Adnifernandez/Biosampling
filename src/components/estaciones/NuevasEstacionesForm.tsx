@@ -35,7 +35,7 @@ export function NuevasEstacionesForm({
   const [length, setLength] = useState("");
   const [width, setWidth] = useState("");
   const [area, setArea] = useState("");
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState<number | "">(1);
   const [notes, setNotes] = useState("");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
@@ -47,7 +47,8 @@ export function NuevasEstacionesForm({
       ? (parseFloat(length) * parseFloat(width)).toFixed(2)
       : null;
 
-  const previewNames = Array.from({ length: Math.max(1, quantity) }, (_, i) => `${prefix}${nextNumber + i}`).join(", ");
+  const qty = typeof quantity === "number" && quantity >= 1 ? quantity : 1;
+  const previewNames = Array.from({ length: Math.min(qty, 10) }, (_, i) => `${prefix}${nextNumber + i}`).join(", ") + (qty > 10 ? ` ... ${prefix}${nextNumber + qty - 1}` : "");
 
   function captureGPS() {
     if (!navigator.geolocation) {
@@ -80,7 +81,7 @@ export function NuevasEstacionesForm({
     fd.append("campaignId", campaignId);
     fd.append("type", stationType);
     fd.append("sizeMode", sizeMode);
-    fd.append("quantity", String(quantity));
+    fd.append("quantity", String(qty));
     if (sizeMode === "dimensions") {
       if (length) fd.append("length", length);
       if (width) fd.append("width", width);
@@ -131,14 +132,17 @@ export function NuevasEstacionesForm({
 
       {/* Quantity */}
       <div className="space-y-1.5">
-        <Label htmlFor="quantity">Cantidad de estaciones (1–20)</Label>
+        <Label htmlFor="quantity">Cantidad de estaciones</Label>
         <Input
           id="quantity"
           type="number"
           min={1}
-          max={20}
           value={quantity}
-          onChange={(e) => setQuantity(Math.min(20, Math.max(1, parseInt(e.target.value) || 1)))}
+          onChange={(e) => {
+            const val = e.target.value;
+            setQuantity(val === "" ? "" : Math.max(1, parseInt(val) || 1));
+          }}
+          onBlur={() => { if (quantity === "" || quantity < 1) setQuantity(1); }}
           className="max-w-[120px]"
         />
         <p className="text-xs text-gray-500">
@@ -302,7 +306,7 @@ export function NuevasEstacionesForm({
         >
           {isSubmitting
             ? "Creando..."
-            : `Crear ${quantity} ${stationType === "PARCELA" ? (quantity === 1 ? "parcela" : "parcelas") : (quantity === 1 ? "transecto" : "transectos")}`}
+            : `Crear ${qty} ${stationType === "PARCELA" ? (qty === 1 ? "parcela" : "parcelas") : (qty === 1 ? "transecto" : "transectos")}`}
         </Button>
       </div>
     </form>
