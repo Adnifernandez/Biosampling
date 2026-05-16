@@ -13,6 +13,7 @@ import {
   FileBarChart2,
   Layers,
   LayoutList,
+  ClipboardList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -20,7 +21,8 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/proyectos", label: "Proyectos", icon: FolderOpen },
   { href: "/campanas", label: "Campañas", icon: Layers },
-  { href: "/estaciones", label: "Estaciones", icon: LayoutList },
+  { href: "/estaciones", label: "Estaciones/Réplicas", icon: LayoutList },
+  { href: "/ocurrencias", label: "Ocurrencias", icon: ClipboardList },
   { href: "/reportes", label: "Reportes", icon: FileBarChart2 },
   { href: "/admin/usuarios", label: "Usuarios", icon: Users },
 ];

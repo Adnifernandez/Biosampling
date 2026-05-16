@@ -2,10 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ButtonLink } from "@/components/ui/button-link";
-import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Plus, FileText, MapPin, Pencil } from "lucide-react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { ArrowLeft, MapPin, Pencil } from "lucide-react";
 import { DeleteStationButton } from "@/components/estaciones/DeleteStationButton";
 
 export default async function EstacionDetailPage({
@@ -18,14 +15,7 @@ export default async function EstacionDetailPage({
     where: { id: sid },
     include: {
       campaign: {
-        select: { id: true, name: true, surveyType: true, methodology: true, projectId: true },
-      },
-      occurrences: {
-        orderBy: { date: "desc" },
-        include: {
-          species: { select: { genus: true, species: true, commonName: true } },
-          user: { select: { name: true } },
-        },
+        select: { id: true, name: true, surveyType: true, projectId: true },
       },
     },
   });
@@ -60,11 +50,6 @@ export default async function EstacionDetailPage({
                   ? `${station.length} m largo${station.width ? ` × ${station.width} m` : ""}`
                   : label}
               </span>
-              {station.latitude && station.longitude && (
-                <span className="text-green-600">
-                  GPS: {station.latitude.toFixed(4)}, {station.longitude.toFixed(4)}
-                </span>
-              )}
             </div>
           </div>
         </div>
@@ -83,72 +68,6 @@ export default async function EstacionDetailPage({
       {station.notes && (
         <p className="text-sm text-gray-600 bg-gray-50 rounded-lg px-4 py-3">{station.notes}</p>
       )}
-
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-gray-500" />
-            <h2 className="font-semibold text-gray-800">
-              Ocurrencias ({station.occurrences.length})
-            </h2>
-          </div>
-          <ButtonLink
-            href={`/estaciones/${sid}/ocurrencias/nueva`}
-            size="sm"
-            className="bg-green-700 hover:bg-green-800 text-white"
-          >
-            <Plus className="h-4 w-4 mr-1" /> Nueva
-          </ButtonLink>
-        </div>
-
-        {station.occurrences.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center">
-              <FileText className="h-10 w-10 mx-auto mb-2 text-gray-300" />
-              <p className="text-gray-500 text-sm">No hay ocurrencias registradas</p>
-              <ButtonLink
-                href={`/estaciones/${sid}/ocurrencias/nueva`}
-                size="sm"
-                className="mt-3 inline-flex bg-green-700 hover:bg-green-800 text-white"
-              >
-                <Plus className="h-4 w-4 mr-1" /> Registrar ocurrencia
-              </ButtonLink>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {station.occurrences.map((o) => (
-              <Link key={o.id} href={`/estaciones/${sid}/ocurrencias/${o.id}/editar`}>
-                <Card className="hover:shadow-sm transition-shadow">
-                  <CardContent className="py-3 px-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-medium text-sm text-gray-900 italic">
-                          {o.species.genus} {o.species.species}
-                        </p>
-                        {o.species.commonName && (
-                          <p className="text-xs text-gray-500">{o.species.commonName}</p>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        {o.abundance && (
-                          <p className="text-sm font-semibold text-gray-700">{o.abundance} ind.</p>
-                        )}
-                        {o.cover && (
-                          <p className="text-sm font-semibold text-gray-700">{o.cover}%</p>
-                        )}
-                        <p className="text-xs text-gray-400">
-                          {format(new Date(o.date), "d MMM", { locale: es })}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }

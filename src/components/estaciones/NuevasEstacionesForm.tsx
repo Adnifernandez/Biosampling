@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { MapPin, Loader2, Leaf, Bird } from "lucide-react";
+import { Leaf, Bird } from "lucide-react";
 import { createEstaciones } from "@/app/(app)/estaciones/actions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -37,9 +37,6 @@ export function NuevasEstacionesForm({
   const [area, setArea] = useState("");
   const [quantity, setQuantity] = useState<number | "">(1);
   const [notes, setNotes] = useState("");
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
-  const [gpsLoading, setGpsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const calculatedArea =
@@ -49,29 +46,6 @@ export function NuevasEstacionesForm({
 
   const qty = typeof quantity === "number" && quantity >= 1 ? quantity : 1;
   const previewNames = Array.from({ length: Math.min(qty, 10) }, (_, i) => `${prefix}${nextNumber + i}`).join(", ") + (qty > 10 ? ` ... ${prefix}${nextNumber + qty - 1}` : "");
-
-  function captureGPS() {
-    if (!navigator.geolocation) {
-      toast.error("GPS no disponible en este dispositivo");
-      return;
-    }
-    setGpsLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLatitude(pos.coords.latitude.toFixed(6));
-        setLongitude(pos.coords.longitude.toFixed(6));
-        setGpsLoading(false);
-        toast.success(
-          `GPS capturado: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`
-        );
-      },
-      () => {
-        setGpsLoading(false);
-        toast.error("No se pudo obtener la ubicación. Verifica los permisos.");
-      },
-      { enableHighAccuracy: true, timeout: 15000 }
-    );
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -89,8 +63,6 @@ export function NuevasEstacionesForm({
       if (area) fd.append("area", area);
     }
     if (notes) fd.append("notes", notes);
-    if (latitude) fd.append("latitude", latitude);
-    if (longitude) fd.append("longitude", longitude);
 
     const result = await createEstaciones(fd);
     setIsSubmitting(false);
@@ -230,53 +202,6 @@ export function NuevasEstacionesForm({
         )}
       </div>
 
-      {/* GPS */}
-      <div className="space-y-2">
-        <Label>Ubicación GPS (opcional)</Label>
-        <div className="flex gap-2">
-          <Input
-            type="number"
-            step="any"
-            placeholder="Latitud"
-            value={latitude}
-            onChange={(e) => setLatitude(e.target.value)}
-            className="flex-1"
-          />
-          <Input
-            type="number"
-            step="any"
-            placeholder="Longitud"
-            value={longitude}
-            onChange={(e) => setLongitude(e.target.value)}
-            className="flex-1"
-          />
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="w-full gap-2 border-dashed"
-          onClick={captureGPS}
-          disabled={gpsLoading}
-        >
-          {gpsLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <MapPin className="h-4 w-4 text-green-600" />
-          )}
-          {gpsLoading
-            ? "Obteniendo GPS..."
-            : latitude && longitude
-            ? "Recapturar GPS"
-            : "Capturar GPS (opcional)"}
-        </Button>
-        {latitude && longitude && (
-          <p className="text-xs text-green-600 text-center">
-            GPS: {parseFloat(latitude).toFixed(4)}, {parseFloat(longitude).toFixed(4)}
-          </p>
-        )}
-      </div>
-
       {/* Notes */}
       <div className="space-y-1.5">
         <Label htmlFor="notes">Notas (opcional)</Label>
@@ -295,7 +220,7 @@ export function NuevasEstacionesForm({
           type="button"
           variant="outline"
           className="flex-1"
-          onClick={() => router.push(`/proyectos/${projectId}/campanas/${campaignId}`)}
+          onClick={() => router.push(`/estaciones?projectId=${projectId}&campaignId=${campaignId}`)}
         >
           Cancelar
         </Button>

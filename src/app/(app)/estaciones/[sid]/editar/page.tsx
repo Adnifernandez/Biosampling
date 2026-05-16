@@ -37,8 +37,6 @@ export default async function EditarEstacionPage({
           area: station.area?.toString() ?? "",
           length: station.length?.toString() ?? "",
           width: station.width?.toString() ?? "",
-          latitude: station.latitude?.toString() ?? "",
-          longitude: station.longitude?.toString() ?? "",
           notes: station.notes ?? "",
         }}
       />
