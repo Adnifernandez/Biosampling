@@ -23,6 +23,10 @@ export function OcurrenciasFiltro({
 }: Props) {
   const router = useRouter();
 
+  const projectName = projects.find((p) => p.id === selectedProjectId)?.name;
+  const campaignName = campaigns.find((c) => c.id === selectedCampaignId)?.name;
+  const stationName = stations.find((s) => s.id === selectedStationId)?.name;
+
   function onProjectChange(val: string | null) {
     const v = val ?? "";
     router.push(v ? `/ocurrencias?projectId=${v}` : `/ocurrencias`);
@@ -47,8 +51,12 @@ export function OcurrenciasFiltro({
       <div className="space-y-1.5">
         <Label className="text-xs text-gray-500">Proyecto</Label>
         <Select value={selectedProjectId || undefined} onValueChange={onProjectChange}>
-          <SelectTrigger>
-            <SelectValue placeholder="Seleccionar proyecto..." />
+          <SelectTrigger className="w-full">
+            <SelectValue>
+              {projectName
+                ? projectName
+                : <span className="text-muted-foreground">Seleccionar proyecto...</span>}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {projects.map((p) => (
@@ -65,8 +73,12 @@ export function OcurrenciasFiltro({
           onValueChange={onCampaignChange}
           disabled={!selectedProjectId}
         >
-          <SelectTrigger>
-            <SelectValue placeholder={selectedProjectId ? "Seleccionar campaña..." : "Primero elige proyecto"} />
+          <SelectTrigger className="w-full">
+            <SelectValue>
+              {campaignName
+                ? campaignName
+                : <span className="text-muted-foreground">{selectedProjectId ? "Seleccionar campaña..." : "Primero elige proyecto"}</span>}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {campaigns.map((c) => (
@@ -83,8 +95,12 @@ export function OcurrenciasFiltro({
           onValueChange={onStationChange}
           disabled={!selectedCampaignId}
         >
-          <SelectTrigger>
-            <SelectValue placeholder={selectedCampaignId ? "Seleccionar estación..." : "Primero elige campaña"} />
+          <SelectTrigger className="w-full">
+            <SelectValue>
+              {stationName
+                ? stationName
+                : <span className="text-muted-foreground">{selectedCampaignId ? "Seleccionar estación..." : "Primero elige campaña"}</span>}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {stations.map((s) => (

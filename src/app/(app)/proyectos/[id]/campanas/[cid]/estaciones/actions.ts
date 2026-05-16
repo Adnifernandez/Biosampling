@@ -8,12 +8,12 @@ import { z } from "zod";
 const stationSchema = z.object({
   name: z.string().min(1, "Nombre requerido"),
   type: z.enum(["PARCELA", "TRANSECTO"]),
-  area: z.string().optional(),
-  length: z.string().optional(),
-  width: z.string().optional(),
-  latitude: z.string().optional(),
-  longitude: z.string().optional(),
-  notes: z.string().optional(),
+  area: z.string().nullish(),
+  length: z.string().nullish(),
+  width: z.string().nullish(),
+  latitude: z.string().nullish(),
+  longitude: z.string().nullish(),
+  notes: z.string().nullish(),
 });
 
 export async function createStation(projectId: string, campaignId: string, formData: FormData) {
