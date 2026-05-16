@@ -1,3 +1,8 @@
-// Middleware removed: NextAuth CredentialsProvider with bcryptjs is incompatible
-// with the Vercel Edge runtime. Auth is handled in src/app/(app)/layout.tsx instead.
-export {};
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+
+export function middleware(_req: NextRequest) {
+  return NextResponse.next();
+}
+
+export const config = { matcher: [] };
