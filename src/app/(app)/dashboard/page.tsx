@@ -7,18 +7,17 @@ import Link from "next/link";
 export default async function DashboardPage() {
   const session = await auth();
 
-  const [proyectos, campanas, estaciones, ocurrencias] = await Promise.all([
+  const [proyectos, campanas, estaciones, ocurrencias, recentProjects] = await Promise.all([
     prisma.project.count({ where: { status: "ACTIVE" } }),
     prisma.campaign.count({ where: { status: "ACTIVE" } }),
     prisma.station.count(),
     prisma.occurrence.count(),
+    prisma.project.findMany({
+      take: 5,
+      orderBy: { createdAt: "desc" },
+      include: { _count: { select: { campaigns: true } } },
+    }),
   ]);
-
-  const recentProjects = await prisma.project.findMany({
-    take: 5,
-    orderBy: { createdAt: "desc" },
-    include: { campaigns: { select: { id: true } } },
-  });
 
   const stats = [
     { label: "Proyectos activos", value: proyectos, icon: FolderOpen, href: "/proyectos", color: "text-green-600" },
@@ -92,7 +91,7 @@ export default async function DashboardPage() {
                       <p className="text-xs text-gray-500">{p.region} · {p.commune}</p>
                     </div>
                     <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                      {p.campaigns.length} campaña{p.campaigns.length !== 1 ? "s" : ""}
+                      {p._count.campaigns} campaña{p._count.campaigns !== 1 ? "s" : ""}
                     </span>
                   </CardContent>
                 </Card>

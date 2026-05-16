@@ -7,6 +7,16 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { OcurrenciasFiltro } from "@/components/ocurrencias/OcurrenciasFiltro";
 
+type OccurrenceRow = {
+  id: string;
+  date: Date;
+  abundance: number | null;
+  cover: number | null;
+  species: { genus: string; species: string; commonName: string | null };
+  user: { name: string };
+  station: { name: string };
+};
+
 export default async function OcurrenciasPage({
   searchParams,
 }: {
@@ -14,38 +24,42 @@ export default async function OcurrenciasPage({
 }) {
   const { projectId, campaignId, stationId } = await searchParams;
 
-  const projects = await prisma.project.findMany({
-    orderBy: { name: "asc" },
-    select: { id: true, name: true },
-  });
-
-  const campaigns = projectId
-    ? await prisma.campaign.findMany({
-        where: { projectId },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true, surveyType: true },
-      })
-    : [];
-
-  const stations = campaignId
-    ? await prisma.station.findMany({
-        where: { campaignId },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true },
-      })
-    : [];
-
-  const occurrences = stationId
-    ? await prisma.occurrence.findMany({
-        where: { stationId },
-        orderBy: { date: "desc" },
-        include: {
-          species: { select: { genus: true, species: true, commonName: true } },
-          user: { select: { name: true } },
-          station: { select: { name: true } },
-        },
-      })
-    : [];
+  // All queries start simultaneously — no sequential waiting
+  const [projects, campaigns, stations, occurrences] = await Promise.all([
+    prisma.project.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    projectId
+      ? prisma.campaign.findMany({
+          where: { projectId },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true, surveyType: true },
+        })
+      : ([] as { id: string; name: string; surveyType: string }[]),
+    campaignId
+      ? prisma.station.findMany({
+          where: { campaignId },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        })
+      : ([] as { id: string; name: string }[]),
+    stationId
+      ? prisma.occurrence.findMany({
+          where: { stationId },
+          orderBy: { date: "desc" },
+          select: {
+            id: true,
+            date: true,
+            abundance: true,
+            cover: true,
+            species: { select: { genus: true, species: true, commonName: true } },
+            user: { select: { name: true } },
+            station: { select: { name: true } },
+          },
+        })
+      : ([] as OccurrenceRow[]),
+  ]);
 
   const selectedStation = stationId ? stations.find((s) => s.id === stationId) : null;
 
