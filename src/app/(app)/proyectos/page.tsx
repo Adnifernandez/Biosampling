@@ -1,9 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button-link";
-import { Plus, FolderOpen, MapPin, User } from "lucide-react";
+import { Plus, FolderOpen, MapPin, User, Pencil } from "lucide-react";
 import { PROJECT_STATUS_LABELS, type ProjectStatus } from "@/lib/types";
+import { DeleteProjectButton } from "@/components/proyectos/DeleteProjectButton";
 
 const STATUS_COLORS: Record<ProjectStatus, string> = {
   ACTIVE: "bg-green-100 text-green-800",
@@ -43,9 +43,9 @@ export default async function ProyectosPage() {
       ) : (
         <div className="space-y-3">
           {projects.map((p) => (
-            <Link key={p.id} href={`/proyectos/${p.id}`}>
-              <Card className="hover:shadow-md transition-shadow">
-                <CardContent className="py-4 px-4">
+            <Card key={p.id}>
+              <CardContent className="py-4 px-4 flex items-start justify-between gap-3">
+                <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="font-semibold text-gray-900 truncate">{p.name}</h2>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[p.status as ProjectStatus]}`}>
@@ -60,9 +60,15 @@ export default async function ProyectosPage() {
                       <User className="h-3 w-3" /> {p.responsible}
                     </span>
                   </div>
-                </CardContent>
-              </Card>
-            </Link>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <ButtonLink href={`/proyectos/${p.id}/editar`} variant="outline" size="sm">
+                    <Pencil className="h-4 w-4" />
+                  </ButtonLink>
+                  <DeleteProjectButton id={p.id} />
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}

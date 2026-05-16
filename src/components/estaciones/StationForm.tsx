@@ -51,13 +51,10 @@ export function StationForm({ projectId, campaignId, surveyType, stationId, defa
     const fd = new FormData();
     fd.append("name", defaultValues.name);
     fd.append("type", stationType);
-    if (sizeMode === "dimensions") {
-      if (length) fd.append("length", length);
-      if (width) fd.append("width", width);
-    } else {
-      if (area) fd.append("area", area);
-    }
-    if (notes) fd.append("notes", notes);
+    fd.append("length", sizeMode === "dimensions" ? length : "");
+    fd.append("width", sizeMode === "dimensions" ? width : "");
+    fd.append("area", sizeMode === "area" ? area : "");
+    fd.append("notes", notes);
 
     const result = await updateStation(projectId, campaignId, stationId, fd);
     setIsSubmitting(false);
