@@ -12,7 +12,7 @@ export default async function EditarEstacionPage({
   const { sid } = await params;
   const station = await prisma.station.findUnique({
     where: { id: sid },
-    include: { campaign: { select: { surveyType: true, projectId: true, id: true } } },
+    include: { campaign: { select: { surveyType: true, projectId: true, id: true, methodology: true } } },
   });
   if (!station) notFound();
 
@@ -31,12 +31,11 @@ export default async function EditarEstacionPage({
         projectId={station.campaign.projectId}
         campaignId={station.campaign.id}
         surveyType={station.campaign.surveyType as "FLORA" | "FAUNA"}
+        methodology={station.campaign.methodology ?? ""}
         stationId={station.id}
         defaultValues={{
           name: station.name,
           area: station.area?.toString() ?? "",
-          length: station.length?.toString() ?? "",
-          width: station.width?.toString() ?? "",
           notes: station.notes ?? "",
         }}
       />

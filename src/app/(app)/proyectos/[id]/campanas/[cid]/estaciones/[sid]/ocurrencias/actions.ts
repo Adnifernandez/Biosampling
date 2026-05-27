@@ -124,6 +124,125 @@ export async function deleteOccurrence(
   return { success: true };
 }
 
+export async function createGrillaOccurrences(
+  projectId: string,
+  campaignId: string,
+  stationId: string,
+  data: {
+    date: string;
+    notes?: string;
+    sinVegetacion: number;
+    utmNorth?: string;
+    utmEast?: string;
+    utmZone?: string;
+    photo?: string;
+    species: { speciesId: string; count: number; individuos?: number }[];
+  }
+) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("No autorizado");
+  if (data.species.length === 0 && data.sinVegetacion === 0) return { error: "Agrega al menos una especie o puntos sin vegetación" };
+
+  const userId = session.user.id;
+  const methodologyData = JSON.stringify({
+    sinVegetacion: data.sinVegetacion,
+    totalIntersections: 16,
+    ...(data.utmNorth ? { utm_north: data.utmNorth, utm_east: data.utmEast, utm_zone: data.utmZone } : {}),
+    ...(data.photo ? { photo: data.photo } : {}),
+  });
+
+  if (data.species.length > 0) {
+    await prisma.occurrence.createMany({
+      data: data.species.map((s) => ({
+        stationId,
+        speciesId: s.speciesId,
+        userId,
+        date: data.date ? new Date(data.date) : new Date(),
+        abundance: s.count,
+        groupSize: s.individuos ?? null,
+        notes: data.notes || null,
+        methodologyData,
+      })),
+    });
+  }
+
+  revalidatePath(`/proyectos/${projectId}/campanas/${campaignId}/estaciones/${stationId}`);
+  revalidatePath("/ocurrencias");
+  return { success: true, count: data.species.length };
+}
+
+export async function deleteGrillaOccurrences(
+  projectId: string,
+  campaignId: string,
+  stationId: string,
+) {
+  const session = await auth();
+  if (!session) throw new Error("No autorizado");
+  await prisma.occurrence.deleteMany({ where: { stationId } });
+  revalidatePath(`/proyectos/${projectId}/campanas/${campaignId}/estaciones/${stationId}`);
+  revalidatePath("/ocurrencias");
+  return { success: true };
+}
+
+export async function updateGrillaOccurrences(
+  projectId: string,
+  campaignId: string,
+  stationId: string,
+  data: {
+    date: string;
+    notes?: string;
+    sinVegetacion: number;
+    utmNorth?: string;
+    utmEast?: string;
+    utmZone?: string;
+    photo?: string;
+    species: { speciesId: string; count: number; individuos?: number }[];
+  }
+) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("No autorizado");
+
+  const userId = session.user.id;
+  const methodologyData = JSON.stringify({
+    sinVegetacion: data.sinVegetacion,
+    totalIntersections: 16,
+    ...(data.utmNorth ? { utm_north: data.utmNorth, utm_east: data.utmEast, utm_zone: data.utmZone } : {}),
+    ...(data.photo ? { photo: data.photo } : {}),
+  });
+
+  await prisma.occurrence.deleteMany({ where: { stationId } });
+
+  if (data.species.length > 0) {
+    await prisma.occurrence.createMany({
+      data: data.species.map((s) => ({
+        stationId,
+        speciesId: s.speciesId,
+        userId,
+        date: data.date ? new Date(data.date) : new Date(),
+        abundance: s.count,
+        groupSize: s.individuos ?? null,
+        notes: data.notes || null,
+        methodologyData,
+      })),
+    });
+  }
+
+  revalidatePath(`/proyectos/${projectId}/campanas/${campaignId}/estaciones/${stationId}`);
+  revalidatePath("/ocurrencias");
+  return { success: true };
+}
+
+export async function updateTransectoCoordinates(
+  transectoId: string,
+  latitude: number,
+  longitude: number
+) {
+  const session = await auth();
+  if (!session) throw new Error("No autorizado");
+  await prisma.station.update({ where: { id: transectoId }, data: { latitude, longitude } });
+  return { success: true };
+}
+
 export async function searchSpecies(query: string, surveyType: string) {
   const species = await prisma.species.findMany({
     where: {

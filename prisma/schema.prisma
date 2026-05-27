@@ -67,12 +67,16 @@ model Station {
   latitude    Float?
   longitude   Float?
   notes       String?
+  parentId    String?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   campaign    Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  parent      Station?     @relation("StationChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Station[]    @relation("StationChildren")
   occurrences Occurrence[]
 
   @@index([campaignId])
+  @@index([parentId])
 }
 
 model Species {
@@ -85,6 +89,12 @@ model Species {
   category           String?
   conservationStatus String?
   endemic            Boolean      @default(false)
+  origen             String?
+  habito             String?
+  macrofitasHabito   String?
+  division           String?
+  clase              String?
+  orden              String?
   occurrences        Occurrence[]
 
   @@index([type])

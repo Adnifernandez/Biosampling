@@ -22,6 +22,14 @@ export default async function NuevaOcurrenciaPage({
   });
   if (!station) notFound();
 
+  const isGrilla = station.campaign.methodology === "GRILLA";
+  const transectoStation = isGrilla && station.parentId
+    ? await prisma.station.findUnique({
+        where: { id: station.parentId },
+        select: { id: true, latitude: true, longitude: true },
+      })
+    : null;
+
   return (
     <div className="max-w-xl space-y-5">
       <div className="flex items-center gap-2">
@@ -43,6 +51,8 @@ export default async function NuevaOcurrenciaPage({
         stationId={stationId}
         surveyType={station.campaign.surveyType as "FLORA" | "FAUNA"}
         methodology={station.campaign.methodology}
+        transectoId={transectoStation?.id ?? undefined}
+        transectoCoords={transectoStation ? { latitude: transectoStation.latitude, longitude: transectoStation.longitude } : undefined}
       />
     </div>
   );

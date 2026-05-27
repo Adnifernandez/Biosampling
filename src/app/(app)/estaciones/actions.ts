@@ -28,10 +28,12 @@ export async function createEstaciones(formData: FormData) {
     return { error: "La cantidad debe ser entre 1 y 20" };
   }
 
+  const methodology = formData.get("methodology") as string | null;
+
   // Look up the campaign to get projectId
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },
-    select: { id: true, projectId: true },
+    select: { id: true, projectId: true, methodology: true },
   });
   if (!campaign) return { error: "Campaña no encontrada" };
 
@@ -41,11 +43,23 @@ export async function createEstaciones(formData: FormData) {
     select: { name: true },
   });
 
-  const prefix = type === "PARCELA" ? "P" : "T";
+  const effectiveMethodology = methodology ?? campaign.methodology;
+  const isGrilla = effectiveMethodology === "GRILLA";
+
+  const prefix =
+    isGrilla ? "T"
+    : type === "TRANSECTO" ? "T"
+    : effectiveMethodology === "PARCELAS_FORESTALES" ? "PF"
+    : effectiveMethodology === "MICRORUTEO" ? "R"
+    : "P";
   const regex = new RegExp(`^${prefix}(\\d+)$`);
 
+  const stationsToCount = isGrilla
+    ? existingStations.filter((s) => /^T\d+$/.test(s.name))
+    : existingStations;
+
   let maxNum = 0;
-  for (const s of existingStations) {
+  for (const s of stationsToCount) {
     const match = s.name.match(regex);
     if (match) {
       const num = parseInt(match[1], 10);
@@ -71,20 +85,52 @@ export async function createEstaciones(formData: FormData) {
   const latitude = latitudeVal ? parseFloat(latitudeVal) : null;
   const longitude = longitudeVal ? parseFloat(longitudeVal) : null;
 
-  // Create stations
-  const stationsData = Array.from({ length: quantity }, (_, i) => ({
-    campaignId,
-    name: `${prefix}${nextNumber + i}`,
-    type,
-    area,
-    length,
-    width,
-    latitude,
-    longitude,
-    notes,
-  }));
+  if (isGrilla) {
+    // Count existing grilla child stations to determine next G number
+    const existingGrillas = await prisma.station.count({
+      where: { campaignId, type: "GRILLA" },
+    });
 
-  await prisma.station.createMany({ data: stationsData });
+    // Create transectos + 4 grilla children each
+    for (let i = 0; i < quantity; i++) {
+      const transecto = await prisma.station.create({
+        data: {
+          campaignId,
+          name: `T${nextNumber + i}`,
+          type: "TRANSECTO",
+          area,
+          length,
+          width,
+          latitude,
+          longitude,
+          notes,
+        },
+      });
+      const gOffset = existingGrillas + i * 4;
+      await prisma.station.createMany({
+        data: Array.from({ length: 4 }, (_, j) => ({
+          campaignId,
+          name: `G${gOffset + j + 1}`,
+          type: "GRILLA",
+          parentId: transecto.id,
+        })),
+      });
+    }
+  } else {
+    // Regular station creation
+    const stationsData = Array.from({ length: quantity }, (_, i) => ({
+      campaignId,
+      name: `${prefix}${nextNumber + i}`,
+      type,
+      area,
+      length,
+      width,
+      latitude,
+      longitude,
+      notes,
+    }));
+    await prisma.station.createMany({ data: stationsData });
+  }
 
   revalidatePath("/estaciones");
   revalidatePath(`/proyectos/${campaign.projectId}/campanas/${campaignId}`);

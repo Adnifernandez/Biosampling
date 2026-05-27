@@ -20,19 +20,20 @@ export default async function EstacionesPage({
       name: true,
       campaigns: {
         orderBy: { createdAt: "desc" },
-        select: { id: true, name: true, surveyType: true },
+        select: { id: true, name: true, surveyType: true, methodology: true },
       },
     },
   });
 
   const stations = campaignId
     ? await prisma.station.findMany({
-        where: { campaignId },
+        where: { campaignId, parentId: null },
         orderBy: { name: "asc" },
         include: {
           campaign: {
-            select: { id: true, name: true, surveyType: true, projectId: true },
+            select: { id: true, name: true, surveyType: true, methodology: true, projectId: true },
           },
+          children: { select: { id: true, name: true }, orderBy: { name: "asc" } },
         },
       })
     : [];
@@ -124,19 +125,24 @@ export default async function EstacionesPage({
                     {s.name}
                   </span>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900">
-                      {STATION_TYPE_LABELS[s.type as StationType]}
-                    </p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {s.type === "PARCELA" ? (
-                        s.area
-                          ? `${s.area} m²`
-                          : s.length && s.width
-                          ? `${s.length} × ${s.width} m`
-                          : "Sin dimensiones"
-                      ) : (
-                        s.length ? `${s.length} m largo` : "Sin dimensiones"
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-gray-900">
+                        {s.campaign.methodology === "GRILLA" ? "Transecto"
+                          : s.campaign.methodology === "MICRORUTEO" ? "Ruta"
+                          : STATION_TYPE_LABELS[s.type as StationType]}
+                      </p>
+                      {s.children.length > 0 && (
+                        <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-mono">
+                          {s.children.map((c) => c.name).join(", ")}
+                        </span>
                       )}
+                    </div>
+                    <p className="text-xs text-gray-500 truncate">
+                      {s.area
+                        ? `${s.area} m²`
+                        : s.length && s.width
+                        ? `${s.length} × ${s.width} m`
+                        : "Sin dimensiones"}
                     </p>
                     {s.notes && (
                       <p className="text-xs text-gray-400 truncate mt-0.5">{s.notes}</p>

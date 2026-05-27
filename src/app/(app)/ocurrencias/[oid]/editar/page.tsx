@@ -18,6 +18,7 @@ export default async function EditarOcurrenciaPage({
   const occurrence = await prisma.occurrence.findUnique({
     where: { id: oid },
     include: {
+      species: { select: { genus: true, species: true, commonName: true } },
       station: {
         include: {
           campaign: {
@@ -29,10 +30,28 @@ export default async function EditarOcurrenciaPage({
   });
   if (!occurrence) notFound();
 
-  const sid = stationId ?? occurrence.stationId;
+  const isGrilla = occurrence.station.campaign.methodology === "GRILLA";
+
+  // For GRILLA: load all occurrences for this grilla station to pre-populate the grid
+  const grillaOccurrences = isGrilla
+    ? await prisma.occurrence.findMany({
+        where: { stationId: occurrence.stationId },
+        include: { species: { select: { genus: true, species: true, commonName: true } } },
+      })
+    : [];
+
+  // For GRILLA: get the parent transecto id and its coordinates
+  const parentId = isGrilla ? (occurrence.station.parentId ?? null) : null;
+  const transectoStation = isGrilla && parentId
+    ? await prisma.station.findUnique({
+        where: { id: parentId },
+        select: { latitude: true, longitude: true },
+      })
+    : null;
 
   const defaultValues: Record<string, string> = {
     speciesId: occurrence.speciesId,
+    speciesLabel: `${occurrence.species.genus} ${occurrence.species.species}${occurrence.species.commonName ? ` · ${occurrence.species.commonName}` : ""}`,
     date: format(new Date(occurrence.date), "yyyy-MM-dd"),
     latitude: occurrence.latitude?.toString() ?? "",
     longitude: occurrence.longitude?.toString() ?? "",
@@ -47,15 +66,18 @@ export default async function EditarOcurrenciaPage({
     behavior: occurrence.behavior ?? "",
     detectionMethod: occurrence.detectionMethod ?? "",
     notes: occurrence.notes ?? "",
+    methodologyData: occurrence.methodologyData ?? "",
   };
+
+  const { projectId: pid, id: cid } = occurrence.station.campaign;
+  const backHref = isGrilla && parentId
+    ? `/ocurrencias?projectId=${pid}&campaignId=${cid}&transectoId=${parentId}&stationId=${occurrence.stationId}`
+    : `/ocurrencias?projectId=${pid}&campaignId=${cid}&stationId=${occurrence.stationId}`;
 
   return (
     <div className="max-w-xl space-y-5">
       <div className="flex items-center gap-2">
-        <Link
-          href={`/ocurrencias?projectId=${occurrence.station.campaign.projectId}&campaignId=${occurrence.station.campaignId}&stationId=${occurrence.stationId}`}
-          className="text-gray-400 hover:text-gray-600"
-        >
+        <Link href={backHref} className="text-gray-400 hover:text-gray-600">
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div>
@@ -65,13 +87,21 @@ export default async function EditarOcurrenciaPage({
       </div>
 
       <OccurrenceForm
-        projectId={occurrence.station.campaign.projectId}
-        campaignId={occurrence.station.campaignId}
+        projectId={pid}
+        campaignId={cid}
         stationId={occurrence.stationId}
         surveyType={occurrence.station.campaign.surveyType as "FLORA" | "FAUNA"}
         methodology={occurrence.station.campaign.methodology}
         occurrenceId={oid}
         defaultValues={defaultValues}
+        grillaOccurrences={grillaOccurrences.map((o) => ({
+          speciesId: o.speciesId,
+          abundance: o.abundance ?? 0,
+          label: `${o.species.genus} ${o.species.species}${o.species.commonName ? ` · ${o.species.commonName}` : ""}`,
+          individuos: o.groupSize ?? undefined,
+        }))}
+        transectoId={parentId ?? undefined}
+        transectoCoords={transectoStation ? { latitude: transectoStation.latitude, longitude: transectoStation.longitude } : undefined}
       />
     </div>
   );

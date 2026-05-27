@@ -3,6 +3,7 @@ import { ButtonLink } from "@/components/ui/button-link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Layers, Plus, Leaf, Bird, Pencil } from "lucide-react";
 import { CAMPAIGN_STATUS_LABELS, type CampaignStatus } from "@/lib/types";
+import { getMethodologyById } from "@/lib/methodologies";
 import { CampanasFilter } from "@/components/campanas/CampanasFilter";
 import { DeleteCampaignButton } from "@/components/campanas/DeleteCampaignButton";
 
@@ -65,7 +66,10 @@ export default async function CampanasPage({
                   </div>
                   <div className="min-w-0">
                     <p className="font-medium text-sm text-gray-900 truncate">{c.name}</p>
-                    <p className="text-xs text-gray-500 truncate">{c.project.name}</p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {c.project.name}
+                      {c.methodology && <span className="text-gray-400"> · {getMethodologyById(c.methodology)?.name ?? c.methodology}</span>}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

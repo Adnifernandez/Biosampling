@@ -16,6 +16,17 @@ export default async function ReportesPage() {
                   user: { select: { name: true } },
                 },
               },
+              children: {
+                orderBy: { name: "asc" },
+                include: {
+                  occurrences: {
+                    include: {
+                      species: true,
+                      user: { select: { name: true } },
+                    },
+                  },
+                },
+              },
             },
           },
         },

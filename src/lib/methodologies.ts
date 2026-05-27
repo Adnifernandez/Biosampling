@@ -12,92 +12,59 @@ export interface MethodologyField {
 export interface Methodology {
   id: string;
   name: string;
+  description: string;
   surveyType: SurveyType;
   fields: MethodologyField[];
 }
 
+export const BB_COVER_CODES = [
+  { code: "p",  desc: "Registro fuera de la parcela; cobertura insignificante" },
+  { code: "r",  desc: "Individuo solitario, cobertura insignificante" },
+  { code: "+",  desc: "Pocos individuos, cobertura poco significativa" },
+  { code: "1",  desc: "Numerosos individuos, cobertura < 5%" },
+  { code: "2m", desc: "Nº individuos > 50, cobertura < 5%" },
+  { code: "2a", desc: "Numerosos individuos, cobertura 5–15%" },
+  { code: "2b", desc: "Cobertura 16–25%" },
+  { code: "3",  desc: "Cobertura 26–50%" },
+  { code: "4",  desc: "Cobertura 51–75%" },
+  { code: "5",  desc: "Cobertura 76–100%" },
+];
+
 export const METHODOLOGIES: Methodology[] = [
   // Flora
   {
-    id: "CUADRANTE",
-    name: "Cuadrante",
+    id: "BRAUN_BLANQUET",
+    name: "Parcelas BB",
+    description: "Braun-Blanquet",
     surveyType: "FLORA",
-    fields: [
-      { key: "abundance", label: "Abundancia (nº individuos)", type: "number", required: true },
-      { key: "cover", label: "Cobertura", type: "number", unit: "%", required: true },
-      { key: "height", label: "Altura promedio", type: "number", unit: "m" },
-      {
-        key: "stratum",
-        label: "Estrato",
-        type: "select",
-        options: ["Arbóreo", "Arbustivo", "Herbáceo", "Rasante"],
-        required: true,
-      },
-      {
-        key: "phenology",
-        label: "Estado fenológico",
-        type: "select",
-        options: ["Vegetativo", "Floración", "Fructificación", "Senescencia", "Sin hojas"],
-      },
-    ],
+    fields: [],
   },
   {
-    id: "TRANSECTO_LINEAL_FLORA",
-    name: "Transecto Lineal",
+    id: "MICRORUTEO",
+    name: "Microruteo",
+    description: "Área de influencia",
     surveyType: "FLORA",
-    fields: [
-      { key: "distance", label: "Distancia en transecto", type: "number", unit: "m", required: true },
-      { key: "cover", label: "Cobertura", type: "number", unit: "%" },
-      {
-        key: "stratum",
-        label: "Estrato",
-        type: "select",
-        options: ["Arbóreo", "Arbustivo", "Herbáceo", "Rasante"],
-      },
-      { key: "abundance", label: "Abundancia", type: "number" },
-    ],
+    fields: [],
   },
   {
-    id: "PARCELA_FIJA",
-    name: "Parcela Fija",
+    id: "PARCELAS_FORESTALES",
+    name: "Parcelas Forestales",
+    description: "DAT, DAP y Altura por individuo",
     surveyType: "FLORA",
-    fields: [
-      { key: "abundance", label: "Abundancia (nº individuos)", type: "number", required: true },
-      { key: "cover", label: "Cobertura", type: "number", unit: "%" },
-      { key: "height", label: "Altura promedio", type: "number", unit: "m" },
-      {
-        key: "stratum",
-        label: "Estrato",
-        type: "select",
-        options: ["Arbóreo", "Arbustivo", "Herbáceo", "Rasante"],
-        required: true,
-      },
-      {
-        key: "phenology",
-        label: "Estado fenológico",
-        type: "select",
-        options: ["Vegetativo", "Floración", "Fructificación", "Senescencia", "Sin hojas"],
-      },
-    ],
+    fields: [],
   },
   {
-    id: "INVENTARIO_FLORISTICO",
-    name: "Inventario Florístico",
+    id: "GRILLA",
+    name: "Grilla",
+    description: "Delimitación de Humedales",
     surveyType: "FLORA",
-    fields: [
-      { key: "abundance", label: "Abundancia", type: "number" },
-      {
-        key: "stratum",
-        label: "Estrato",
-        type: "select",
-        options: ["Arbóreo", "Arbustivo", "Herbáceo", "Rasante"],
-      },
-    ],
+    fields: [],
   },
   // Fauna
   {
     id: "TRANSECTO_LINEAL_FAUNA",
     name: "Transecto Lineal",
+    description: "Distancia y azimut",
     surveyType: "FAUNA",
     fields: [
       { key: "groupSize", label: "Tamaño de grupo", type: "number", required: true },
@@ -114,6 +81,7 @@ export const METHODOLOGIES: Methodology[] = [
   {
     id: "PUNTO_CONTEO",
     name: "Punto de Conteo",
+    description: "Visual y auditivo",
     surveyType: "FAUNA",
     fields: [
       { key: "groupSize", label: "Número de individuos", type: "number", required: true },
@@ -136,6 +104,7 @@ export const METHODOLOGIES: Methodology[] = [
   {
     id: "TRAMPA_CAMARA",
     name: "Trampa Cámara",
+    description: "Registro fotográfico",
     surveyType: "FAUNA",
     fields: [
       { key: "groupSize", label: "Nº individuos en foto", type: "number", required: true },
@@ -156,6 +125,7 @@ export const METHODOLOGIES: Methodology[] = [
   {
     id: "RED_NIEBLA",
     name: "Red de Niebla",
+    description: "Captura y marcaje",
     surveyType: "FAUNA",
     fields: [
       { key: "groupSize", label: "Nº individuos capturados", type: "number", required: true },
@@ -170,7 +140,8 @@ export const METHODOLOGIES: Methodology[] = [
   },
   {
     id: "VES",
-    name: "VES (Visual Encounter Survey)",
+    name: "VES",
+    description: "Visual Encounter Survey",
     surveyType: "FAUNA",
     fields: [
       { key: "groupSize", label: "Nº individuos", type: "number", required: true },

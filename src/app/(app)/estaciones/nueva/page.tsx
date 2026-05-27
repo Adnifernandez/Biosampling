@@ -19,6 +19,7 @@ export default async function NuevaEstacionPage({
       id: true,
       name: true,
       surveyType: true,
+      methodology: true,
       projectId: true,
       project: { select: { name: true } },
     },
@@ -27,11 +28,16 @@ export default async function NuevaEstacionPage({
   if (!campaign || campaign.projectId !== projectId) notFound();
 
   const stationType = campaign.surveyType === "FLORA" ? "PARCELA" : "TRANSECTO";
-  const prefix = campaign.surveyType === "FLORA" ? "P" : "T";
+  const prefix =
+    campaign.methodology === "GRILLA" ? "T"
+    : campaign.surveyType === "FAUNA" ? "T"
+    : campaign.methodology === "PARCELAS_FORESTALES" ? "PF"
+    : campaign.methodology === "MICRORUTEO" ? "R"
+    : "P";
   const regex = new RegExp(`^${prefix}(\\d+)$`);
 
   const existingStations = await prisma.station.findMany({
-    where: { campaignId },
+    where: { campaignId, parentId: null },
     select: { name: true },
   });
 
@@ -66,6 +72,7 @@ export default async function NuevaEstacionPage({
         campaignId={campaignId}
         projectId={projectId}
         surveyType={campaign.surveyType as "FLORA" | "FAUNA"}
+        methodology={campaign.methodology ?? ""}
         nextNumber={nextNumber}
         campaignName={campaign.name}
       />

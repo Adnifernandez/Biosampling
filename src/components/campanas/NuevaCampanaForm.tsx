@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sun, Leaf, Snowflake, Flower2, Bird, FolderOpen } from "lucide-react";
+// Select kept for project picker above
 import { METHODOLOGIES } from "@/lib/methodologies";
 import { createCampana, updateCampana } from "@/app/(app)/campanas/actions";
 import { toast } from "sonner";
@@ -189,22 +190,34 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
           </div>
 
           {/* Metodología */}
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <Label>Metodología <span className="text-red-500">*</span></Label>
-            <Select value={methodology} onValueChange={(v) => setMethodology(v ?? "")}>
-              <SelectTrigger>
-                <SelectValue>
-                  {methodology
-                    ? (METHODOLOGIES.find((m) => m.id === methodology)?.name ?? methodology)
-                    : <span className="text-gray-400">Seleccionar metodología...</span>}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {methodologies.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className={cn("grid gap-2", methodologies.length <= 3 ? "grid-cols-3" : "grid-cols-2")}>
+              {methodologies.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setMethodology(m.id)}
+                  className={cn(
+                    "flex items-start gap-2 px-3 py-3 rounded-xl border-2 transition-all text-left",
+                    methodology === m.id
+                      ? (surveyType === "FLORA" ? "border-green-600 bg-green-50" : "border-blue-600 bg-blue-50")
+                      : "border-gray-200 hover:border-gray-300 bg-white"
+                  )}
+                >
+                  <div className={cn(
+                    "w-3.5 h-3.5 rounded-full border-2 mt-0.5 shrink-0",
+                    methodology === m.id
+                      ? (surveyType === "FLORA" ? "border-green-600 bg-green-600" : "border-blue-600 bg-blue-600")
+                      : "border-gray-300"
+                  )} />
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-gray-900 leading-tight">{m.name}</p>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-tight">{m.description}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Fechas */}

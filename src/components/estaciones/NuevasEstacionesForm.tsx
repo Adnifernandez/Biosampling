@@ -16,6 +16,7 @@ interface NuevasEstacionesFormProps {
   campaignId: string;
   projectId: string;
   surveyType: "FLORA" | "FAUNA";
+  methodology: string;
   nextNumber: number;
   campaignName: string;
 }
@@ -24,17 +25,30 @@ export function NuevasEstacionesForm({
   campaignId,
   projectId,
   surveyType,
+  methodology,
   nextNumber,
   campaignName,
 }: NuevasEstacionesFormProps) {
   const router = useRouter();
   const stationType = surveyType === "FLORA" ? "PARCELA" : "TRANSECTO";
-  const prefix = surveyType === "FLORA" ? "P" : "T";
+  const isMicroruteo = methodology === "MICRORUTEO";
+  const isGrilla = methodology === "GRILLA";
 
-  const [sizeMode, setSizeMode] = useState<"dimensions" | "area">("dimensions");
+  const prefix =
+    isGrilla ? "T"
+    : surveyType === "FAUNA" ? "T"
+    : methodology === "PARCELAS_FORESTALES" ? "PF"
+    : isMicroruteo ? "R"
+    : "P";
+
+  const stationLabel = isGrilla ? "Transecto" : isMicroruteo ? "Ruta" : stationType === "PARCELA" ? "Parcela" : "Transecto";
+  const stationLabelPlural = isGrilla ? "transectos" : isMicroruteo ? "rutas" : stationType === "PARCELA" ? "parcelas" : "transectos";
+
+  const [sizeMode, setSizeMode] = useState<"dimensions" | "area">(isMicroruteo ? "area" : "dimensions");
   const [length, setLength] = useState("");
   const [width, setWidth] = useState("");
   const [area, setArea] = useState("");
+  const [areaUnit, setAreaUnit] = useState<"sqm" | "ha">("sqm");
   const [quantity, setQuantity] = useState<number | "">(1);
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -49,18 +63,27 @@ export function NuevasEstacionesForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (sizeMode === "dimensions") {
+      if (!length || !width) { toast.error("Ingresa largo y ancho"); return; }
+    } else {
+      if (!area) { toast.error("Ingresa el área"); return; }
+    }
+
     setIsSubmitting(true);
 
     const fd = new FormData();
     fd.append("campaignId", campaignId);
     fd.append("type", stationType);
+    fd.append("methodology", methodology);
     fd.append("sizeMode", sizeMode);
     fd.append("quantity", String(qty));
     if (sizeMode === "dimensions") {
-      if (length) fd.append("length", length);
-      if (width) fd.append("width", width);
+      fd.append("length", length);
+      fd.append("width", width);
     } else {
-      if (area) fd.append("area", area);
+      const areaInSqm = areaUnit === "ha" ? String(parseFloat(area) * 10000) : area;
+      fd.append("area", areaInSqm);
     }
     if (notes) fd.append("notes", notes);
 
@@ -70,9 +93,7 @@ export function NuevasEstacionesForm({
     if ("error" in result && result.error) {
       toast.error(result.error);
     } else if ("success" in result && result.success) {
-      toast.success(
-        `${result.count} ${stationType === "PARCELA" ? (result.count === 1 ? "parcela creada" : "parcelas creadas") : (result.count === 1 ? "transecto creado" : "transectos creados")}`
-      );
+      toast.success(`${result.count} ${result.count === 1 ? stationLabel.toLowerCase() : stationLabelPlural} creada${stationType === "TRANSECTO" ? "s" : result.count === 1 ? "" : "s"}`);
       router.push(`/estaciones?projectId=${projectId}&campaignId=${campaignId}`);
     }
   }
@@ -92,7 +113,7 @@ export function NuevasEstacionesForm({
               : <Bird className="h-5 w-5 text-blue-700 shrink-0" />}
             <div>
               <p className={cn("font-semibold text-sm", surveyType === "FLORA" ? "text-green-800" : "text-blue-800")}>
-                {stationType === "PARCELA" ? "Parcela" : "Transecto"}
+                {stationLabel}
               </p>
               <p className="text-xs text-gray-500">
                 Campaña {surveyType === "FLORA" ? "Flora" : "Fauna"} · {campaignName}
@@ -104,7 +125,7 @@ export function NuevasEstacionesForm({
 
       {/* Quantity */}
       <div className="space-y-1.5">
-        <Label htmlFor="quantity">Cantidad de estaciones</Label>
+        <Label htmlFor="quantity">{isGrilla ? "Cantidad de transectos" : "Cantidad de estaciones"}</Label>
         <Input
           id="quantity"
           type="number"
@@ -120,85 +141,84 @@ export function NuevasEstacionesForm({
         <p className="text-xs text-gray-500">
           Se crearán: <span className="font-medium text-gray-700">{previewNames}</span>
         </p>
+        {isGrilla && (
+          <p className="text-xs text-blue-600 bg-blue-50 rounded px-2 py-1">
+            Cada transecto generará automáticamente 4 puntos de grilla (G1-G4, G5-G8…)
+          </p>
+        )}
       </div>
 
-      {/* Size mode toggle */}
+      {/* Size section */}
       <div className="space-y-3">
-        <Label>Dimensiones</Label>
-        <div className="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit">
-          <button
-            type="button"
-            onClick={() => setSizeMode("dimensions")}
-            className={cn(
-              "px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-              sizeMode === "dimensions"
-                ? "bg-white shadow-sm text-gray-900"
-                : "text-gray-500 hover:text-gray-700"
-            )}
-          >
-            Largo × Ancho
-          </button>
-          <button
-            type="button"
-            onClick={() => setSizeMode("area")}
-            className={cn(
-              "px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-              sizeMode === "area"
-                ? "bg-white shadow-sm text-gray-900"
-                : "text-gray-500 hover:text-gray-700"
-            )}
-          >
-            m²
-          </button>
-        </div>
+        <Label>{isGrilla ? "Dimensiones transecto" : "Dimensiones"} <span className="text-red-500">*</span></Label>
 
-        {sizeMode === "dimensions" ? (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="length">Largo (m)</Label>
-                <Input
-                  id="length"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  placeholder="Ej: 10"
-                  value={length}
-                  onChange={(e) => setLength(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="width">Ancho (m)</Label>
-                <Input
-                  id="width"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  placeholder="Ej: 10"
-                  value={width}
-                  onChange={(e) => setWidth(e.target.value)}
-                />
-              </div>
+        {isMicroruteo ? (
+          /* Microruteo: only m² / ha */
+          <div className="space-y-2">
+            <div className="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit">
+              {(["sqm", "ha"] as const).map((u) => (
+                <button key={u} type="button" onClick={() => setAreaUnit(u)}
+                  className={cn("px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                    areaUnit === u ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700")}>
+                  {u === "sqm" ? "m²" : "ha"}
+                </button>
+              ))}
             </div>
-            {calculatedArea && (
-              <p className="text-xs text-green-700 bg-green-50 rounded px-3 py-1.5">
-                Área calculada: <span className="font-semibold">{calculatedArea} m²</span>
-              </p>
-            )}
+            <div className="space-y-1.5">
+              <Label htmlFor="area">Área de la zona ({areaUnit === "ha" ? "ha" : "m²"})</Label>
+              <Input id="area" type="number" step={areaUnit === "ha" ? "0.0001" : "0.01"} min="0"
+                placeholder={areaUnit === "ha" ? "Ej: 1.5" : "Ej: 10000"}
+                value={area} onChange={(e) => setArea(e.target.value)} />
+              {areaUnit === "ha" && area && !isNaN(parseFloat(area)) && (
+                <p className="text-xs text-green-700 bg-green-50 rounded px-3 py-1.5">
+                  Equivale a: <span className="font-semibold">{(parseFloat(area) * 10000).toLocaleString("es-CL")} m²</span>
+                </p>
+              )}
+            </div>
           </div>
         ) : (
-          <div className="space-y-1.5">
-            <Label htmlFor="area">Área total (m²)</Label>
-            <Input
-              id="area"
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="Ej: 100"
-              value={area}
-              onChange={(e) => setArea(e.target.value)}
-            />
-          </div>
+          /* All other methodologies (incl. Grilla): Largo × Ancho or m² */
+          <>
+            <div className="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit">
+              <button type="button" onClick={() => setSizeMode("dimensions")}
+                className={cn("px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                  sizeMode === "dimensions" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700")}>
+                Largo × Ancho
+              </button>
+              <button type="button" onClick={() => setSizeMode("area")}
+                className={cn("px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                  sizeMode === "area" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700")}>
+                m²
+              </button>
+            </div>
+            {sizeMode === "dimensions" ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="length">Largo (m)</Label>
+                    <Input id="length" type="number" step="0.1" min="0" placeholder="Ej: 10"
+                      value={length} onChange={(e) => setLength(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="width">Ancho (m)</Label>
+                    <Input id="width" type="number" step="0.1" min="0" placeholder="Ej: 10"
+                      value={width} onChange={(e) => setWidth(e.target.value)} />
+                  </div>
+                </div>
+                {calculatedArea && (
+                  <p className="text-xs text-green-700 bg-green-50 rounded px-3 py-1.5">
+                    Área calculada: <span className="font-semibold">{calculatedArea} m²</span>
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <Label htmlFor="area">Área total (m²)</Label>
+                <Input id="area" type="number" step="0.01" min="0" placeholder="Ej: 100"
+                  value={area} onChange={(e) => setArea(e.target.value)} />
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -231,7 +251,7 @@ export function NuevasEstacionesForm({
         >
           {isSubmitting
             ? "Creando..."
-            : `Crear ${qty} ${stationType === "PARCELA" ? (qty === 1 ? "parcela" : "parcelas") : (qty === 1 ? "transecto" : "transectos")}`}
+            : `Crear ${qty} ${qty === 1 ? stationLabel.toLowerCase() : stationLabelPlural}`}
         </Button>
       </div>
     </form>

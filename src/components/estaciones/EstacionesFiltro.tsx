@@ -8,8 +8,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getMethodologyById } from "@/lib/methodologies";
 
-type Campaign = { id: string; name: string; surveyType: string };
+type Campaign = { id: string; name: string; surveyType: string; methodology: string | null };
 type Project = { id: string; name: string; campaigns: Campaign[] };
 
 interface EstacionesFiltroProps {
@@ -68,18 +69,22 @@ export function EstacionesFiltro({
 
       {selectedProjectId && campaigns.length > 0 && (
         <Select value={selectedCampaignId} onValueChange={handleCampaignChange}>
-          <SelectTrigger className="max-w-xs w-full sm:w-auto">
+          <SelectTrigger className="w-full sm:w-auto sm:min-w-[220px]">
             <SelectValue>
-              {selectedCampaignId
-                ? (campaigns.find((c) => c.id === selectedCampaignId)?.name ?? "Todas las campañas")
-                : <span className="text-gray-500">Todas las campañas</span>}
+              {(() => {
+                const c = campaigns.find((c) => c.id === selectedCampaignId);
+                if (!c) return <span className="text-gray-500">Todas las campañas</span>;
+                const metodName = c.methodology ? getMethodologyById(c.methodology)?.name : null;
+                return <>{c.name}{metodName && <span className="text-gray-400 ml-1">· {metodName}</span>}</>;
+              })()}
             </SelectValue>
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="min-w-max">
             <SelectItem value="all">Todas las campañas</SelectItem>
             {campaigns.map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.name}
+                {c.methodology && <span className="text-gray-400 ml-1">· {getMethodologyById(c.methodology)?.name ?? c.methodology}</span>}
               </SelectItem>
             ))}
           </SelectContent>
