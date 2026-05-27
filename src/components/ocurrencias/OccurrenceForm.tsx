@@ -294,7 +294,7 @@ export function OccurrenceForm({
       if (occurrenceId) {
         const result = await updateGrillaOccurrences(projectId, campaignId, stationId, gridPayload);
         setSubmitting(false);
-        if ("error" in result && result.error) { toast.error(result.error); }
+        if ("error" in result && result.error) { toast.error(String(result.error)); }
         else {
           toast.success("Grilla actualizada");
           const back = transectoId
@@ -305,7 +305,7 @@ export function OccurrenceForm({
       } else {
         const result = await createGrillaOccurrences(projectId, campaignId, stationId, gridPayload);
         setSubmitting(false);
-        if ("error" in result && result.error) { toast.error(result.error); }
+        if ("error" in result && result.error) { toast.error(String(result.error)); }
         else if ("success" in result) {
           toast.success(`Grilla registrada — ${result.count} especie${result.count === 1 ? "" : "s"}`);
           setSessionCount((n) => n + result.count);
