@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, FolderOpen, Layers, LayoutList, ClipboardList } from "lucide-react";
+import { LayoutDashboard, FolderOpen, Layers, LayoutList, ClipboardList, BarChart2 } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "Inicio", icon: LayoutDashboard },
   { href: "/proyectos", label: "Proyectos", icon: FolderOpen },
-  { href: "/campanas", label: "Campañas", icon: Layers },
   { href: "/estaciones", label: "Réplicas", icon: LayoutList },
   { href: "/ocurrencias", label: "Ocurrencias", icon: ClipboardList },
+  { href: "/reportes", label: "Reportes", icon: BarChart2 },
 ];
 
 export function BottomNav() {
