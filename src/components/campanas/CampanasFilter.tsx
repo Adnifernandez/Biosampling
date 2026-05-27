@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 type Project = { id: string; name: string };
 
@@ -9,29 +9,18 @@ export function CampanasFilter({ projects, selectedProjectId }: { projects: Proj
   const router = useRouter();
 
   return (
-    <Select
+    <SearchableSelect
+      className="max-w-xs"
       value={selectedProjectId}
-      onValueChange={(v) => {
-        if (v && v !== "all") {
+      options={projects.map((p) => ({ value: p.id, label: p.name }))}
+      allLabel="Todos los proyectos"
+      onChange={(v) => {
+        if (v) {
           router.push(`/campanas?projectId=${v}`);
         } else {
           router.push("/campanas");
         }
       }}
-    >
-      <SelectTrigger className="max-w-xs">
-        <SelectValue>
-          {selectedProjectId
-            ? projects.find((p) => p.id === selectedProjectId)?.name ?? "Todos los proyectos"
-            : <span className="text-gray-500">Todos los proyectos</span>}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all">Todos los proyectos</SelectItem>
-        {projects.map((p) => (
-          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    />
   );
 }

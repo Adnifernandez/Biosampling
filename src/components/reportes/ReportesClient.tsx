@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -468,23 +469,12 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-gray-700">Proyecto</label>
-              <Select
+              <SearchableSelect
                 value={projectId}
-                onValueChange={(v) => { setProjectId(v ?? ""); setCampaignId(""); }}
-              >
-                <SelectTrigger>
-                  <SelectValue>
-                    {selectedProject
-                      ? selectedProject.name
-                      : <span className="text-muted-foreground">Seleccionar proyecto...</span>}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={projects.map((p) => ({ value: p.id, label: p.name }))}
+                placeholder="Seleccionar proyecto..."
+                onChange={(v) => { setProjectId(v); setCampaignId(""); }}
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-gray-700">Campaña</label>

@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Sun, Leaf, Snowflake, Flower2, Bird, FolderOpen } from "lucide-react";
-// Select kept for project picker above
 import { METHODOLOGIES } from "@/lib/methodologies";
 import { createCampana, updateCampana } from "@/app/(app)/campanas/actions";
 import { toast } from "sonner";
@@ -107,20 +107,12 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
                 {preselectedProject.name}
               </div>
             ) : (
-              <Select value={projectId} onValueChange={(v) => setProjectId(v ?? "")}>
-                <SelectTrigger>
-                  <SelectValue>
-                    {projectId
-                      ? projects.find((p) => p.id === projectId)?.name ?? projectId
-                      : <span className="text-gray-400">Seleccionar proyecto...</span>}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={projectId}
+                options={projects.map((p) => ({ value: p.id, label: p.name }))}
+                placeholder="Seleccionar proyecto..."
+                onChange={(v) => setProjectId(v)}
+              />
             )}
             {!preselectedProject && projects.length === 0 && (
               <p className="text-xs text-orange-500">No hay proyectos activos. Crea uno primero.</p>

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Label } from "@/components/ui/label";
 import { getMethodologyById } from "@/lib/methodologies";
 
@@ -83,20 +84,13 @@ export function OcurrenciasFiltro({
     <div className={`grid ${cols} gap-3`}>
       <div className="space-y-1.5">
         <Label className="text-xs text-gray-500">Proyecto</Label>
-        <Select value={selectedProjectId} onValueChange={onProjectChange}>
-          <SelectTrigger className="w-full">
-            <SelectValue>
-              {projectName
-                ? projectName
-                : <span className="text-muted-foreground">Seleccionar proyecto...</span>}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {projects.map((p) => (
-              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          className="w-full"
+          value={selectedProjectId}
+          options={projects.map((p) => ({ value: p.id, label: p.name }))}
+          placeholder="Seleccionar proyecto..."
+          onChange={onProjectChange}
+        />
       </div>
 
       <div className="space-y-1.5">

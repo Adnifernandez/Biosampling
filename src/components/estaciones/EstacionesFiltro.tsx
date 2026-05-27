@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { getMethodologyById } from "@/lib/methodologies";
 
 type Campaign = { id: string; name: string; surveyType: string; methodology: string | null };
@@ -29,10 +30,9 @@ export function EstacionesFiltro({
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
   const campaigns = selectedProject?.campaigns ?? [];
 
-  function handleProjectChange(v: string | null) {
-    const val = v ?? "";
-    if (val && val !== "all") {
-      router.push(`/estaciones?projectId=${val}`);
+  function handleProjectChange(v: string) {
+    if (v) {
+      router.push(`/estaciones?projectId=${v}`);
     } else {
       router.push("/estaciones");
     }
@@ -49,23 +49,13 @@ export function EstacionesFiltro({
 
   return (
     <div className="flex flex-wrap gap-3">
-      <Select value={selectedProjectId} onValueChange={handleProjectChange}>
-        <SelectTrigger className="max-w-xs w-full sm:w-auto">
-          <SelectValue>
-            {selectedProjectId
-              ? (projects.find((p) => p.id === selectedProjectId)?.name ?? "Todos los proyectos")
-              : <span className="text-gray-500">Todos los proyectos</span>}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todos los proyectos</SelectItem>
-          {projects.map((p) => (
-            <SelectItem key={p.id} value={p.id}>
-              {p.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <SearchableSelect
+        className="max-w-xs w-full sm:w-auto"
+        value={selectedProjectId}
+        options={projects.map((p) => ({ value: p.id, label: p.name }))}
+        allLabel="Todos los proyectos"
+        onChange={handleProjectChange}
+      />
 
       {selectedProjectId && campaigns.length > 0 && (
         <Select value={selectedCampaignId} onValueChange={handleCampaignChange}>
