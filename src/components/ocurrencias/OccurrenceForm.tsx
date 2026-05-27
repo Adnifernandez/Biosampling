@@ -308,7 +308,7 @@ export function OccurrenceForm({
         if ("error" in result && result.error) { toast.error(String(result.error)); }
         else if ("success" in result) {
           toast.success(`Grilla registrada — ${result.count} especie${result.count === 1 ? "" : "s"}`);
-          setSessionCount((n) => n + result.count);
+          setSessionCount((n) => n + (result.count ?? 0));
           resetForm();
         }
       }
