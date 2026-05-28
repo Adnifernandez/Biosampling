@@ -33,9 +33,10 @@ export async function createEstaciones(formData: FormData) {
   // Look up the campaign to get projectId
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },
-    select: { id: true, projectId: true, methodology: true },
+    select: { id: true, projectId: true, methodology: true, project: { select: { status: true } } },
   });
   if (!campaign) return { error: "Campaña no encontrada" };
+  if (campaign.project?.status === "COMPLETED") return { error: "El proyecto está cerrado y no permite cambios" };
 
   // Get existing stations to determine next number
   const existingStations = await prisma.station.findMany({

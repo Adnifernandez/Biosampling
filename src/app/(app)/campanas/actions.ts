@@ -18,6 +18,9 @@ export async function createCampana(formData: FormData) {
     return { error: "Completa todos los campos requeridos" };
   }
 
+  const project = await prisma.project.findUnique({ where: { id: projectId }, select: { status: true } });
+  if (project?.status === "COMPLETED") return { error: "El proyecto está cerrado y no permite cambios" };
+
   const name = suffix ? `${season} ${year} — ${suffix}` : `${season} ${year}`;
 
   const campaign = await prisma.campaign.create({
@@ -53,6 +56,9 @@ export async function updateCampana(campaignId: string, formData: FormData) {
   }
 
   const name = suffix ? `${season} ${year} — ${suffix}` : `${season} ${year}`;
+
+  const existing = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { project: { select: { status: true } } } });
+  if (existing?.project?.status === "COMPLETED") return { error: "El proyecto está cerrado y no permite cambios" };
 
   const campaign = await prisma.campaign.update({
     where: { id: campaignId },

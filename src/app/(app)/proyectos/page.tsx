@@ -4,6 +4,7 @@ import { ButtonLink } from "@/components/ui/button-link";
 import { Plus, FolderOpen, MapPin, User, Pencil } from "lucide-react";
 import { PROJECT_STATUS_LABELS, type ProjectStatus } from "@/lib/types";
 import { DeleteProjectButton } from "@/components/proyectos/DeleteProjectButton";
+import { CloseProjectButton } from "@/components/proyectos/CloseProjectButton";
 
 const STATUS_COLORS: Record<ProjectStatus, string> = {
   ACTIVE: "bg-green-100 text-green-800",
@@ -62,9 +63,12 @@ export default async function ProyectosPage() {
                   </div>
                 </div>
                 <div className="flex gap-1 shrink-0">
-                  <ButtonLink href={`/proyectos/${p.id}/editar`} variant="outline" size="sm">
-                    <Pencil className="h-4 w-4" />
-                  </ButtonLink>
+                  <CloseProjectButton id={p.id} status={p.status} />
+                  {p.status !== "COMPLETED" && (
+                    <ButtonLink href={`/proyectos/${p.id}/editar`} variant="outline" size="sm">
+                      <Pencil className="h-4 w-4" />
+                    </ButtonLink>
+                  )}
                   <DeleteProjectButton id={p.id} />
                 </div>
               </CardContent>

@@ -30,6 +30,9 @@ export async function createOccurrence(
   const session = await auth();
   if (!session?.user?.id) throw new Error("No autorizado");
 
+  const project = await prisma.project.findUnique({ where: { id: projectId }, select: { status: true } });
+  if (project?.status === "COMPLETED") return { error: "El proyecto está cerrado y no permite cambios" };
+
   const occurrence = await prisma.occurrence.create({
     data: {
       stationId,
@@ -83,6 +86,9 @@ export async function updateOccurrence(
 ) {
   const session = await auth();
   if (!session) throw new Error("No autorizado");
+
+  const project = await prisma.project.findUnique({ where: { id: projectId }, select: { status: true } });
+  if (project?.status === "COMPLETED") return { error: "El proyecto está cerrado y no permite cambios" };
 
   await prisma.occurrence.update({
     where: { id: occurrenceId },
@@ -141,6 +147,10 @@ export async function createGrillaOccurrences(
 ) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("No autorizado");
+
+  const project = await prisma.project.findUnique({ where: { id: projectId }, select: { status: true } });
+  if (project?.status === "COMPLETED") return { error: "El proyecto está cerrado y no permite cambios" };
+
   if (data.species.length === 0 && data.sinVegetacion === 0) return { error: "Agrega al menos una especie o puntos sin vegetación" };
 
   const userId = session.user.id;
@@ -201,6 +211,9 @@ export async function updateGrillaOccurrences(
 ) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("No autorizado");
+
+  const project = await prisma.project.findUnique({ where: { id: projectId }, select: { status: true } });
+  if (project?.status === "COMPLETED") return { error: "El proyecto está cerrado y no permite cambios" };
 
   const userId = session.user.id;
   const methodologyData = JSON.stringify({
