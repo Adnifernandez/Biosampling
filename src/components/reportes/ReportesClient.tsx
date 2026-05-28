@@ -590,35 +590,32 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
+                  <table className="w-full text-xs border-collapse">
                     <thead>
-                      <tr className="border-b bg-gray-50">
-                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">División</th>
-                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Clase</th>
-                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Familia</th>
-                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap italic">Especie</th>
-                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Nombre Común</th>
-                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Hábito</th>
-                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Origen</th>
-                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Estado Conservación</th>
+                      <tr className="bg-[#1e3a5f] text-white">
+                        {["División","Clase","Familia","Especie","Nombre Común","Hábito","Origen","Estado de\nConservación"].map((h) => (
+                          <th key={h} className="border border-[#2d4f7a] px-3 py-2 font-semibold text-left whitespace-pre-wrap leading-tight">
+                            {h === "Especie" ? <span className="italic">{h}</span> : h}
+                          </th>
+                        ))}
                         {bbData.sortedStations.map((s) => (
-                          <th key={s.id} className="text-center px-2 py-2.5 font-semibold text-gray-600 whitespace-nowrap">{s.name}</th>
+                          <th key={s.id} className="border border-[#2d4f7a] px-2 py-2 font-semibold text-center whitespace-nowrap">{s.name}</th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y">
-                      {bbData.rows.map(({ sp, stMap }) => (
-                        <tr key={sp.id} className="hover:bg-gray-50">
-                          <td className="px-3 py-2 text-gray-500">{sp.division ?? "—"}</td>
-                          <td className="px-3 py-2 text-gray-500">{sp.clase ?? "—"}</td>
-                          <td className="px-3 py-2">{sp.family}</td>
-                          <td className="px-3 py-2 italic font-medium whitespace-nowrap">{sp.genus} {sp.species}</td>
-                          <td className="px-3 py-2 text-gray-500">{sp.commonName ?? "—"}</td>
-                          <td className="px-3 py-2 text-gray-500">{sp.habito ?? "—"}</td>
-                          <td className="px-3 py-2 text-gray-500">{sp.origen ?? "—"}</td>
-                          <td className="px-3 py-2">{statusBadge(sp.conservationStatus)}</td>
+                    <tbody>
+                      {bbData.rows.map(({ sp, stMap }, i) => (
+                        <tr key={sp.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                          <td className="border border-gray-200 px-3 py-1.5">{sp.division ?? ""}</td>
+                          <td className="border border-gray-200 px-3 py-1.5">{sp.clase ?? ""}</td>
+                          <td className="border border-gray-200 px-3 py-1.5">{sp.family}</td>
+                          <td className="border border-gray-200 px-3 py-1.5 italic font-medium whitespace-nowrap">{sp.genus} {sp.species}</td>
+                          <td className="border border-gray-200 px-3 py-1.5">{sp.commonName ?? ""}</td>
+                          <td className="border border-gray-200 px-3 py-1.5">{sp.habito ?? ""}</td>
+                          <td className="border border-gray-200 px-3 py-1.5">{sp.origen ?? ""}</td>
+                          <td className="border border-gray-200 px-3 py-1.5">{primaryStatus(sp.conservationStatus)}</td>
                           {bbData.sortedStations.map((s) => (
-                            <td key={s.id} className="px-2 py-2 text-center font-mono font-semibold text-gray-800">
+                            <td key={s.id} className="border border-gray-200 px-2 py-1.5 text-center font-mono font-semibold">
                               {stMap.get(s.id) ?? ""}
                             </td>
                           ))}
