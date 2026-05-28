@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 interface StationFormProps {
   projectId: string;
   campaignId: string;
-  surveyType: "FLORA" | "FAUNA" | "RESCATE";
+  surveyType: "FLORA" | "FAUNA";
   methodology?: string;
   stationId: string;
   defaultValues: {
@@ -28,10 +28,10 @@ interface StationFormProps {
 
 export function StationForm({ projectId, campaignId, surveyType, methodology, stationId, defaultValues }: StationFormProps) {
   const router = useRouter();
-  const isMicroruteo = methodology === "MICRORUTEO" || methodology === "RESCATE_MICRORUTEO";
-  const isTransecto = surveyType === "FAUNA" || methodology === "RESCATE_TRANSECTO";
-  const stationType = isTransecto ? "TRANSECTO" : "PARCELA";
-  const label = isMicroruteo ? "Ruta" : isTransecto ? "Transecto" : "Parcela";
+  const isMicroruteo = methodology === "MICRORUTEO";
+  const isTransecto = surveyType === "FAUNA";
+  const stationType = surveyType === "FLORA" ? "PARCELA" : "TRANSECTO";
+  const label = isMicroruteo ? "Ruta" : surveyType === "FLORA" ? "Parcela" : "Transecto";
 
   const hasLengthWidth = !!(defaultValues.length && defaultValues.width && parseFloat(defaultValues.length) > 0);
   const [sizeMode, setSizeMode] = useState<"dimensions" | "area" | "ha">(

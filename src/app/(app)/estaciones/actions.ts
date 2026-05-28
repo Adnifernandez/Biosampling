@@ -52,7 +52,7 @@ export async function createEstaciones(formData: FormData) {
     : type === "TRANSECTO" ? "T"
     : effectiveMethodology === "PARCELAS_FORESTALES" ? "PF"
     : effectiveMethodology === "MICRORUTEO" ? "R"
-    : effectiveMethodology === "RESCATE_MICRORUTEO" ? "R"
+    : effectiveMethodology === "RESCATE_RELOC" ? "R"
     : "P";
   const regex = new RegExp(`^${prefix}(\\d+)$`);
 

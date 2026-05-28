@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { Sun, Leaf, Snowflake, Flower2, Bird, FolderOpen, ShieldCheck } from "lucide-react";
+import { Sun, Leaf, Snowflake, Flower2, Bird, FolderOpen } from "lucide-react";
 import { METHODOLOGIES } from "@/lib/methodologies";
 import { createCampana, updateCampana } from "@/app/(app)/campanas/actions";
 import { toast } from "sonner";
@@ -33,7 +33,7 @@ type Project = { id: string; name: string };
 
 interface DefaultValues {
   name?: string;
-  surveyType?: "FLORA" | "FAUNA" | "RESCATE";
+  surveyType?: "FLORA" | "FAUNA";
   methodology?: string;
   startDate?: string;
   endDate?: string;
@@ -57,7 +57,7 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
   const [projectId, setProjectId] = useState(preselectedProject?.id ?? "");
   const [season, setSeason] = useState(parsed.season);
   const [suffix, setSuffix] = useState(parsed.suffix);
-  const [surveyType, setSurveyType] = useState<"FLORA" | "FAUNA" | "RESCATE">(defaultValues?.surveyType ?? "FLORA");
+  const [surveyType, setSurveyType] = useState<"FLORA" | "FAUNA">(defaultValues?.surveyType ?? "FLORA");
   const [methodology, setMethodology] = useState(defaultValues?.methodology ?? "");
   const [submitting, setSubmitting] = useState(false);
 
@@ -67,18 +67,11 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
 
   const methodologies = METHODOLOGIES.filter((m) =>
     m.surveyType === surveyType &&
-    (surveyType !== "FAUNA" || m.id === "TRANSECTO_LINEAL_FAUNA")
+    (surveyType !== "FAUNA" || ["TRANSECTO_LINEAL_FAUNA", "RESCATE_RELOC"].includes(m.id))
   );
 
-  const methodologyActiveClass =
-    surveyType === "FLORA" ? "border-green-600 bg-green-50"
-    : surveyType === "FAUNA" ? "border-blue-600 bg-blue-50"
-    : "border-orange-600 bg-orange-50";
-
-  const methodologyDotClass =
-    surveyType === "FLORA" ? "border-green-600 bg-green-600"
-    : surveyType === "FAUNA" ? "border-blue-600 bg-blue-600"
-    : "border-orange-600 bg-orange-600";
+  const methodologyActiveClass = surveyType === "FLORA" ? "border-green-600 bg-green-50" : "border-blue-600 bg-blue-50";
+  const methodologyDotClass = surveyType === "FLORA" ? "border-green-600 bg-green-600" : "border-blue-600 bg-blue-600";
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -172,27 +165,26 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
           {/* Tipo de levantamiento */}
           <div className="space-y-2">
             <Label>Tipo de levantamiento <span className="text-red-500">*</span></Label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               {[
                 { type: "FLORA" as const, label: "Flora", sub: "Parcelas", Icon: Leaf, color: "text-green-600", bg: "bg-green-50 border-green-600" },
                 { type: "FAUNA" as const, label: "Fauna", sub: "Transectos", Icon: Bird, color: "text-blue-600", bg: "bg-blue-50 border-blue-600" },
-                { type: "RESCATE" as const, label: "Rescate", sub: "Relocalización", Icon: ShieldCheck, color: "text-orange-600", bg: "bg-orange-50 border-orange-600" },
               ].map(({ type, label, sub, Icon, color, bg }) => (
                 <button
                   key={type}
                   type="button"
                   onClick={() => { setSurveyType(type); setMethodology(""); }}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-3 rounded-xl border-2 transition-all text-left",
+                    "flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left",
                     surveyType === type ? bg : "border-gray-200 hover:border-gray-300 bg-white"
                   )}
                 >
-                  <div className={cn("p-1.5 rounded-lg shrink-0", surveyType === type ? "bg-white" : "bg-gray-100")}>
-                    <Icon className={cn("h-4 w-4", color)} />
+                  <div className={cn("p-1.5 rounded-lg", surveyType === type ? "bg-white" : "bg-gray-100")}>
+                    <Icon className={cn("h-5 w-5", color)} />
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-gray-900">{label}</p>
-                    <p className="text-xs text-gray-500 truncate">{sub}</p>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{label}</p>
+                    <p className="text-xs text-gray-500">{sub}</p>
                   </div>
                 </button>
               ))}

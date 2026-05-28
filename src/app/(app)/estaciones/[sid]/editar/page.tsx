@@ -30,7 +30,7 @@ export default async function EditarEstacionPage({
       <StationForm
         projectId={station.campaign.projectId}
         campaignId={station.campaign.id}
-        surveyType={station.campaign.surveyType as "FLORA" | "FAUNA" | "RESCATE"}
+        surveyType={station.campaign.surveyType as "FLORA" | "FAUNA"}
         methodology={station.campaign.methodology ?? ""}
         stationId={station.id}
         defaultValues={{

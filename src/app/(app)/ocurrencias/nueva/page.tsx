@@ -49,7 +49,7 @@ export default async function NuevaOcurrenciaPage({
         projectId={station.campaign.projectId}
         campaignId={station.campaignId}
         stationId={stationId}
-        surveyType={station.campaign.surveyType as "FLORA" | "FAUNA" | "RESCATE"}
+        surveyType={station.campaign.surveyType as "FLORA" | "FAUNA"}
         methodology={station.campaign.methodology}
         transectoId={transectoStation?.id ?? undefined}
         transectoCoords={transectoStation ? { latitude: transectoStation.latitude, longitude: transectoStation.longitude } : undefined}

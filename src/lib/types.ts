@@ -1,4 +1,4 @@
-export type SurveyType = "FLORA" | "FAUNA" | "RESCATE";
+export type SurveyType = "FLORA" | "FAUNA";
 export type StationType = "PARCELA" | "TRANSECTO";
 export type ProjectStatus = "ACTIVE" | "INACTIVE" | "COMPLETED";
 export type CampaignStatus = "ACTIVE" | "COMPLETED" | "CANCELLED";
@@ -6,7 +6,6 @@ export type CampaignStatus = "ACTIVE" | "COMPLETED" | "CANCELLED";
 export const SURVEY_TYPE_LABELS: Record<SurveyType, string> = {
   FLORA: "Flora",
   FAUNA: "Fauna",
-  RESCATE: "Rescate",
 };
 
 export const STATION_TYPE_LABELS: Record<StationType, string> = {

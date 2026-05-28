@@ -59,7 +59,7 @@ interface OccurrenceFormProps {
   projectId: string;
   campaignId: string;
   stationId: string;
-  surveyType: "FLORA" | "FAUNA" | "RESCATE";
+  surveyType: "FLORA" | "FAUNA";
   methodology: string;
   occurrenceId?: string;
   defaultValues?: Record<string, string>;
@@ -86,7 +86,7 @@ export function OccurrenceForm({
   const isForestal = methodology === "PARCELAS_FORESTALES";
   const isGrilla = methodology === "GRILLA";
   const isTransectoFauna = methodology === "TRANSECTO_LINEAL_FAUNA";
-  const isRescate = methodology === "RESCATE_TRANSECTO" || methodology === "RESCATE_MICRORUTEO";
+  const isRescate = methodology === "RESCATE_RELOC";
 
   // Single-species search
   const [speciesQuery, setSpeciesQuery] = useState("");
@@ -235,7 +235,7 @@ export function OccurrenceForm({
     setSearching(true);
     const seq = ++searchSeq.current;
     const timer = setTimeout(async () => {
-      const results = await searchSpecies(speciesQuery, surveyType === "RESCATE" ? "FAUNA" : surveyType);
+      const results = await searchSpecies(speciesQuery, surveyType);
       if (seq === searchSeq.current) { setSpeciesList(results); setSearching(false); }
     }, 250);
     return () => clearTimeout(timer);

@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 interface NuevasEstacionesFormProps {
   campaignId: string;
   projectId: string;
-  surveyType: "FLORA" | "FAUNA" | "RESCATE";
+  surveyType: "FLORA" | "FAUNA";
   methodology: string;
   nextNumber: number;
   campaignName: string;
@@ -30,22 +30,36 @@ export function NuevasEstacionesForm({
   campaignName,
 }: NuevasEstacionesFormProps) {
   const router = useRouter();
-  const isMicroruteo = methodology === "MICRORUTEO" || methodology === "RESCATE_MICRORUTEO";
+  const isRescate = methodology === "RESCATE_RELOC";
+  const isMicroruteo = methodology === "MICRORUTEO";
   const isGrilla = methodology === "GRILLA";
-  const isTransectoMethod = surveyType === "FAUNA" || methodology === "RESCATE_TRANSECTO";
+
+  // For RESCATE, user picks modality per station batch
+  const [rescateModality, setRescateModality] = useState<"TRANSECTO" | "MICRORUTEO">("TRANSECTO");
+
+  const isTransectoMethod = isRescate
+    ? rescateModality === "TRANSECTO"
+    : surveyType === "FAUNA" && !isMicroruteo;
+  const isMicroruteoActive = isMicroruteo || (isRescate && rescateModality === "MICRORUTEO");
   const stationType = isTransectoMethod ? "TRANSECTO" : "PARCELA";
 
   const prefix =
     isGrilla ? "T"
     : isTransectoMethod ? "T"
     : methodology === "PARCELAS_FORESTALES" ? "PF"
-    : isMicroruteo ? "R"
+    : isMicroruteoActive ? "R"
     : "P";
 
-  const stationLabel = isGrilla ? "Transecto" : isMicroruteo ? "Ruta" : stationType === "PARCELA" ? "Parcela" : "Transecto";
-  const stationLabelPlural = isGrilla ? "transectos" : isMicroruteo ? "rutas" : stationType === "PARCELA" ? "parcelas" : "transectos";
+  const stationLabel = isGrilla ? "Transecto"
+    : isMicroruteoActive ? "Ruta"
+    : stationType === "PARCELA" ? "Parcela"
+    : "Transecto";
+  const stationLabelPlural = isGrilla ? "transectos"
+    : isMicroruteoActive ? "rutas"
+    : stationType === "PARCELA" ? "parcelas"
+    : "transectos";
 
-  const [sizeMode, setSizeMode] = useState<"dimensions" | "area">(isMicroruteo ? "area" : "dimensions");
+  const [sizeMode, setSizeMode] = useState<"dimensions" | "area">("dimensions");
   const [length, setLength] = useState("");
   const [width, setWidth] = useState("");
   const [area, setArea] = useState("");
@@ -65,7 +79,9 @@ export function NuevasEstacionesForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (sizeMode === "dimensions") {
+    if (isMicroruteoActive) {
+      if (!area) { toast.error("Ingresa el área"); return; }
+    } else if (sizeMode === "dimensions") {
       if (!length || !width) { toast.error("Ingresa largo y ancho"); return; }
     } else {
       if (!area) { toast.error("Ingresa el área"); return; }
@@ -77,14 +93,16 @@ export function NuevasEstacionesForm({
     fd.append("campaignId", campaignId);
     fd.append("type", stationType);
     fd.append("methodology", methodology);
-    fd.append("sizeMode", sizeMode);
+    fd.append("sizeMode", isMicroruteoActive ? "area" : sizeMode);
     fd.append("quantity", String(qty));
-    if (sizeMode === "dimensions") {
+    if (isMicroruteoActive) {
+      const areaInSqm = areaUnit === "ha" ? String(parseFloat(area) * 10000) : area;
+      fd.append("area", areaInSqm);
+    } else if (sizeMode === "dimensions") {
       fd.append("length", length);
       fd.append("width", width);
     } else {
-      const areaInSqm = areaUnit === "ha" ? String(parseFloat(area) * 10000) : area;
-      fd.append("area", areaInSqm);
+      fd.append("area", area);
     }
     if (notes) fd.append("notes", notes);
 
@@ -104,33 +122,59 @@ export function NuevasEstacionesForm({
       {/* Type card — display only */}
       <Card>
         <CardContent className="py-4 px-4">
-          <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Tipo de estación</p>
+          <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Tipo de campaña</p>
           <div className={cn(
             "flex items-center gap-3 p-3 rounded-lg border-2",
             surveyType === "FLORA" ? "border-green-200 bg-green-50"
-            : surveyType === "RESCATE" ? "border-orange-200 bg-orange-50"
+            : isRescate ? "border-orange-200 bg-orange-50"
             : "border-blue-200 bg-blue-50"
           )}>
             {surveyType === "FLORA"
               ? <Leaf className="h-5 w-5 text-green-700 shrink-0" />
-              : surveyType === "RESCATE"
+              : isRescate
                 ? <ShieldCheck className="h-5 w-5 text-orange-700 shrink-0" />
                 : <Bird className="h-5 w-5 text-blue-700 shrink-0" />}
             <div>
               <p className={cn("font-semibold text-sm",
                 surveyType === "FLORA" ? "text-green-800"
-                : surveyType === "RESCATE" ? "text-orange-800"
+                : isRescate ? "text-orange-800"
                 : "text-blue-800"
               )}>
-                {stationLabel}
+                {isRescate ? "Rescate y Relocalización" : surveyType === "FLORA" ? "Flora" : "Fauna"}
               </p>
-              <p className="text-xs text-gray-500">
-                Campaña {surveyType === "FLORA" ? "Flora" : surveyType === "RESCATE" ? "Rescate" : "Fauna"} · {campaignName}
-              </p>
+              <p className="text-xs text-gray-500">{campaignName}</p>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* RESCATE: modality toggle */}
+      {isRescate && (
+        <div className="space-y-2">
+          <Label>Modalidad de la estación <span className="text-red-500">*</span></Label>
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              { val: "TRANSECTO" as const, label: "Transecto", sub: "Largo × Ancho · prefijo T" },
+              { val: "MICRORUTEO" as const, label: "Microruteo", sub: "Recorrido libre · prefijo R" },
+            ] as const).map(({ val, label, sub }) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setRescateModality(val)}
+                className={cn(
+                  "flex flex-col items-start px-3 py-2.5 rounded-xl border-2 transition-all text-left",
+                  rescateModality === val
+                    ? "border-orange-500 bg-orange-50"
+                    : "border-gray-200 hover:border-gray-300 bg-white"
+                )}
+              >
+                <p className="text-sm font-semibold text-gray-900">{label}</p>
+                <p className="text-xs text-gray-500">{sub}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Quantity */}
       <div className="space-y-1.5">
@@ -161,7 +205,7 @@ export function NuevasEstacionesForm({
       <div className="space-y-3">
         <Label>{isGrilla ? "Dimensiones transecto" : "Dimensiones"} <span className="text-red-500">*</span></Label>
 
-        {isMicroruteo ? (
+        {isMicroruteoActive ? (
           /* Microruteo: only m² / ha */
           <div className="space-y-2">
             <div className="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit">
@@ -186,7 +230,7 @@ export function NuevasEstacionesForm({
             </div>
           </div>
         ) : (
-          /* All other methodologies (incl. Grilla): Largo × Ancho or m² */
+          /* Transecto / Parcela: Largo × Ancho or m² */
           <>
             <div className="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit">
               <button type="button" onClick={() => setSizeMode("dimensions")}

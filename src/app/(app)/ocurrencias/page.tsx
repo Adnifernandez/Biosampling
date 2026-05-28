@@ -191,7 +191,7 @@ export default async function OcurrenciasPage({
         /* ── Non-GRILLA: individual occurrence cards ── */
         <div className="space-y-2">
           {occurrences.map((o) => {
-            const isRescate = o.station.campaign.methodology === "RESCATE_TRANSECTO" || o.station.campaign.methodology === "RESCATE_MICRORUTEO";
+            const isRescate = o.station.campaign.methodology === "RESCATE_RELOC";
             return (
               <Card key={o.id} className="hover:shadow-sm transition-shadow">
                 <CardContent className="py-3 px-4">
