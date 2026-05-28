@@ -63,8 +63,8 @@ export const METHODOLOGIES: Methodology[] = [
   // Fauna
   {
     id: "TRANSECTO_LINEAL_FAUNA",
-    name: "Transecto Lineal",
-    description: "Distancia y azimut",
+    name: "Transecto",
+    description: "Transecto de fauna",
     surveyType: "FAUNA",
     fields: [],
   },

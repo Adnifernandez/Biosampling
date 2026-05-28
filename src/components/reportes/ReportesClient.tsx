@@ -21,6 +21,7 @@ type SpeciesRow = {
   conservationStatus: string | null;
   division: string | null;
   clase: string | null;
+  orden: string | null;
   habito: string | null;
   origen: string | null;
   macrofitasHabito: string | null;
@@ -94,6 +95,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
   const isMicroruteo = selectedCampaign?.methodology === "MICRORUTEO";
   const isPF = selectedCampaign?.methodology === "PARCELAS_FORESTALES";
   const isGrilla = selectedCampaign?.methodology === "GRILLA";
+  const isTransectoFauna = selectedCampaign?.methodology === "TRANSECTO_LINEAL_FAUNA";
 
   // ── Summary stats (all methodologies) ──
   const stats = (() => {
@@ -396,7 +398,20 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
       }
     }
 
-    if (!isBB && !isMicroruteo && !isPF && !isGrilla) {
+    if (isTransectoFauna && transectoFaunaData) {
+      const { rows, totalAbundance } = transectoFaunaData;
+      addSheet("Transecto Fauna", [
+        ["Clase", "Orden", "Familia", "Especie", "Nombre Común", "Origen", "E.C.", "Abundancia Total"],
+        ...rows.map(({ sp, abundance }) => [
+          sp.clase ?? "", sp.orden ?? "", sp.family,
+          `${sp.genus} ${sp.species}`, sp.commonName ?? "",
+          sp.origen ?? "", primaryStatus(sp.conservationStatus), abundance,
+        ]),
+        ["", "", "", "", "", "", "Total", totalAbundance],
+      ]);
+    }
+
+    if (!isBB && !isMicroruteo && !isPF && !isGrilla && !isTransectoFauna) {
       addSheet("Lista de Especies", [
         ["Familia", "Género", "Especie", "Nombre Común", "Tipo", "Estado Conservación", "Nº Registros", "Abundancia Total"],
         ...stats.speciesList.map(({ sp, count, abundance }) => [
@@ -462,6 +477,30 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     return { individualRows, speciesRows };
   })();
 
+  // ── Transecto Fauna: consolidated species table ──
+  const transectoFaunaData = (() => {
+    if (!selectedCampaign || !isTransectoFauna) return null;
+    const allOcc = selectedCampaign.stations.flatMap((s) => s.occurrences);
+    const speciesMap = new Map<string, { sp: SpeciesRow; abundance: number }>();
+    for (const occ of allOcc) {
+      const key = occ.species.id;
+      const n = occ.abundance ?? 1;
+      const ex = speciesMap.get(key);
+      if (ex) { ex.abundance += n; }
+      else speciesMap.set(key, { sp: occ.species, abundance: n });
+    }
+    const rows = Array.from(speciesMap.values()).sort((a, b) => {
+      const c = (a.sp.clase ?? "").localeCompare(b.sp.clase ?? "");
+      if (c !== 0) return c;
+      const o = (a.sp.orden ?? "").localeCompare(b.sp.orden ?? "");
+      if (o !== 0) return o;
+      const f = (a.sp.family || "").localeCompare(b.sp.family || "");
+      if (f !== 0) return f;
+      return `${a.sp.genus} ${a.sp.species}`.localeCompare(`${b.sp.genus} ${b.sp.species}`);
+    });
+    const totalAbundance = rows.reduce((sum, r) => sum + r.abundance, 0);
+    return { rows, totalAbundance };
+  })();
 
   return (
     <div className="space-y-4">
@@ -1066,8 +1105,58 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
             </Card>
           )}
 
+          {/* ── TRANSECTO FAUNA: consolidated table ── */}
+          {isTransectoFauna && transectoFaunaData && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Consolidado de Fauna — Transecto</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-800 text-white">
+                        <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Clase</th>
+                        <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Orden</th>
+                        <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Familia</th>
+                        <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap italic">Especie</th>
+                        <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Nombre Común</th>
+                        <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Origen</th>
+                        <th className="text-center px-3 py-2.5 font-semibold whitespace-nowrap">E.C.</th>
+                        <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">Abundancia Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {transectoFaunaData.rows.map(({ sp, abundance }, i) => (
+                        <tr key={sp.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                          <td className="px-3 py-2">{sp.clase ?? "—"}</td>
+                          <td className="px-3 py-2 text-gray-600">{sp.orden ?? "—"}</td>
+                          <td className="px-3 py-2 text-gray-600">{sp.family}</td>
+                          <td className="px-3 py-2 italic font-medium whitespace-nowrap">{sp.genus} {sp.species}</td>
+                          <td className="px-3 py-2 text-gray-600">{sp.commonName ?? "—"}</td>
+                          <td className="px-3 py-2 text-gray-600">{sp.origen ?? "—"}</td>
+                          <td className="px-3 py-2 text-center">{statusBadge(sp.conservationStatus)}</td>
+                          <td className="px-3 py-2 text-right font-semibold">{abundance}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-gray-300 bg-gray-100">
+                        <td colSpan={7} className="px-3 py-2.5 text-right font-bold text-gray-800">Total</td>
+                        <td className="px-3 py-2.5 text-right font-bold text-gray-900">{transectoFaunaData.totalAbundance}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                  {transectoFaunaData.rows.length === 0 && (
+                    <p className="text-sm text-gray-400 text-center py-8">Sin registros en esta campaña</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* ── Generic species table (non-BB methodologies) ── */}
-          {!isBB && !isMicroruteo && !isPF && !isGrilla && (
+          {!isBB && !isMicroruteo && !isPF && !isGrilla && !isTransectoFauna && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Lista de Especies</CardTitle>
