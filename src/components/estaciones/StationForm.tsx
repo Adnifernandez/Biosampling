@@ -66,7 +66,7 @@ export function StationForm({ projectId, campaignId, surveyType, methodology, st
       toast.error(result.error);
     } else {
       toast.success(`${label} actualizada`);
-      router.push(`/estaciones/${stationId}`);
+      router.push(`/estaciones?projectId=${projectId}&campaignId=${campaignId}`);
     }
   }
 

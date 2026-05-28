@@ -81,7 +81,7 @@ export function ProjectForm({ projectId, defaultValues }: ProjectFormProps) {
         toast.error(result.error);
       } else if (result.success && result.id) {
         toast.success("Proyecto creado");
-        router.push(`/proyectos/${result.id}`);
+        router.push(`/proyectos`);
       }
     }
   }

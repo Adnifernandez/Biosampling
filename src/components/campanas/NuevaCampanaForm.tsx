@@ -89,7 +89,7 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
       toast.error(result.error);
     } else if (result.success) {
       toast.success(isEdit ? "Campaña actualizada" : "Campaña creada");
-      router.push(`/campanas/${result.id}`);
+      router.push(projectId ? `/campanas?projectId=${projectId}` : `/campanas`);
     }
   }
 
