@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
+import { createPortal } from "react-dom"
 import { Check, ChevronsUpDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -31,23 +32,25 @@ export function SearchableSelect({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [rect, setRect] = useState<DOMRect | null>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
-  const selected = options.find((o) => o.value === value)
-  const filtered = query
-    ? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
-    : options
+  const selected = useMemo(() => options.find((o) => o.value === value), [options, value])
 
-  const allItems: SelectOption[] = [
+  const filtered = useMemo(
+    () => query ? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase())) : options,
+    [options, query]
+  )
+
+  const allItems = useMemo<SelectOption[]>(() => [
     ...(allLabel ? [{ value: "", label: allLabel }] : []),
     ...filtered,
-  ]
+  ], [allLabel, filtered])
 
-  useEffect(() => {
-    setHighlightedIndex(-1)
-  }, [query])
+  useEffect(() => { setHighlightedIndex(-1) }, [query])
 
   useEffect(() => {
     if (highlightedIndex < 0 || !listRef.current) return
@@ -56,33 +59,47 @@ export function SearchableSelect({
   }, [highlightedIndex])
 
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+    if (!open) return
+    inputRef.current?.focus()
+
+    function handleOutside(e: MouseEvent) {
+      if (
+        !triggerRef.current?.contains(e.target as Node) &&
+        !dropdownRef.current?.contains(e.target as Node)
+      ) {
         setOpen(false)
         setQuery("")
       }
     }
-    document.addEventListener("mousedown", handleClick)
-    return () => document.removeEventListener("mousedown", handleClick)
-  }, [])
 
-  useEffect(() => {
-    if (open) inputRef.current?.focus()
+    function handleScroll() {
+      if (triggerRef.current) setRect(triggerRef.current.getBoundingClientRect())
+    }
+
+    document.addEventListener("mousedown", handleOutside)
+    window.addEventListener("scroll", handleScroll, true)
+    window.addEventListener("resize", handleScroll)
+    return () => {
+      document.removeEventListener("mousedown", handleOutside)
+      window.removeEventListener("scroll", handleScroll, true)
+      window.removeEventListener("resize", handleScroll)
+    }
   }, [open])
 
-  function openDropdown() {
-    if (!disabled) {
-      setOpen(true)
-      setHighlightedIndex(-1)
-    }
-  }
+  const openDropdown = useCallback(() => {
+    if (disabled) return
+    const r = triggerRef.current?.getBoundingClientRect()
+    setRect(r ?? null)
+    setOpen(true)
+    setHighlightedIndex(-1)
+  }, [disabled])
 
-  function select(val: string) {
+  const select = useCallback((val: string) => {
     onChange(val)
     setOpen(false)
     setQuery("")
     setHighlightedIndex(-1)
-  }
+  }, [onChange])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "ArrowDown") {
@@ -93,9 +110,7 @@ export function SearchableSelect({
       setHighlightedIndex((i) => Math.max(i - 1, 0))
     } else if (e.key === "Enter") {
       e.preventDefault()
-      if (highlightedIndex >= 0 && highlightedIndex < allItems.length) {
-        select(allItems[highlightedIndex].value)
-      }
+      if (highlightedIndex >= 0) select(allItems[highlightedIndex].value)
     } else if (e.key === "Escape") {
       setOpen(false)
       setQuery("")
@@ -105,38 +120,25 @@ export function SearchableSelect({
   function handleTriggerKeyDown(e: React.KeyboardEvent<HTMLButtonElement>) {
     if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
       e.preventDefault()
-      openDropdown()
+      open ? setOpen(false) : openDropdown()
     }
   }
 
-  const displayLabel = selected
-    ? selected.label
-    : allLabel && !value
-    ? allLabel
-    : undefined
+  const displayLabel = selected?.label ?? (allLabel && !value ? allLabel : undefined)
 
-  return (
-    <div ref={containerRef} className={cn("relative", className)}>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => setOpen((o) => !o)}
-        onKeyDown={handleTriggerKeyDown}
-        className={cn(
-          "flex h-8 w-full items-center justify-between gap-1.5 rounded-lg border border-input bg-transparent pl-2.5 pr-2 text-sm transition-colors outline-none select-none",
-          "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-          "disabled:cursor-not-allowed disabled:opacity-50",
-          !displayLabel && "text-muted-foreground"
-        )}
-      >
-        <span className="flex-1 truncate text-left">
-          {displayLabel ?? placeholder}
-        </span>
-        <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
-      </button>
-
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-full min-w-[220px] rounded-lg border border-border bg-popover shadow-md text-popover-foreground">
+  const dropdown = open && rect && typeof document !== "undefined"
+    ? createPortal(
+        <div
+          ref={dropdownRef}
+          style={{
+            position: "fixed",
+            top: rect.bottom + 4,
+            left: rect.left,
+            width: Math.max(rect.width, 220),
+            zIndex: 9999,
+          }}
+          className="rounded-lg border border-border bg-popover shadow-md text-popover-foreground"
+        >
           <div className="p-1.5">
             <input
               ref={inputRef}
@@ -160,7 +162,7 @@ export function SearchableSelect({
                     "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-left transition-colors",
                     "hover:bg-accent hover:text-accent-foreground",
                     (o.value === value || (o.value === "" && !value)) && "bg-accent text-accent-foreground",
-                    i === highlightedIndex && "bg-accent text-accent-foreground outline outline-1 outline-ring/50"
+                    i === highlightedIndex && "ring-1 ring-ring/50 bg-accent text-accent-foreground"
                   )}
                 >
                   <Check
@@ -174,8 +176,33 @@ export function SearchableSelect({
               ))
             )}
           </div>
-        </div>
-      )}
+        </div>,
+        document.body
+      )
+    : null
+
+  return (
+    <div className={cn("relative", className)}>
+      <button
+        ref={triggerRef}
+        type="button"
+        disabled={disabled}
+        onClick={() => open ? setOpen(false) : openDropdown()}
+        onKeyDown={handleTriggerKeyDown}
+        className={cn(
+          "flex h-8 w-full items-center justify-between gap-1.5 rounded-lg border border-input bg-transparent pl-2.5 pr-2 text-sm transition-colors outline-none select-none",
+          "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+          "disabled:cursor-not-allowed disabled:opacity-50",
+          !displayLabel && "text-muted-foreground"
+        )}
+      >
+        <span className="flex-1 truncate text-left">
+          {displayLabel ?? placeholder}
+        </span>
+        <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
+      </button>
+
+      {dropdown}
     </div>
   )
 }
