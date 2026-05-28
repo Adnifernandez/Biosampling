@@ -66,17 +66,7 @@ export const METHODOLOGIES: Methodology[] = [
     name: "Transecto Lineal",
     description: "Distancia y azimut",
     surveyType: "FAUNA",
-    fields: [
-      { key: "groupSize", label: "Tamaño de grupo", type: "number", required: true },
-      { key: "distance", label: "Distancia perpendicular", type: "number", unit: "m" },
-      { key: "bearing", label: "Azimut de detección", type: "number", unit: "°" },
-      {
-        key: "behavior",
-        label: "Comportamiento",
-        type: "select",
-        options: ["Reposo", "Alimentación", "Desplazamiento", "Reproducción", "Alerta", "Otro"],
-      },
-    ],
+    fields: [],
   },
   {
     id: "PUNTO_CONTEO",

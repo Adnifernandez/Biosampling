@@ -84,6 +84,7 @@ export function OccurrenceForm({
   const isMicroruteo = methodology === "MICRORUTEO";
   const isForestal = methodology === "PARCELAS_FORESTALES";
   const isGrilla = methodology === "GRILLA";
+  const isTransectoFauna = methodology === "TRANSECTO_LINEAL_FAUNA";
 
   // Single-species search
   const [speciesQuery, setSpeciesQuery] = useState("");
@@ -127,6 +128,17 @@ export function OccurrenceForm({
   const [grillaIndividuos, setGrillaIndividuos] = useState<Record<string, string>>({});
   const [grillaPhoto, setGrillaPhoto] = useState<string | null>(null);
 
+  // Fauna transecto state
+  const [tfDetectionMethod, setTfDetectionMethod] = useState("");
+  const [tfDeviceId, setTfDeviceId] = useState("");
+  const [tfTime, setTfTime] = useState("");
+  const [tfLat, setTfLat] = useState<number | null>(null);
+  const [tfLng, setTfLng] = useState<number | null>(null);
+  const [tfAbundance, setTfAbundance] = useState("");
+  const [shermanCaptures, setShermanCaptures] = useState<{ date: string; abundance: string }[]>([
+    { date: format(new Date(), "yyyy-MM-dd"), abundance: "" },
+  ]);
+
   // Load methodology data in edit mode
   useEffect(() => {
     if (!defaultValues?.methodologyData) return;
@@ -147,9 +159,25 @@ export function OccurrenceForm({
     } catch {}
   }, []);
 
+  // Load fauna transecto fields in edit mode
+  useEffect(() => {
+    if (!isTransectoFauna || !defaultValues) return;
+    if (defaultValues.detectionMethod) setTfDetectionMethod(defaultValues.detectionMethod);
+    if (defaultValues.abundance) setTfAbundance(defaultValues.abundance);
+    if (defaultValues.latitude) setTfLat(parseFloat(defaultValues.latitude));
+    if (defaultValues.longitude) setTfLng(parseFloat(defaultValues.longitude));
+    if (defaultValues.methodologyData) {
+      try {
+        const md = JSON.parse(defaultValues.methodologyData);
+        if (md.time) setTfTime(md.time);
+        if (md.deviceId) setTfDeviceId(String(md.deviceId));
+      } catch {}
+    }
+  }, []);
+
   // Load fauna fields in edit mode
   useEffect(() => {
-    if (!defaultValues || isBB || isMicroruteo || isForestal) return;
+    if (!defaultValues || isBB || isMicroruteo || isForestal || isTransectoFauna) return;
     const faunaKeys = ["groupSize", "distance", "bearing", "behavior", "detectionMethod", "abundance", "cover", "height", "stratum", "phenology"];
     const loaded: Record<string, string> = {};
     for (const k of faunaKeys) {
@@ -231,6 +259,13 @@ export function OccurrenceForm({
     setUtmNorth("");
     setUtmEast("");
     setNotes("");
+    setTfDetectionMethod("");
+    setTfDeviceId("");
+    setTfTime("");
+    setTfLat(null);
+    setTfLng(null);
+    setTfAbundance("");
+    setShermanCaptures([{ date: format(new Date(), "yyyy-MM-dd"), abundance: "" }]);
   }
 
   function captureGPS() {
@@ -249,6 +284,29 @@ export function OccurrenceForm({
       () => { toast.error("No se pudo obtener ubicación GPS"); setGpsLoading(false); },
       { enableHighAccuracy: true, timeout: 10000 }
     );
+  }
+
+  function captureGPSFauna() {
+    setGpsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setTfLat(pos.coords.latitude);
+        setTfLng(pos.coords.longitude);
+        setGpsLoading(false);
+      },
+      () => { toast.error("No se pudo obtener ubicación GPS"); setGpsLoading(false); },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  function addShermanCapture() {
+    setShermanCaptures(prev => [...prev, { date: format(new Date(), "yyyy-MM-dd"), abundance: "" }]);
+  }
+  function removeShermanCapture(i: number) {
+    setShermanCaptures(prev => prev.filter((_, idx) => idx !== i));
+  }
+  function updateShermanCapture(i: number, field: "date" | "abundance", value: string) {
+    setShermanCaptures(prev => prev.map((c, idx) => idx === i ? { ...c, [field]: value } : c));
   }
 
   function addIndividual() {
@@ -309,6 +367,79 @@ export function OccurrenceForm({
         else if ("success" in result) {
           toast.success(`Grilla registrada — ${result.count} especie${result.count === 1 ? "" : "s"}`);
           setSessionCount((n) => n + (result.count ?? 0));
+          resetForm();
+        }
+      }
+      return;
+    }
+
+    // Fauna transecto flow
+    if (isTransectoFauna) {
+      const speciesId = selectedSpecies?.id ?? defaultValues?.speciesId ?? "";
+      if (!speciesId) { toast.error("Selecciona una especie"); return; }
+      if (!tfDetectionMethod) { toast.error("Selecciona el método de detección"); return; }
+      const needsDevice = tfDetectionMethod === "Trampa Sherman" || tfDetectionMethod === "Cámara trampa";
+      if (needsDevice && !tfDeviceId) {
+        toast.error(`Ingresa el N° de ${tfDetectionMethod === "Trampa Sherman" ? "trampa" : "cámara"}`);
+        return;
+      }
+
+      const buildMethodologyData = () => JSON.stringify({
+        ...(tfTime ? { time: tfTime } : {}),
+        ...(tfDeviceId ? { deviceId: parseInt(tfDeviceId) } : {}),
+      });
+
+      if (!occurrenceId && tfDetectionMethod === "Trampa Sherman") {
+        const validCaptures = shermanCaptures.filter(c => c.date && c.abundance);
+        if (validCaptures.length === 0) { toast.error("Agrega al menos una captura"); return; }
+        setSubmitting(true);
+        const methodologyData = buildMethodologyData();
+        let count = 0;
+        for (const capture of validCaptures) {
+          const result = await createOccurrence(projectId, campaignId, stationId, {
+            speciesId,
+            date: capture.date,
+            abundance: capture.abundance,
+            detectionMethod: tfDetectionMethod,
+            latitude: tfLat !== null ? String(tfLat) : undefined,
+            longitude: tfLng !== null ? String(tfLng) : undefined,
+            notes: notes || undefined,
+            methodologyData,
+          });
+          if ("success" in result) count++;
+        }
+        setSubmitting(false);
+        if (count > 0) {
+          toast.success(`${count} captura${count === 1 ? "" : "s"} de trampa Sherman registrada${count === 1 ? "" : "s"}`);
+          setSessionCount(n => n + count);
+          resetForm();
+        }
+      } else {
+        if (!tfAbundance) { toast.error("Ingresa el N° de individuos"); return; }
+        const methodologyData = buildMethodologyData();
+        setSubmitting(true);
+        const payload = {
+          speciesId,
+          date: date || format(new Date(), "yyyy-MM-dd"),
+          abundance: tfAbundance,
+          detectionMethod: tfDetectionMethod,
+          latitude: tfLat !== null ? String(tfLat) : undefined,
+          longitude: tfLng !== null ? String(tfLng) : undefined,
+          notes: notes || undefined,
+          methodologyData,
+        };
+        const result = occurrenceId
+          ? await updateOccurrence(projectId, campaignId, stationId, occurrenceId, payload)
+          : await createOccurrence(projectId, campaignId, stationId, payload);
+        setSubmitting(false);
+        if ("error" in result && result.error) {
+          toast.error(String(result.error));
+        } else if (occurrenceId) {
+          toast.success("Registro actualizado");
+          router.push(`/ocurrencias?stationId=${stationId}`);
+        } else {
+          toast.success("Especie registrada");
+          setSessionCount(n => n + 1);
           resetForm();
         }
       }
@@ -414,11 +545,13 @@ export function OccurrenceForm({
             />
           )}
 
-          {/* Date */}
-          <div className="space-y-1.5">
-            <Label htmlFor="date">Fecha de registro</Label>
-            <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
+          {/* Date — hidden for transecto fauna (handled inside custom section) */}
+          {!isTransectoFauna && (
+            <div className="space-y-1.5">
+              <Label htmlFor="date">Fecha de registro</Label>
+              <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+          )}
 
           {/* ── BRAUN-BLANQUET ── */}
           {isBB && (
@@ -716,8 +849,125 @@ export function OccurrenceForm({
             </>
           )}
 
+          {/* ── TRANSECTO LINEAL FAUNA ── */}
+          {isTransectoFauna && (
+            <>
+              {/* Detection method */}
+              <div className="space-y-1.5">
+                <Label>Método de detección <span className="text-red-500">*</span></Label>
+                <Select value={tfDetectionMethod} onValueChange={(v) => setTfDetectionMethod(v ?? "")}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["POA", "Trampa Sherman", "Cámara trampa", "Observación directa", "Captura manual", "Otro"].map((m) => (
+                      <SelectItem key={m} value={m}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Device ID — Sherman or Camera */}
+              {(tfDetectionMethod === "Trampa Sherman" || tfDetectionMethod === "Cámara trampa") && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="tfDeviceId">
+                    N° de {tfDetectionMethod === "Trampa Sherman" ? "trampa" : "cámara"} <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="tfDeviceId"
+                    type="number"
+                    min={1}
+                    step={1}
+                    placeholder="Ej: 1"
+                    value={tfDeviceId}
+                    onChange={(e) => setTfDeviceId(e.target.value)}
+                    className="max-w-[140px]"
+                  />
+                </div>
+              )}
+
+              {/* Sherman: multi-row captures by day */}
+              {!occurrenceId && tfDetectionMethod === "Trampa Sherman" ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Capturas por día <span className="text-red-500">*</span></Label>
+                    <Button type="button" variant="outline" size="sm" onClick={addShermanCapture} className="gap-1 h-7 text-xs">
+                      <Plus className="h-3.5 w-3.5" /> Agregar día
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {shermanCaptures.map((capture, i) => (
+                      <div key={i} className="flex gap-2 items-end bg-gray-50 rounded-lg p-2">
+                        <div className="flex-1 space-y-1">
+                          <Label className="text-xs">Fecha</Label>
+                          <Input type="date" value={capture.date}
+                            onChange={(e) => updateShermanCapture(i, "date", e.target.value)}
+                            className="h-8 text-sm" />
+                        </div>
+                        <div className="w-28 space-y-1">
+                          <Label className="text-xs">N° individuos</Label>
+                          <Input type="number" min={0} placeholder="0" value={capture.abundance}
+                            onChange={(e) => updateShermanCapture(i, "abundance", e.target.value)}
+                            className="h-8 text-sm" />
+                        </div>
+                        {shermanCaptures.length > 1 && (
+                          <button type="button" onClick={() => removeShermanCapture(i)}
+                            className="text-red-400 hover:text-red-600 pb-1">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                /* All other methods or edit mode: single date + time + abundance */
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="date">Fecha <span className="text-red-500">*</span></Label>
+                      <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="tfTime">Hora</Label>
+                      <Input id="tfTime" type="time" value={tfTime} onChange={(e) => setTfTime(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="tfAbundance">N° individuos <span className="text-red-500">*</span></Label>
+                    <Input id="tfAbundance" type="number" min={0} placeholder="0"
+                      value={tfAbundance} onChange={(e) => setTfAbundance(e.target.value)}
+                      className="max-w-[140px]" />
+                  </div>
+                </div>
+              )}
+
+              {/* GPS */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Coordenadas GPS <span className="text-gray-400 font-normal text-xs">(opcional)</span></Label>
+                  <Button type="button" variant="outline" size="sm" onClick={captureGPSFauna}
+                    disabled={gpsLoading} className="gap-1.5 h-8 text-xs">
+                    {gpsLoading
+                      ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Obteniendo...</>
+                      : <><MapPin className="h-3.5 w-3.5" /> Capturar GPS</>}
+                  </Button>
+                </div>
+                {tfLat !== null ? (
+                  <p className="text-xs text-green-700 bg-green-50 rounded px-3 py-1.5 font-mono">
+                    {tfLat.toFixed(6)}, {tfLng!.toFixed(6)}
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-400 bg-gray-50 rounded px-3 py-2">
+                    Presiona "Capturar GPS" para registrar las coordenadas del avistamiento.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+
           {/* ── FAUNA dynamic fields ── */}
-          {!isBB && !isMicroruteo && !isForestal && !isGrilla && surveyType === "FAUNA" && (
+          {!isBB && !isMicroruteo && !isForestal && !isGrilla && !isTransectoFauna && surveyType === "FAUNA" && (
             <FaunaFields
               methodology={methodology}
               values={fieldValues}

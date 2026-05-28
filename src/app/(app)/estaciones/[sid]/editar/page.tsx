@@ -36,6 +36,8 @@ export default async function EditarEstacionPage({
         defaultValues={{
           name: station.name,
           area: station.area?.toString() ?? "",
+          length: station.length?.toString() ?? "",
+          width: station.width?.toString() ?? "",
           notes: station.notes ?? "",
         }}
       />
