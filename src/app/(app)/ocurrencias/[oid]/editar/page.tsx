@@ -90,7 +90,7 @@ export default async function EditarOcurrenciaPage({
         projectId={pid}
         campaignId={cid}
         stationId={occurrence.stationId}
-        surveyType={occurrence.station.campaign.surveyType as "FLORA" | "FAUNA"}
+        surveyType={occurrence.station.campaign.surveyType as "FLORA" | "FAUNA" | "RESCATE"}
         methodology={occurrence.station.campaign.methodology}
         occurrenceId={oid}
         defaultValues={defaultValues}

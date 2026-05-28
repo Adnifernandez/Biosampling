@@ -17,6 +17,7 @@ import {
   createGrillaOccurrences,
   updateGrillaOccurrences,
   updateTransectoCoordinates,
+  createRescateOccurrence,
 } from "@/app/(app)/proyectos/[id]/campanas/[cid]/estaciones/[sid]/ocurrencias/actions";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -58,7 +59,7 @@ interface OccurrenceFormProps {
   projectId: string;
   campaignId: string;
   stationId: string;
-  surveyType: "FLORA" | "FAUNA";
+  surveyType: "FLORA" | "FAUNA" | "RESCATE";
   methodology: string;
   occurrenceId?: string;
   defaultValues?: Record<string, string>;
@@ -85,6 +86,7 @@ export function OccurrenceForm({
   const isForestal = methodology === "PARCELAS_FORESTALES";
   const isGrilla = methodology === "GRILLA";
   const isTransectoFauna = methodology === "TRANSECTO_LINEAL_FAUNA";
+  const isRescate = methodology === "RESCATE_TRANSECTO" || methodology === "RESCATE_MICRORUTEO";
 
   // Single-species search
   const [speciesQuery, setSpeciesQuery] = useState("");
@@ -138,6 +140,17 @@ export function OccurrenceForm({
   const [shermanCaptures, setShermanCaptures] = useState<{ date: string; abundance: string }[]>([
     { date: format(new Date(), "yyyy-MM-dd"), abundance: "" },
   ]);
+
+  // Rescate state
+  const [rescatePeso, setRescatePeso] = useState("");
+  const [rescateLargo, setRescateLargo] = useState("");
+  const [rescateAncho, setRescateAncho] = useState("");
+  const [rescateUtmNorth, setRescateUtmNorth] = useState("");
+  const [rescateUtmEast, setRescateUtmEast] = useState("");
+  const [rescateUtmZone, setRescateUtmZone] = useState("19S");
+  const [rescateLat, setRescateLat] = useState<number | null>(null);
+  const [rescateLng, setRescateLng] = useState<number | null>(null);
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
 
   // Load methodology data in edit mode
   useEffect(() => {
@@ -222,7 +235,7 @@ export function OccurrenceForm({
     setSearching(true);
     const seq = ++searchSeq.current;
     const timer = setTimeout(async () => {
-      const results = await searchSpecies(speciesQuery, surveyType);
+      const results = await searchSpecies(speciesQuery, surveyType === "RESCATE" ? "FAUNA" : surveyType);
       if (seq === searchSeq.current) { setSpeciesList(results); setSearching(false); }
     }, 250);
     return () => clearTimeout(timer);
@@ -279,6 +292,23 @@ export function OccurrenceForm({
         if (isGrilla && transectoId) {
           try { await updateTransectoCoordinates(transectoId, pos.coords.latitude, pos.coords.longitude); } catch {}
         }
+        setGpsLoading(false);
+      },
+      () => { toast.error("No se pudo obtener ubicación GPS"); setGpsLoading(false); },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  function captureGPSRescate() {
+    setGpsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { north, east, zone } = latLngToUTM(pos.coords.latitude, pos.coords.longitude);
+        setRescateUtmNorth(String(north));
+        setRescateUtmEast(String(east));
+        setRescateUtmZone(zone);
+        setRescateLat(pos.coords.latitude);
+        setRescateLng(pos.coords.longitude);
         setGpsLoading(false);
       },
       () => { toast.error("No se pudo obtener ubicación GPS"); setGpsLoading(false); },
@@ -442,6 +472,47 @@ export function OccurrenceForm({
           setSessionCount(n => n + 1);
           resetForm();
         }
+      }
+      return;
+    }
+
+    // Rescate flow
+    if (isRescate) {
+      const speciesId = selectedSpecies?.id ?? defaultValues?.speciesId ?? "";
+      if (!speciesId) { toast.error("Selecciona una especie"); return; }
+      setSubmitting(true);
+      const result = await createRescateOccurrence(projectId, campaignId, stationId, {
+        speciesId,
+        date: date || format(new Date(), "yyyy-MM-dd"),
+        latitude: rescateLat !== null ? String(rescateLat) : undefined,
+        longitude: rescateLng !== null ? String(rescateLng) : undefined,
+        utmNorth: rescateUtmNorth || undefined,
+        utmEast: rescateUtmEast || undefined,
+        utmZone: rescateUtmZone || undefined,
+        peso: rescatePeso || undefined,
+        largo: rescateLargo || undefined,
+        ancho: rescateAncho || undefined,
+        notes: notes || undefined,
+      });
+      setSubmitting(false);
+      if ("error" in result && result.error) {
+        toast.error(String(result.error));
+      } else if ("success" in result) {
+        const code = result.individualCode ?? "";
+        setGeneratedCode(code);
+        toast.success(`Captura registrada — Código: ${code}`);
+        setSessionCount((n) => n + 1);
+        setSelectedSpecies(null);
+        setSpeciesQuery("");
+        setSpeciesList([]);
+        setRescatePeso("");
+        setRescateLargo("");
+        setRescateAncho("");
+        setRescateUtmNorth("");
+        setRescateUtmEast("");
+        setRescateLat(null);
+        setRescateLng(null);
+        setNotes("");
       }
       return;
     }
@@ -960,6 +1031,105 @@ export function OccurrenceForm({
             </>
           )}
 
+          {/* ── RESCATE ── */}
+          {isRescate && (
+            <div className="space-y-4">
+              {/* GPS UTM */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Coordenadas UTM de captura <span className="text-gray-400 font-normal text-xs">(opcional)</span></Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={gpsLoading}
+                    onClick={captureGPSRescate}
+                    className="gap-1.5 h-8 text-xs"
+                  >
+                    {gpsLoading
+                      ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Obteniendo...</>
+                      : <><MapPin className="h-3.5 w-3.5" /> Capturar GPS</>}
+                  </Button>
+                </div>
+                {(rescateUtmNorth || rescateUtmEast) ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-gray-600">Norte</Label>
+                        <Input type="text" readOnly value={rescateUtmNorth} className="bg-gray-50 font-mono text-sm" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-gray-600">Este</Label>
+                        <Input type="text" readOnly value={rescateUtmEast} className="bg-gray-50 font-mono text-sm" />
+                      </div>
+                    </div>
+                    <p className="text-xs text-green-700 bg-green-50 rounded px-3 py-1.5">
+                      Zona: <span className="font-semibold">{rescateUtmZone}</span> · coordenadas calculadas automáticamente
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-400 bg-gray-50 rounded px-3 py-2">
+                    Presiona "Capturar GPS" para registrar las coordenadas UTM del punto de captura.
+                  </p>
+                )}
+              </div>
+
+              {/* Biometrics */}
+              <div className="space-y-2">
+                <Label>Biometría <span className="text-gray-400 font-normal text-xs">(opcional)</span></Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-gray-600">Peso (g)</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      placeholder="—"
+                      value={rescatePeso}
+                      onChange={(e) => setRescatePeso(e.target.value)}
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-gray-600">Largo (cm)</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      placeholder="—"
+                      value={rescateLargo}
+                      onChange={(e) => setRescateLargo(e.target.value)}
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-gray-600">Ancho (cm)</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      placeholder="—"
+                      value={rescateAncho}
+                      onChange={(e) => setRescateAncho(e.target.value)}
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Generated code display */}
+              {generatedCode && (
+                <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2.5">
+                  <CheckCircle2 className="h-4 w-4 text-orange-600 shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-500">Último código generado</p>
+                    <p className="text-sm font-bold font-mono text-orange-700">{generatedCode}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── FAUNA dynamic fields ── */}
           {!isBB && !isMicroruteo && !isForestal && !isGrilla && !isTransectoFauna && surveyType === "FAUNA" && (
             <FaunaFields
@@ -998,7 +1168,9 @@ export function OccurrenceForm({
               {submitting ? "Guardando..."
                 : isGrilla
                   ? `${occurrenceId ? "Actualizar" : "Registrar"} grilla (${grillaPoints.filter(p => p.type !== "empty").length}/16 puntos)`
-                  : occurrenceId ? "Actualizar" : "Registrar especie"}
+                  : isRescate
+                    ? "Registrar captura"
+                    : occurrenceId ? "Actualizar" : "Registrar especie"}
             </Button>
           </div>
         </form>

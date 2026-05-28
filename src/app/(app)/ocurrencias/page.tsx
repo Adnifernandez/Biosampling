@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, ClipboardList, Pencil } from "lucide-react";
+import { Plus, ClipboardList, Pencil, MapPin } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { OcurrenciasFiltro } from "@/components/ocurrencias/OcurrenciasFiltro";
@@ -15,9 +15,11 @@ type OccurrenceRow = {
   abundance: number | null;
   cover: number | null;
   methodologyData: string | null;
+  individualCode: string | null;
   species: { genus: string; species: string; commonName: string | null };
   user: { name: string };
-  station: { name: string };
+  station: { name: string; campaign: { methodology: string } };
+  relocation: { id: string } | null;
 };
 
 export default async function OcurrenciasPage({
@@ -57,9 +59,11 @@ export default async function OcurrenciasPage({
             abundance: true,
             cover: true,
             methodologyData: true,
+            individualCode: true,
             species: { select: { genus: true, species: true, commonName: true } },
             user: { select: { name: true } },
-            station: { select: { name: true } },
+            station: { select: { name: true, campaign: { select: { methodology: true } } } },
+            relocation: { select: { id: true } },
           },
         })
       : ([] as OccurrenceRow[]),
@@ -186,50 +190,69 @@ export default async function OcurrenciasPage({
       ) : (
         /* ── Non-GRILLA: individual occurrence cards ── */
         <div className="space-y-2">
-          {occurrences.map((o) => (
-            <Card key={o.id} className="hover:shadow-sm transition-shadow">
-              <CardContent className="py-3 px-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-gray-900 italic">
-                      {o.species.genus} {o.species.species}
-                    </p>
-                    {o.species.commonName && (
-                      <p className="text-xs text-gray-500">{o.species.commonName}</p>
-                    )}
-                    <p className="text-xs text-gray-400 mt-0.5">{o.user.name}</p>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <div className="text-right">
-                      {o.abundance != null && (
-                        <p className="text-sm font-semibold text-gray-700">{o.abundance} ind.</p>
-                      )}
-                      {o.cover != null && (
-                        <p className="text-sm font-semibold text-gray-700">{o.cover}%</p>
-                      )}
-                      <p className="text-xs text-gray-400">
-                        {format(new Date(o.date), "d MMM yyyy", { locale: es })}
+          {occurrences.map((o) => {
+            const isRescate = o.station.campaign.methodology === "RESCATE_TRANSECTO" || o.station.campaign.methodology === "RESCATE_MICRORUTEO";
+            return (
+              <Card key={o.id} className="hover:shadow-sm transition-shadow">
+                <CardContent className="py-3 px-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-gray-900 italic">
+                        {o.species.genus} {o.species.species}
                       </p>
+                      {o.species.commonName && (
+                        <p className="text-xs text-gray-500">{o.species.commonName}</p>
+                      )}
+                      {o.individualCode && (
+                        <p className="text-xs font-mono text-orange-600 font-semibold mt-0.5">{o.individualCode}</p>
+                      )}
+                      <p className="text-xs text-gray-400 mt-0.5">{o.user.name}</p>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Link
-                        href={`/ocurrencias/${o.id}/editar?stationId=${stationId}`}
-                        className="inline-flex items-center justify-center h-8 w-8 rounded-md border border-gray-200 hover:bg-gray-50 text-gray-500 hover:text-gray-700 transition-colors"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Link>
-                      <DeleteOccurrenceButton
-                        projectId={projectId ?? ""}
-                        campaignId={campaignId ?? ""}
-                        stationId={stationId ?? ""}
-                        occurrenceId={o.id}
-                      />
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="text-right">
+                        {o.abundance != null && (
+                          <p className="text-sm font-semibold text-gray-700">{o.abundance} ind.</p>
+                        )}
+                        {o.cover != null && (
+                          <p className="text-sm font-semibold text-gray-700">{o.cover}%</p>
+                        )}
+                        <p className="text-xs text-gray-400">
+                          {format(new Date(o.date), "d MMM yyyy", { locale: es })}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {isRescate && (
+                          <Link
+                            href={`/ocurrencias/${o.id}/relocalizacion?stationId=${stationId}`}
+                            className={`inline-flex items-center justify-center h-8 w-8 rounded-md border transition-colors ${
+                              o.relocation
+                                ? "border-orange-300 bg-orange-50 text-orange-600 hover:bg-orange-100"
+                                : "border-gray-200 hover:bg-gray-50 text-gray-400 hover:text-gray-600"
+                            }`}
+                            title={o.relocation ? "Ver relocalización" : "Relocalizar"}
+                          >
+                            <MapPin className="h-3.5 w-3.5" />
+                          </Link>
+                        )}
+                        <Link
+                          href={`/ocurrencias/${o.id}/editar?stationId=${stationId}`}
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-md border border-gray-200 hover:bg-gray-50 text-gray-500 hover:text-gray-700 transition-colors"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Link>
+                        <DeleteOccurrenceButton
+                          projectId={projectId ?? ""}
+                          campaignId={campaignId ?? ""}
+                          stationId={stationId ?? ""}
+                          occurrenceId={o.id}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

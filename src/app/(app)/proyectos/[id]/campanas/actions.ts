@@ -7,7 +7,7 @@ import { z } from "zod";
 
 const campaignSchema = z.object({
   name: z.string().min(2),
-  surveyType: z.enum(["FLORA", "FAUNA"]),
+  surveyType: z.enum(["FLORA", "FAUNA", "RESCATE"]),
   methodology: z.string().min(1),
   startDate: z.string().min(1),
   endDate: z.string().min(1),

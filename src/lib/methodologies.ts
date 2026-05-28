@@ -128,6 +128,21 @@ export const METHODOLOGIES: Methodology[] = [
       { key: "behavior", label: "Edad/Plumaje", type: "text" },
     ],
   },
+  // Rescate y Relocalización
+  {
+    id: "RESCATE_TRANSECTO",
+    name: "Transecto",
+    description: "Transecto de rescate",
+    surveyType: "RESCATE",
+    fields: [],
+  },
+  {
+    id: "RESCATE_MICRORUTEO",
+    name: "Microruteo",
+    description: "Recorrido libre",
+    surveyType: "RESCATE",
+    fields: [],
+  },
   {
     id: "VES",
     name: "VES",

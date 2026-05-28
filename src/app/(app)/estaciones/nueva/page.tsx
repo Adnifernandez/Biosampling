@@ -27,12 +27,14 @@ export default async function NuevaEstacionPage({
 
   if (!campaign || campaign.projectId !== projectId) notFound();
 
-  const stationType = campaign.surveyType === "FLORA" ? "PARCELA" : "TRANSECTO";
+  const isTransectoMethodology = campaign.surveyType === "FAUNA" || campaign.methodology === "RESCATE_TRANSECTO";
+  const stationType = isTransectoMethodology ? "TRANSECTO" : "PARCELA";
   const prefix =
     campaign.methodology === "GRILLA" ? "T"
-    : campaign.surveyType === "FAUNA" ? "T"
+    : isTransectoMethodology ? "T"
     : campaign.methodology === "PARCELAS_FORESTALES" ? "PF"
     : campaign.methodology === "MICRORUTEO" ? "R"
+    : campaign.methodology === "RESCATE_MICRORUTEO" ? "R"
     : "P";
   const regex = new RegExp(`^${prefix}(\\d+)$`);
 
@@ -71,7 +73,7 @@ export default async function NuevaEstacionPage({
       <NuevasEstacionesForm
         campaignId={campaignId}
         projectId={projectId}
-        surveyType={campaign.surveyType as "FLORA" | "FAUNA"}
+        surveyType={campaign.surveyType as "FLORA" | "FAUNA" | "RESCATE"}
         methodology={campaign.methodology ?? ""}
         nextNumber={nextNumber}
         campaignName={campaign.name}

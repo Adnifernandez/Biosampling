@@ -103,11 +103,11 @@ model Species {
 }
 
 model Occurrence {
-  id              String   @id @default(cuid())
+  id              String      @id @default(cuid())
   stationId       String
   speciesId       String
   userId          String
-  date            DateTime @default(now())
+  date            DateTime    @default(now())
   latitude        Float?
   longitude       Float?
   abundance       Int?
@@ -122,14 +122,29 @@ model Occurrence {
   detectionMethod String?
   notes           String?
   methodologyData String?
-  synced          Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  station         Station  @relation(fields: [stationId], references: [id], onDelete: Cascade)
-  species         Species  @relation(fields: [speciesId], references: [id])
-  user            User     @relation(fields: [userId], references: [id])
+  individualCode  String?
+  synced          Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  station         Station     @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  species         Species     @relation(fields: [speciesId], references: [id])
+  user            User        @relation(fields: [userId], references: [id])
+  relocation      Relocation?
 
   @@index([stationId])
   @@index([speciesId])
   @@index([userId])
+}
+
+model Relocation {
+  id           String     @id @default(cuid())
+  occurrenceId String     @unique
+  latitude     Float?
+  longitude    Float?
+  notes        String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  occurrence   Occurrence @relation(fields: [occurrenceId], references: [id], onDelete: Cascade)
+
+  @@index([occurrenceId])
 }

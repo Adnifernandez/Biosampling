@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Leaf, Bird } from "lucide-react";
+import { Leaf, Bird, ShieldCheck } from "lucide-react";
 import { createEstaciones } from "@/app/(app)/estaciones/actions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 interface NuevasEstacionesFormProps {
   campaignId: string;
   projectId: string;
-  surveyType: "FLORA" | "FAUNA";
+  surveyType: "FLORA" | "FAUNA" | "RESCATE";
   methodology: string;
   nextNumber: number;
   campaignName: string;
@@ -30,13 +30,14 @@ export function NuevasEstacionesForm({
   campaignName,
 }: NuevasEstacionesFormProps) {
   const router = useRouter();
-  const stationType = surveyType === "FLORA" ? "PARCELA" : "TRANSECTO";
-  const isMicroruteo = methodology === "MICRORUTEO";
+  const isMicroruteo = methodology === "MICRORUTEO" || methodology === "RESCATE_MICRORUTEO";
   const isGrilla = methodology === "GRILLA";
+  const isTransectoMethod = surveyType === "FAUNA" || methodology === "RESCATE_TRANSECTO";
+  const stationType = isTransectoMethod ? "TRANSECTO" : "PARCELA";
 
   const prefix =
     isGrilla ? "T"
-    : surveyType === "FAUNA" ? "T"
+    : isTransectoMethod ? "T"
     : methodology === "PARCELAS_FORESTALES" ? "PF"
     : isMicroruteo ? "R"
     : "P";
@@ -106,17 +107,25 @@ export function NuevasEstacionesForm({
           <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Tipo de estación</p>
           <div className={cn(
             "flex items-center gap-3 p-3 rounded-lg border-2",
-            surveyType === "FLORA" ? "border-green-200 bg-green-50" : "border-blue-200 bg-blue-50"
+            surveyType === "FLORA" ? "border-green-200 bg-green-50"
+            : surveyType === "RESCATE" ? "border-orange-200 bg-orange-50"
+            : "border-blue-200 bg-blue-50"
           )}>
             {surveyType === "FLORA"
               ? <Leaf className="h-5 w-5 text-green-700 shrink-0" />
-              : <Bird className="h-5 w-5 text-blue-700 shrink-0" />}
+              : surveyType === "RESCATE"
+                ? <ShieldCheck className="h-5 w-5 text-orange-700 shrink-0" />
+                : <Bird className="h-5 w-5 text-blue-700 shrink-0" />}
             <div>
-              <p className={cn("font-semibold text-sm", surveyType === "FLORA" ? "text-green-800" : "text-blue-800")}>
+              <p className={cn("font-semibold text-sm",
+                surveyType === "FLORA" ? "text-green-800"
+                : surveyType === "RESCATE" ? "text-orange-800"
+                : "text-blue-800"
+              )}>
                 {stationLabel}
               </p>
               <p className="text-xs text-gray-500">
-                Campaña {surveyType === "FLORA" ? "Flora" : "Fauna"} · {campaignName}
+                Campaña {surveyType === "FLORA" ? "Flora" : surveyType === "RESCATE" ? "Rescate" : "Fauna"} · {campaignName}
               </p>
             </div>
           </div>

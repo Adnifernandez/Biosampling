@@ -30,7 +30,7 @@ export default async function EditarCampanaPage({ params }: { params: Promise<{ 
         campaignId={campaign.id}
         defaultValues={{
           name: campaign.name,
-          surveyType: campaign.surveyType as "FLORA" | "FAUNA",
+          surveyType: campaign.surveyType as "FLORA" | "FAUNA" | "RESCATE",
           methodology: campaign.methodology,
           startDate: format(new Date(campaign.startDate), "yyyy-MM-dd"),
           endDate: format(new Date(campaign.endDate), "yyyy-MM-dd"),

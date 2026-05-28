@@ -245,6 +245,131 @@ export async function updateGrillaOccurrences(
   return { success: true };
 }
 
+export async function createRescateOccurrence(
+  projectId: string,
+  campaignId: string,
+  stationId: string,
+  data: {
+    speciesId: string;
+    date: string;
+    latitude?: string;
+    longitude?: string;
+    utmNorth?: string;
+    utmEast?: string;
+    utmZone?: string;
+    peso?: string;
+    largo?: string;
+    ancho?: string;
+    notes?: string;
+  }
+) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("No autorizado");
+
+  const project = await prisma.project.findUnique({ where: { id: projectId }, select: { status: true } });
+  if (project?.status === "COMPLETED") return { error: "El proyecto está cerrado y no permite cambios" };
+
+  // Get species genus for the code
+  const species = await prisma.species.findUnique({ where: { id: data.speciesId }, select: { genus: true } });
+  if (!species) return { error: "Especie no encontrada" };
+
+  // Count existing occurrences of this species in this campaign to generate correlative code
+  const existing = await prisma.occurrence.count({
+    where: {
+      speciesId: data.speciesId,
+      station: { campaignId },
+    },
+  });
+  const individualCode = `${species.genus}-${String(existing + 1).padStart(3, "0")}`;
+
+  const methodologyData = JSON.stringify({
+    ...(data.utmNorth ? { utm_north: data.utmNorth, utm_east: data.utmEast, utm_zone: data.utmZone } : {}),
+    ...(data.peso ? { peso: parseFloat(data.peso) } : {}),
+    ...(data.largo ? { largo: parseFloat(data.largo) } : {}),
+    ...(data.ancho ? { ancho: parseFloat(data.ancho) } : {}),
+  });
+
+  const occurrence = await prisma.occurrence.create({
+    data: {
+      stationId,
+      speciesId: data.speciesId,
+      userId: session.user.id,
+      date: data.date ? new Date(data.date) : new Date(),
+      latitude: data.latitude ? parseFloat(data.latitude) : null,
+      longitude: data.longitude ? parseFloat(data.longitude) : null,
+      individualCode,
+      notes: data.notes || null,
+      methodologyData,
+    },
+  });
+
+  revalidatePath(`/proyectos/${projectId}/campanas/${campaignId}/estaciones/${stationId}`);
+  revalidatePath("/ocurrencias");
+  return { success: true, id: occurrence.id, individualCode };
+}
+
+export async function createRelocation(
+  projectId: string,
+  campaignId: string,
+  stationId: string,
+  occurrenceId: string,
+  data: {
+    latitude?: string;
+    longitude?: string;
+    notes?: string;
+  }
+) {
+  const session = await auth();
+  if (!session) throw new Error("No autorizado");
+
+  await prisma.relocation.create({
+    data: {
+      occurrenceId,
+      latitude: data.latitude ? parseFloat(data.latitude) : null,
+      longitude: data.longitude ? parseFloat(data.longitude) : null,
+      notes: data.notes || null,
+    },
+  });
+
+  revalidatePath(`/proyectos/${projectId}/campanas/${campaignId}/estaciones/${stationId}`);
+  revalidatePath("/ocurrencias");
+  return { success: true };
+}
+
+export async function updateRelocation(
+  projectId: string,
+  campaignId: string,
+  stationId: string,
+  occurrenceId: string,
+  data: {
+    latitude?: string;
+    longitude?: string;
+    notes?: string;
+  }
+) {
+  const session = await auth();
+  if (!session) throw new Error("No autorizado");
+
+  await prisma.relocation.upsert({
+    where: { occurrenceId },
+    create: {
+      occurrenceId,
+      latitude: data.latitude ? parseFloat(data.latitude) : null,
+      longitude: data.longitude ? parseFloat(data.longitude) : null,
+      notes: data.notes || null,
+    },
+    update: {
+      latitude: data.latitude ? parseFloat(data.latitude) : null,
+      longitude: data.longitude ? parseFloat(data.longitude) : null,
+      notes: data.notes || null,
+    },
+  });
+
+  revalidatePath(`/proyectos/${projectId}/campanas/${campaignId}/estaciones/${stationId}`);
+  revalidatePath("/ocurrencias");
+  return { success: true };
+}
+
 export async function updateTransectoCoordinates(
   transectoId: string,
   latitude: number,
