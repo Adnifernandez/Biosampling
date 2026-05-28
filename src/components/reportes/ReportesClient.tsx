@@ -1201,12 +1201,12 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-gray-800 text-white">
-                        <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Transectos</th>
-                        <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">Riqueza (S)</th>
-                        <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">Abundancia (N)</th>
-                        <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">Shannon (H&apos;)</th>
-                        <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">Equidad (J&apos;)</th>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Transectos</th>
+                        <th className="text-right px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Riqueza (S)</th>
+                        <th className="text-right px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Abundancia (N)</th>
+                        <th className="text-right px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Shannon (H&apos;)</th>
+                        <th className="text-right px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Equidad (J&apos;)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
