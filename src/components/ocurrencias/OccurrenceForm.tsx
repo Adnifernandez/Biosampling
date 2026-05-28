@@ -131,7 +131,7 @@ export function OccurrenceForm({
   // Fauna transecto state
   const [tfDetectionMethod, setTfDetectionMethod] = useState("");
   const [tfDeviceId, setTfDeviceId] = useState("");
-  const [tfTime, setTfTime] = useState("");
+  const [tfTime, setTfTime] = useState(format(new Date(), "HH:mm"));
   const [tfLat, setTfLat] = useState<number | null>(null);
   const [tfLng, setTfLng] = useState<number | null>(null);
   const [tfAbundance, setTfAbundance] = useState("");
@@ -261,7 +261,7 @@ export function OccurrenceForm({
     setNotes("");
     setTfDetectionMethod("");
     setTfDeviceId("");
-    setTfTime("");
+    setTfTime(format(new Date(), "HH:mm"));
     setTfLat(null);
     setTfLng(null);
     setTfAbundance("");
@@ -923,15 +923,9 @@ export function OccurrenceForm({
               ) : (
                 /* All other methods or edit mode: single date + time + abundance */
                 <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="date">Fecha <span className="text-red-500">*</span></Label>
-                      <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="tfTime">Hora</Label>
-                      <Input id="tfTime" type="time" value={tfTime} onChange={(e) => setTfTime(e.target.value)} />
-                    </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="date">Fecha <span className="text-red-500">*</span></Label>
+                    <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="tfAbundance">N° individuos <span className="text-red-500">*</span></Label>

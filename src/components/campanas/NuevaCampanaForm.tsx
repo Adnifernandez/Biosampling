@@ -65,7 +65,10 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
     ? `${season} ${year} — ${suffix.trim()}`
     : `${season} ${year}`;
 
-  const methodologies = METHODOLOGIES.filter((m) => m.surveyType === surveyType);
+  const methodologies = METHODOLOGIES.filter((m) =>
+    m.surveyType === surveyType &&
+    (surveyType !== "FAUNA" || m.id === "TRANSECTO_LINEAL_FAUNA")
+  );
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
