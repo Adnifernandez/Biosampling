@@ -400,7 +400,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
 
     if (isTransectoFauna && transectoFaunaData) {
       const { rows, totalAbundance } = transectoFaunaData;
-      addSheet("Transecto Fauna", [
+      addSheet("Consolidado", [
         ["Clase", "Orden", "Familia", "Especie", "Nombre Común", "Origen", "E.C.", "Abundancia Total"],
         ...rows.map(({ sp, abundance }) => [
           sp.clase ?? "", sp.orden ?? "", sp.family,
@@ -408,6 +408,12 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
           sp.origen ?? "", primaryStatus(sp.conservationStatus), abundance,
         ]),
         ["", "", "", "", "", "", "Total", totalAbundance],
+      ]);
+    }
+    if (isTransectoFauna && communityParamsData && communityParamsData.length > 0) {
+      addSheet("Parámetros", [
+        ["Transecto", "Riqueza (S)", "Abundancia (N)", "Shannon (H')", "Equidad (J')"],
+        ...communityParamsData.map((r) => [r.name, r.S, r.N, r.H, r.J]),
       ]);
     }
 
@@ -501,6 +507,36 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     const totalAbundance = rows.reduce((sum, r) => sum + r.abundance, 0);
     return { rows, totalAbundance };
   })();
+
+  // ── Parámetros comunitarios por transecto ──
+  const communityParamsData = (() => {
+    if (!selectedCampaign || !isTransectoFauna) return null;
+    const sortedStations = [...selectedCampaign.stations].sort((a, b) =>
+      a.name.localeCompare(b.name, "es", { numeric: true })
+    );
+    return sortedStations
+      .map((station) => {
+        const speciesAbundance = new Map<string, number>();
+        for (const occ of station.occurrences) {
+          const n = occ.abundance ?? 1;
+          speciesAbundance.set(occ.species.id, (speciesAbundance.get(occ.species.id) ?? 0) + n);
+        }
+        const S = speciesAbundance.size;
+        const N = Array.from(speciesAbundance.values()).reduce((s, n) => s + n, 0);
+        let H = 0;
+        if (N > 0) {
+          for (const ni of speciesAbundance.values()) {
+            const pi = ni / N;
+            if (pi > 0) H -= pi * Math.log(pi);
+          }
+        }
+        const J = S > 1 ? H / Math.log(S) : S === 1 ? 1 : 0;
+        return { name: station.name, S, N, H: Math.round(H * 1000) / 1000, J: Math.round(J * 1000) / 1000 };
+      })
+      .filter((s) => s.N > 0);
+  })();
+
+  const fmt3 = (n: number) => n.toFixed(3).replace(".", ",");
 
   return (
     <div className="space-y-4">
@@ -1115,20 +1151,20 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-gray-800 text-white">
-                        <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Clase</th>
-                        <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Orden</th>
-                        <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Familia</th>
-                        <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap italic">Especie</th>
-                        <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Nombre Común</th>
-                        <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Origen</th>
-                        <th className="text-center px-3 py-2.5 font-semibold whitespace-nowrap">E.C.</th>
-                        <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">Abundancia Total</th>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Clase</th>
+                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Orden</th>
+                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Familia</th>
+                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap italic">Especie</th>
+                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Nombre Común</th>
+                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Origen</th>
+                        <th className="text-center px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">E.C.</th>
+                        <th className="text-right px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Abundancia Total</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {transectoFaunaData.rows.map(({ sp, abundance }, i) => (
-                        <tr key={sp.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                      {transectoFaunaData.rows.map(({ sp, abundance }) => (
+                        <tr key={sp.id} className="hover:bg-gray-50">
                           <td className="px-3 py-2">{sp.clase ?? "—"}</td>
                           <td className="px-3 py-2 text-gray-600">{sp.orden ?? "—"}</td>
                           <td className="px-3 py-2 text-gray-600">{sp.family}</td>
@@ -1150,6 +1186,41 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
                   {transectoFaunaData.rows.length === 0 && (
                     <p className="text-sm text-gray-400 text-center py-8">Sin registros en esta campaña</p>
                   )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ── TRANSECTO FAUNA: parámetros comunitarios ── */}
+          {isTransectoFauna && communityParamsData && communityParamsData.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Parámetros Comunitarios por Transecto</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-800 text-white">
+                        <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Transectos</th>
+                        <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">Riqueza (S)</th>
+                        <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">Abundancia (N)</th>
+                        <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">Shannon (H&apos;)</th>
+                        <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">Equidad (J&apos;)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {communityParamsData.map((row) => (
+                        <tr key={row.name} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 font-medium">{row.name}</td>
+                          <td className="px-3 py-2 text-right font-mono">{row.S}</td>
+                          <td className="px-3 py-2 text-right font-mono">{row.N}</td>
+                          <td className="px-3 py-2 text-right font-mono">{fmt3(row.H)}</td>
+                          <td className="px-3 py-2 text-right font-mono">{fmt3(row.J)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </CardContent>
             </Card>
