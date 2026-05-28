@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Download, BarChart2, ListTree, Leaf, Bird } from "lucide-react";
+import * as XLSX from "xlsx";
 import { SURVEY_TYPE_LABELS } from "@/lib/types";
 import { getMethodologyById } from "@/lib/methodologies";
 
@@ -292,31 +293,114 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     return { grillaStations, rows, sinVegPerGrilla, grillaHasData, hydroByTransecto };
   })();
 
-  // ── CSV export: Parcelas ──
-  function exportParcelasCSV() {
-    if (!bbData || !selectedCampaign) return;
-    const { sortedStations, rows } = bbData;
-    const stHeaders = sortedStations.map((s) => s.name);
-    const header = ["División", "Clase", "Familia", "Especie", "Nombre Común", "Hábito", "Origen", "Estado Conservación", ...stHeaders].join(",");
-    const dataRows = rows.map(({ sp, stMap }) => [
-      sp.division ?? "",
-      sp.clase ?? "",
-      sp.family,
-      `${sp.genus} ${sp.species}`,
-      sp.commonName ?? "",
-      sp.habito ?? "",
-      sp.origen ?? "",
-      primaryStatus(sp.conservationStatus),
-      ...sortedStations.map((s) => stMap.get(s.id) ?? ""),
-    ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","));
-    const csv = [header, ...dataRows].join("\n");
-    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `parcelas_${selectedCampaign.name.replace(/\s+/g, "_")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  // ── XLSX export (all tables, one sheet each) ──
+  function exportXLSX() {
+    if (!selectedCampaign || !stats) return;
+    const wb = XLSX.utils.book_new();
+    const fname = selectedCampaign.name.replace(/\s+/g, "_");
+
+    function addSheet(name: string, rows: (string | number | null | undefined)[][]) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), name);
+    }
+
+    if (isBB && bbData) {
+      const { sortedStations, rows, habitoRows, origenRows } = bbData;
+      addSheet("Parcelas BB", [
+        ["División", "Clase", "Familia", "Especie", "Nombre Común", "Hábito", "Origen", "Estado Conservación", ...sortedStations.map((s) => s.name)],
+        ...rows.map(({ sp, stMap }) => [
+          sp.division ?? "", sp.clase ?? "", sp.family, `${sp.genus} ${sp.species}`,
+          sp.commonName ?? "", sp.habito ?? "", sp.origen ?? "", primaryStatus(sp.conservationStatus),
+          ...sortedStations.map((s) => stMap.get(s.id) ?? ""),
+        ]),
+      ]);
+      addSheet("Hábito", [["Hábito", "N° Especies"], ...habitoRows.map(([h, n]) => [h, n])]);
+      addSheet("Origen", [["Origen", "N° Especies"], ...origenRows.map(([o, n]) => [o, n])]);
+    }
+
+    if (isMicroruteo && microData) {
+      const { rows, habitoRows, origenRows } = microData;
+      addSheet("Microruteo", [
+        ["División", "Clase", "Familia", "Especie", "Nombre Común", "Hábito", "Origen", "Estado Conservación", "Individuo", "Este (m E)", "Norte (m S)"],
+        ...rows.map(({ sp, individuo, utmEast, utmNorth }) => [
+          sp.division ?? "", sp.clase ?? "", sp.family, `${sp.genus} ${sp.species}`,
+          sp.commonName ?? "", sp.habito ?? "", sp.origen ?? "", primaryStatus(sp.conservationStatus),
+          individuo,
+          utmEast != null ? Math.round(utmEast) : "",
+          utmNorth != null ? Math.round(utmNorth) : "",
+        ]),
+      ]);
+      addSheet("Hábito", [["Hábito", "N° Especies"], ...habitoRows.map(([h, n]) => [h, n])]);
+      addSheet("Origen", [["Origen", "N° Especies"], ...origenRows.map(([o, n]) => [o, n])]);
+    }
+
+    if (isPF && pfData) {
+      const { speciesRows, individualRows } = pfData;
+      addSheet("Especies", [
+        ["División", "Clase", "Familia", "Especie", "Nombre Común", "Hábito", "Origen", "Estado Conservación"],
+        ...speciesRows.map((sp) => [
+          sp.division ?? "", sp.clase ?? "", sp.family, `${sp.genus} ${sp.species}`,
+          sp.commonName ?? "", sp.habito ?? "", sp.origen ?? "", primaryStatus(sp.conservationStatus),
+        ]),
+      ]);
+      addSheet("Individuos", [
+        ["Parcela", "Especie", "Individuo", "DAP (cm)", "DAT (cm)", "Altura (m)"],
+        ...individualRows.map((r) => [
+          r.parcela, `${r.sp.genus} ${r.sp.species}`, r.individuo, r.dap ?? "", r.dat ?? "", r.altura ?? "",
+        ]),
+      ]);
+    }
+
+    if (isGrilla && grillaData) {
+      const { grillaStations, rows, sinVegPerGrilla, grillaHasData, hydroByTransecto } = grillaData;
+      const gNames = grillaStations.map((g) => g.name);
+      addSheet("Grilla", [
+        ["División", "Clase", "Familia", "Especie", "Nombre Común", "Hábito", "Hábito Hidrófito", "Origen", "E.C.", ...gNames],
+        ...rows.map(({ sp, perGrilla }) => [
+          sp.division ?? "", sp.clase ?? "", sp.family, `${sp.genus} ${sp.species}`,
+          sp.commonName ?? "", sp.habito ?? "", sp.macrofitasHabito ?? "", sp.origen ?? "",
+          primaryStatus(sp.conservationStatus),
+          ...grillaStations.map((g) => perGrilla.get(g.id) ?? ""),
+        ]),
+        ["", "", "", "", "", "", "", "", "Sin vegetación", ...grillaStations.map((g) => grillaHasData.has(g.id) ? (sinVegPerGrilla.get(g.id) ?? 0) : "")],
+        ["", "", "", "", "", "", "", "", "Total", ...grillaStations.map((g) => grillaHasData.has(g.id) ? 16 : "")],
+      ]);
+      if (hydroByTransecto.length > 0) {
+        const hydroRows: (string | number)[][] = [["Transecto", "Grilla", "Intersecciones Hidrófitas", "Sin Hidrófitas", "Total"]];
+        for (const { transectoName, grillas, siCounts, noCounts } of hydroByTransecto) {
+          for (let i = 0; i < grillas.length; i++) {
+            hydroRows.push([transectoName, grillas[i].name, siCounts[i], noCounts[i], siCounts[i] + noCounts[i]]);
+          }
+        }
+        addSheet("Hidrófitas", hydroRows);
+        addSheet("Condición Humedal", [
+          ["Transecto", "Intersecciones Hidrófitas", "Total Intersecciones", "% Hidrófitas", "Condición"],
+          ...hydroByTransecto.map(({ transectoName, siTotal, grandTotal, siPct }) => [
+            transectoName, siTotal, grandTotal, siPct / 100, siPct > 50 ? "Humedal" : "No Humedal",
+          ]),
+        ]);
+      }
+    }
+
+    if (!isBB && !isMicroruteo && !isPF && !isGrilla) {
+      addSheet("Lista de Especies", [
+        ["Familia", "Género", "Especie", "Nombre Común", "Tipo", "Estado Conservación", "Nº Registros", "Abundancia Total"],
+        ...stats.speciesList.map(({ sp, count, abundance }) => [
+          sp.family, sp.genus, sp.species, sp.commonName ?? "", sp.type,
+          primaryStatus(sp.conservationStatus), count, abundance,
+        ]),
+      ]);
+    }
+
+    if (stats.endangered.length > 0) {
+      addSheet("Conservación", [
+        ["Familia", "Especie", "Nombre Común", "Estado Conservación"],
+        ...stats.endangered.map(({ sp }) => [
+          sp.family, `${sp.genus} ${sp.species}`, sp.commonName ?? "", primaryStatus(sp.conservationStatus),
+        ]),
+      ]);
+    }
+
+    XLSX.writeFile(wb, `reporte_${fname}.xlsx`);
   }
 
   // ── Parcelas Forestales: species list + individuals ──
@@ -363,102 +447,6 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     return { individualRows, speciesRows };
   })();
 
-  // ── CSV export: Microruteo ──
-  function exportMicroruteoCSV() {
-    if (!microData || !selectedCampaign) return;
-    const header = ["División", "Clase", "Familia", "Especie", "Nombre Común", "Hábito", "Origen", "Estado Conservación", "Individuo", "Este (m E)", "Norte (m S)"].join(",");
-    const dataRows = microData.rows.map(({ sp, individuo, utmEast, utmNorth }) =>
-      [sp.division ?? "", sp.clase ?? "", sp.family, `${sp.genus} ${sp.species}`, sp.commonName ?? "",
-       sp.habito ?? "", sp.origen ?? "", primaryStatus(sp.conservationStatus), individuo,
-       utmEast != null ? utmEast.toFixed(0) : "", utmNorth != null ? utmNorth.toFixed(0) : ""].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")
-    );
-    const csv = [header, ...dataRows].join("\n");
-    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `microruteo_${selectedCampaign.name.replace(/\s+/g, "_")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  // ── CSV export: Parcelas Forestales ──
-  function exportForestalesSpeciesCSV() {
-    if (!pfData || !selectedCampaign) return;
-    const header = ["División", "Clase", "Familia", "Especie", "Nombre Común", "Hábito", "Origen", "Estado Conservación"].join(",");
-    const rows = pfData.speciesRows.map((sp) =>
-      [sp.division ?? "", sp.clase ?? "", sp.family, `${sp.genus} ${sp.species}`, sp.commonName ?? "",
-       sp.habito ?? "", sp.origen ?? "", primaryStatus(sp.conservationStatus)]
-        .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")
-    );
-    const csv = [header, ...rows].join("\n");
-    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `especies_forestales_${selectedCampaign.name.replace(/\s+/g, "_")}.csv`; a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function exportForestalesIndividualsCSV() {
-    if (!pfData || !selectedCampaign) return;
-    const header = ["Parcela", "Especie", "Individuo", "DAP (cm)", "DAT (cm)", "Altura (m)"].join(",");
-    const rows = pfData.individualRows.map((r) =>
-      [r.parcela, `${r.sp.genus} ${r.sp.species}`, r.individuo, r.dap, r.dat, r.altura]
-        .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")
-    );
-    const csv = [header, ...rows].join("\n");
-    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `individuos_forestales_${selectedCampaign.name.replace(/\s+/g, "_")}.csv`; a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  // ── CSV export: Grilla ──
-  function exportGrillaCSV() {
-    if (!grillaData || !selectedCampaign) return;
-    const { grillaStations, rows, sinVegPerGrilla } = grillaData;
-    const gNames = grillaStations.map((g) => g.name);
-    const header = ["División", "Clase", "Familia", "Especie", "Nombre Común", "Hábito", "Hábito Hidrófito", "Origen", "E.C", ...gNames].join(",");
-    const dataRows = rows.map(({ sp, perGrilla }) =>
-      [sp.division ?? "", sp.clase ?? "", sp.family, `${sp.genus} ${sp.species}`, sp.commonName ?? "",
-       sp.habito ?? "", sp.macrofitasHabito ?? "", sp.origen ?? "", primaryStatus(sp.conservationStatus),
-       ...grillaStations.map((g) => perGrilla.get(g.id) ?? "")]
-        .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")
-    );
-    const sinVegRow = ["", "", "", "", "", "", "", "", "Sin vegetación",
-      ...grillaStations.map((g) => sinVegPerGrilla.get(g.id) ?? 0)]
-        .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",");
-    const totalRow = ["", "", "", "", "", "", "", "", "Total",
-      ...grillaStations.map(() => 16)]
-        .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",");
-    const csv = [header, ...dataRows, sinVegRow, totalRow].join("\n");
-    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `grilla_${selectedCampaign.name.replace(/\s+/g, "_")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  // ── CSV export: generic ──
-  function exportGenericCSV() {
-    if (!stats || !selectedCampaign) return;
-    const header = "Familia,Género,Especie,Nombre Común,Tipo,Estado Conservación,Nº Registros,Abundancia Total";
-    const rows = stats.speciesList.map((row) =>
-      [row.sp.family, row.sp.genus, row.sp.species, row.sp.commonName ?? "", row.sp.type,
-       primaryStatus(row.sp.conservationStatus), row.count, row.abundance].join(",")
-    );
-    const csv = [header, ...rows].join("\n");
-    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `reporte_${selectedCampaign.name.replace(/\s+/g, "_")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
 
   return (
     <div className="space-y-4">
@@ -507,6 +495,13 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
 
       {stats && selectedCampaign && (
         <div className="space-y-4">
+
+          {/* Export button */}
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" className="gap-2" onClick={exportXLSX}>
+              <Download className="h-4 w-4" /> Exportar XLSX
+            </Button>
+          </div>
 
           {/* Summary cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -575,11 +570,8 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
           {/* ── PARCELAS table (Braun-Blanquet) ── */}
           {isBB && bbData && (
             <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardHeader className="pb-2">
                 <CardTitle className="text-base">Tabla de Parcelas · Braun-Blanquet</CardTitle>
-                <Button variant="outline" size="sm" className="gap-2" onClick={exportParcelasCSV}>
-                  <Download className="h-4 w-4" /> CSV
-                </Button>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
@@ -691,11 +683,8 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
           {/* ── MICRORUTEO table ── */}
           {isMicroruteo && microData && (
             <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardHeader className="pb-2">
                 <CardTitle className="text-base">Tabla de Microruteo</CardTitle>
-                <Button variant="outline" size="sm" className="gap-2" onClick={exportMicroruteoCSV}>
-                  <Download className="h-4 w-4" /> CSV
-                </Button>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
@@ -804,11 +793,8 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
           {/* ── PARCELAS FORESTALES: species table ── */}
           {isPF && pfData && (
             <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardHeader className="pb-2">
                 <CardTitle className="text-base">Tabla general de especies</CardTitle>
-                <Button variant="outline" size="sm" className="gap-2" onClick={exportForestalesSpeciesCSV}>
-                  <Download className="h-4 w-4" /> CSV
-                </Button>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
@@ -851,11 +837,8 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
           {/* ── PARCELAS FORESTALES: individuals table ── */}
           {isPF && pfData && pfData.individualRows.length > 0 && (
             <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardHeader className="pb-2">
                 <CardTitle className="text-base">Tabla de individuos por parcela</CardTitle>
-                <Button variant="outline" size="sm" className="gap-2" onClick={exportForestalesIndividualsCSV}>
-                  <Download className="h-4 w-4" /> CSV
-                </Button>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
@@ -891,14 +874,9 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
           {/* ── GRILLA: species × grilla matrix ── */}
           {isGrilla && grillaData && (
             <Card>
-              <CardHeader className="pb-1 flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">Tabla de Grilla</CardTitle>
-                  <p className="text-xs text-gray-400 mt-0.5">Números = intersecciones del punto de muestreo con la especie (máx. 16 por grilla)</p>
-                </div>
-                <Button variant="outline" size="sm" className="gap-2 shrink-0" onClick={exportGrillaCSV}>
-                  <Download className="h-4 w-4" /> CSV
-                </Button>
+              <CardHeader className="pb-1">
+                <CardTitle className="text-base">Tabla de Grilla</CardTitle>
+                <p className="text-xs text-gray-400 mt-0.5">Números = intersecciones del punto de muestreo con la especie (máx. 16 por grilla)</p>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
@@ -1076,11 +1054,8 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
           {/* ── Generic species table (non-BB methodologies) ── */}
           {!isBB && !isMicroruteo && !isPF && !isGrilla && (
             <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardHeader className="pb-2">
                 <CardTitle className="text-base">Lista de Especies</CardTitle>
-                <Button variant="outline" size="sm" className="gap-2" onClick={exportGenericCSV}>
-                  <Download className="h-4 w-4" /> CSV
-                </Button>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
