@@ -73,7 +73,7 @@ export function ProjectForm({ projectId, defaultValues }: ProjectFormProps) {
         toast.error(result.error);
       } else {
         toast.success("Proyecto actualizado");
-        router.push(`/proyectos/${projectId}`);
+        router.push(`/proyectos`);
       }
     } else {
       const result = await createProject(fd);

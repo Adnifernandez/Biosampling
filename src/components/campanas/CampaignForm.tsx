@@ -23,6 +23,9 @@ const schema = z.object({
   startDate: z.string().min(1, "Fecha de inicio requerida"),
   endDate: z.string().min(1, "Fecha de fin requerida"),
   notes: z.string().optional(),
+}).refine((d) => !d.startDate || !d.endDate || d.endDate >= d.startDate, {
+  message: "La fecha de término no puede ser anterior a la de inicio",
+  path: ["endDate"],
 });
 
 type FormData = z.infer<typeof schema>;
@@ -56,7 +59,7 @@ export function CampaignForm({ projectId, campaignId, defaultValues }: CampaignF
         toast.error(result.error);
       } else {
         toast.success("Campaña actualizada");
-        router.push(`/proyectos/${projectId}/campanas/${campaignId}`);
+        router.push(`/campanas?projectId=${projectId}`);
       }
     } else {
       const result = await createCampaign(projectId, fd);
@@ -64,7 +67,7 @@ export function CampaignForm({ projectId, campaignId, defaultValues }: CampaignF
         toast.error(result.error);
       } else if (result.success && result.id) {
         toast.success("Campaña creada");
-        router.push(`/proyectos/${projectId}/campanas/${result.id}`);
+        router.push(`/campanas?projectId=${projectId}`);
       }
     }
   }

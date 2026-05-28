@@ -71,6 +71,10 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
     e.preventDefault();
     if (!isEdit && !projectId) { toast.error("Selecciona un proyecto"); return; }
     if (!methodology) { toast.error("Selecciona una metodología"); return; }
+    const fd0 = new FormData(e.currentTarget);
+    const sd = fd0.get("startDate") as string;
+    const ed = fd0.get("endDate") as string;
+    if (sd && ed && ed < sd) { toast.error("La fecha de término no puede ser anterior a la de inicio"); return; }
 
     setSubmitting(true);
     const fd = new FormData(e.currentTarget);
