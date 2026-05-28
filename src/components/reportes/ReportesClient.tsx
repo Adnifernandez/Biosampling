@@ -1241,7 +1241,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
           )}
 
           {/* ── TRANSECTO FAUNA: origen summary ── */}
-          {isTransectoFauna && transectoFaunaData && transectoFaunaData.origenRows.length > 0 && (
+          {isTransectoFauna && transectoFaunaData && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold text-gray-700">
@@ -1263,6 +1263,9 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
                         <td className="px-4 py-2 text-right font-medium">{count}</td>
                       </tr>
                     ))}
+                    {transectoFaunaData.origenRows.length === 0 && (
+                      <tr><td colSpan={2} className="px-4 py-4 text-center text-gray-400 text-xs">Sin datos de origen</td></tr>
+                    )}
                   </tbody>
                 </table>
               </CardContent>
