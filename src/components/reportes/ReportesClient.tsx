@@ -61,7 +61,7 @@ type ProjectRow = {
 function primaryStatus(raw: string | null): string {
   if (!raw) return "LC";
   const m = raw.match(/^(CR|EN|VU|NT|LC|DD|EW|EX|NE|NA)/i);
-  return m ? m[1].toUpperCase() : raw.slice(0, 6);
+  return m ? m[1].toUpperCase() : raw;
 }
 
 function statusBadge(raw: string | null) {
@@ -73,7 +73,14 @@ function statusBadge(raw: string | null) {
     code === "NT" ? "bg-blue-50 text-blue-600" :
     code === "LC" ? "bg-gray-100 text-gray-500" :
     "bg-gray-100 text-gray-600";
-  return <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${cls}`}>{code}</span>;
+  return (
+    <span
+      className={`text-xs px-1.5 py-0.5 rounded font-medium whitespace-nowrap ${cls}`}
+      title={raw ?? undefined}
+    >
+      {code}
+    </span>
+  );
 }
 
 export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
@@ -295,12 +302,20 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
 
   // ── XLSX export (all tables, one sheet each) ──
   function exportXLSX() {
-    if (!selectedCampaign || !stats) return;
+    if (!selectedCampaign || !stats || !selectedProject) return;
     const wb = XLSX.utils.book_new();
-    const fname = selectedCampaign.name.replace(/\s+/g, "_");
+    const safe = (s: string) => s.replace(/[/\\?*[\]]/g, "-").replace(/\s+/g, "_");
+    const fname = `${safe(selectedProject.name)}-${safe(selectedCampaign.name)}`;
 
     function addSheet(name: string, rows: (string | number | null | undefined)[][]) {
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), name);
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      if (rows.length > 0) {
+        const cols = rows[0].length;
+        ws["!cols"] = Array.from({ length: cols }, (_, c) => ({
+          wch: Math.min(50, Math.max(10, ...rows.map((r) => String(r[c] ?? "").length))),
+        }));
+      }
+      XLSX.utils.book_append_sheet(wb, ws, name);
     }
 
     if (isBB && bbData) {
@@ -400,7 +415,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
       ]);
     }
 
-    XLSX.writeFile(wb, `reporte_${fname}.xlsx`);
+    XLSX.writeFile(wb, `${fname}.xlsx`);
   }
 
   // ── Parcelas Forestales: species list + individuals ──
