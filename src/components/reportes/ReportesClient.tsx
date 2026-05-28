@@ -416,6 +416,12 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
         ...communityParamsData.map((r) => [r.name, r.S, r.N, r.H, r.J]),
       ]);
     }
+    if (isTransectoFauna && transectoFaunaData && transectoFaunaData.origenRows.length > 0) {
+      addSheet("Origen", [
+        ["Origen", "Cantidad de especies"],
+        ...transectoFaunaData.origenRows.map(([o, n]) => [o, n]),
+      ]);
+    }
 
     if (!isBB && !isMicroruteo && !isPF && !isGrilla && !isTransectoFauna) {
       addSheet("Lista de Especies", [
@@ -505,7 +511,15 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
       return `${a.sp.genus} ${a.sp.species}`.localeCompare(`${b.sp.genus} ${b.sp.species}`);
     });
     const totalAbundance = rows.reduce((sum, r) => sum + r.abundance, 0);
-    return { rows, totalAbundance };
+    const origenCounts = new Map<string, number>();
+    for (const { sp } of rows) {
+      if (sp.origen) {
+        const o = sp.origen === "Endemico" ? "Endémico" : sp.origen;
+        origenCounts.set(o, (origenCounts.get(o) ?? 0) + 1);
+      }
+    }
+    const origenRows = Array.from(origenCounts.entries()).sort((a, b) => b[1] - a[1]);
+    return { rows, totalAbundance, origenRows };
   })();
 
   // ── Parámetros comunitarios por transecto ──
@@ -1222,6 +1236,35 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
                     </tbody>
                   </table>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ── TRANSECTO FAUNA: origen summary ── */}
+          {isTransectoFauna && transectoFaunaData && transectoFaunaData.origenRows.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold text-gray-700">
+                  Tabla resumen del origen de las especies
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-gray-50">
+                      <th className="text-left px-4 py-2 font-semibold text-gray-600">Origen</th>
+                      <th className="text-right px-4 py-2 font-semibold text-gray-600">Cantidad de especies</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {transectoFaunaData.origenRows.map(([origen, count]) => (
+                      <tr key={origen} className="hover:bg-gray-50">
+                        <td className="px-4 py-2">{origen}</td>
+                        <td className="px-4 py-2 text-right font-medium">{count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </CardContent>
             </Card>
           )}
