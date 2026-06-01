@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { db } from "@/lib/db";
 
 function latLngToUTM(lat: number, lng: number): { north: number; east: number; zone: string } {
   const a = 6378137.0, f = 1 / 298.257223563;
@@ -272,7 +273,11 @@ export function OccurrenceForm({
     const seq = ++searchSeq.current;
     const timer = setTimeout(async () => {
       const results = await searchSpecies(speciesQuery, surveyType);
-      if (seq === searchSeq.current) { setSpeciesList(results); setSearching(false); }
+      if (seq === searchSeq.current) {
+        setSpeciesList(results);
+        setSearching(false);
+        if (results.length > 0) db.species.bulkPut(results).catch(() => {});
+      }
     }, 250);
     return () => clearTimeout(timer);
   }, [speciesQuery, surveyType]);
@@ -404,6 +409,18 @@ export function OccurrenceForm({
     setIndividuals((prev) => prev.map((ind, idx) => idx === i ? { ...ind, [field]: value } : ind));
   }
 
+  async function saveOffline(payload: import("@/lib/db").OccurrencePayload, label: string) {
+    await db.pendingOccurrences.add({
+      stationId, projectId, campaignId, methodology, surveyType,
+      payload, speciesLabel: label, createdAt: Date.now(), status: "pending",
+    });
+    toast.success("Sin conexión — registro guardado localmente", {
+      description: "Se subirá automáticamente cuando haya internet.",
+    });
+    setSessionCount(n => n + 1);
+    resetForm();
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -430,6 +447,11 @@ export function OccurrenceForm({
           individuos: grillaIndividuos[speciesId] ? parseInt(grillaIndividuos[speciesId]) : undefined,
         })),
       };
+
+      if (!occurrenceId && !navigator.onLine) {
+        await saveOffline({ kind: "grilla", data: gridPayload }, `Grilla (${gridPayload.species.length} esp.)`);
+        return;
+      }
 
       setSubmitting(true);
       if (occurrenceId) {
@@ -475,6 +497,22 @@ export function OccurrenceForm({
       if (!occurrenceId && tfDetectionMethod === "Trampa Sherman") {
         const validCaptures = shermanCaptures.filter(c => c.date && c.abundance);
         if (validCaptures.length === 0) { toast.error("Agrega al menos una captura"); return; }
+
+        if (!navigator.onLine) {
+          await saveOffline({
+            kind: "sherman", data: {
+              speciesId, detectionMethod: tfDetectionMethod,
+              deviceId: tfDeviceId || undefined,
+              latitude: tfLat !== null ? String(tfLat) : undefined,
+              longitude: tfLng !== null ? String(tfLng) : undefined,
+              notes: notes || undefined,
+              methodologyData: buildMethodologyData(),
+              captures: validCaptures,
+            }
+          }, selectedSpecies ? `${selectedSpecies.genus} ${selectedSpecies.species}` : "Especie");
+          return;
+        }
+
         setSubmitting(true);
         const methodologyData = buildMethodologyData();
         let count = 0;
@@ -500,6 +538,18 @@ export function OccurrenceForm({
       } else {
         if (!tfAbundance) { toast.error("Ingresa el N° de individuos"); return; }
         const methodologyData = buildMethodologyData();
+
+        if (!occurrenceId && !navigator.onLine) {
+          await saveOffline({ kind: "single", data: {
+            speciesId, date: date || format(new Date(), "yyyy-MM-dd"),
+            abundance: tfAbundance, detectionMethod: tfDetectionMethod,
+            latitude: tfLat !== null ? String(tfLat) : undefined,
+            longitude: tfLng !== null ? String(tfLng) : undefined,
+            notes: notes || undefined, methodologyData,
+          }}, selectedSpecies ? `${selectedSpecies.genus} ${selectedSpecies.species}` : "Especie");
+          return;
+        }
+
         setSubmitting(true);
         const payload = {
           speciesId,
@@ -549,6 +599,13 @@ export function OccurrenceForm({
         relocLongitude: relocLng !== null ? String(relocLng) : undefined,
         relocNotes: relocNotes || undefined,
       };
+
+      if (!occurrenceId && !navigator.onLine) {
+        await saveOffline({ kind: "rescate", data: rescateData },
+          selectedSpecies ? `${selectedSpecies.genus} ${selectedSpecies.species}` : "Especie");
+        return;
+      }
+
       setSubmitting(true);
       if (occurrenceId) {
         const result = await updateRescateOccurrence(projectId, campaignId, stationId, occurrenceId, rescateData);
@@ -614,6 +671,12 @@ export function OccurrenceForm({
       methodologyData,
       ...(!isBB && !isMicroruteo && !isForestal ? fieldValues : {}),
     };
+
+    if (!occurrenceId && !navigator.onLine) {
+      await saveOffline({ kind: "single", data: payload },
+        selectedSpecies ? `${selectedSpecies.genus} ${selectedSpecies.species}` : "Especie");
+      return;
+    }
 
     setSubmitting(true);
     const result = occurrenceId

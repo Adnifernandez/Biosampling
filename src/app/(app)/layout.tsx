@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { TopBar } from "@/components/layout/TopBar";
+import { SyncManager } from "@/components/layout/SyncManager";
 import { SessionProvider } from "next-auth/react";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -11,6 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <SessionProvider session={session}>
+      <SyncManager />
       <div className="flex h-full">
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
