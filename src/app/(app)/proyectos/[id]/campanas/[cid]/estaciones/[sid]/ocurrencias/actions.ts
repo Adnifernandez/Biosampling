@@ -261,6 +261,9 @@ export async function createRescateOccurrence(
     largo?: string;
     ancho?: string;
     notes?: string;
+    relocLatitude?: string;
+    relocLongitude?: string;
+    relocNotes?: string;
   }
 ) {
   const session = await auth();
@@ -303,9 +306,91 @@ export async function createRescateOccurrence(
     },
   });
 
+  // Create relocation record if GPS coordinates were captured
+  if (data.relocLatitude || data.relocLongitude) {
+    await prisma.relocation.create({
+      data: {
+        occurrenceId: occurrence.id,
+        latitude: data.relocLatitude ? parseFloat(data.relocLatitude) : null,
+        longitude: data.relocLongitude ? parseFloat(data.relocLongitude) : null,
+        notes: data.relocNotes || null,
+      },
+    });
+  }
+
   revalidatePath(`/proyectos/${projectId}/campanas/${campaignId}/estaciones/${stationId}`);
   revalidatePath("/ocurrencias");
   return { success: true, id: occurrence.id, individualCode };
+}
+
+export async function updateRescateOccurrence(
+  projectId: string,
+  campaignId: string,
+  stationId: string,
+  occurrenceId: string,
+  data: {
+    speciesId: string;
+    date: string;
+    latitude?: string;
+    longitude?: string;
+    utmNorth?: string;
+    utmEast?: string;
+    utmZone?: string;
+    peso?: string;
+    largo?: string;
+    ancho?: string;
+    notes?: string;
+    relocLatitude?: string;
+    relocLongitude?: string;
+    relocNotes?: string;
+  }
+) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("No autorizado");
+
+  const project = await prisma.project.findUnique({ where: { id: projectId }, select: { status: true } });
+  if (project?.status === "COMPLETED") return { error: "El proyecto está cerrado y no permite cambios" };
+
+  const methodologyData = JSON.stringify({
+    ...(data.utmNorth ? { utm_north: data.utmNorth, utm_east: data.utmEast, utm_zone: data.utmZone } : {}),
+    ...(data.peso ? { peso: parseFloat(data.peso) } : {}),
+    ...(data.largo ? { largo: parseFloat(data.largo) } : {}),
+    ...(data.ancho ? { ancho: parseFloat(data.ancho) } : {}),
+  });
+
+  await prisma.occurrence.update({
+    where: { id: occurrenceId },
+    data: {
+      speciesId: data.speciesId,
+      date: data.date ? new Date(data.date) : new Date(),
+      latitude: data.latitude ? parseFloat(data.latitude) : null,
+      longitude: data.longitude ? parseFloat(data.longitude) : null,
+      notes: data.notes || null,
+      methodologyData,
+    },
+  });
+
+  // Upsert relocation if coordinates were provided
+  if (data.relocLatitude || data.relocLongitude) {
+    await prisma.relocation.upsert({
+      where: { occurrenceId },
+      create: {
+        occurrenceId,
+        latitude: data.relocLatitude ? parseFloat(data.relocLatitude) : null,
+        longitude: data.relocLongitude ? parseFloat(data.relocLongitude) : null,
+        notes: data.relocNotes || null,
+      },
+      update: {
+        latitude: data.relocLatitude ? parseFloat(data.relocLatitude) : null,
+        longitude: data.relocLongitude ? parseFloat(data.relocLongitude) : null,
+        notes: data.relocNotes || null,
+      },
+    });
+  }
+
+  revalidatePath(`/proyectos/${projectId}/campanas/${campaignId}/estaciones/${stationId}`);
+  revalidatePath("/ocurrencias");
+  return { success: true };
 }
 
 export async function createRelocation(

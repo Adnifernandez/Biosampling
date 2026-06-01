@@ -19,6 +19,7 @@ export default async function EditarOcurrenciaPage({
     where: { id: oid },
     include: {
       species: { select: { genus: true, species: true, commonName: true } },
+      relocation: true,
       station: {
         include: {
           campaign: {
@@ -31,6 +32,7 @@ export default async function EditarOcurrenciaPage({
   if (!occurrence) notFound();
 
   const isGrilla = occurrence.station.campaign.methodology === "GRILLA";
+  const isRescate = occurrence.station.campaign.methodology === "RESCATE_RELOC";
 
   // For GRILLA: load all occurrences for this grilla station to pre-populate the grid
   const grillaOccurrences = isGrilla
@@ -53,6 +55,10 @@ export default async function EditarOcurrenciaPage({
     speciesId: occurrence.speciesId,
     speciesLabel: `${occurrence.species.genus} ${occurrence.species.species}${occurrence.species.commonName ? ` · ${occurrence.species.commonName}` : ""}`,
     date: format(new Date(occurrence.date), "yyyy-MM-dd"),
+    individualCode: occurrence.individualCode ?? "",
+    relocLat: occurrence.relocation?.latitude?.toString() ?? "",
+    relocLng: occurrence.relocation?.longitude?.toString() ?? "",
+    relocNotes: occurrence.relocation?.notes ?? "",
     latitude: occurrence.latitude?.toString() ?? "",
     longitude: occurrence.longitude?.toString() ?? "",
     abundance: occurrence.abundance?.toString() ?? "",
@@ -81,7 +87,7 @@ export default async function EditarOcurrenciaPage({
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Editar Ocurrencia</h1>
+          <h1 className="text-xl font-bold text-gray-900">{isRescate ? "Editar captura" : "Editar Ocurrencia"}</h1>
           <p className="text-sm text-gray-500">{occurrence.station.name} · {occurrence.station.campaign.name}</p>
         </div>
       </div>

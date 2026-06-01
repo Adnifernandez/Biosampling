@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Search } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -20,6 +21,22 @@ import { Card, CardContent } from "@/components/ui/card";
 import { REGIONS, getCommunesByRegion } from "@/lib/chile-data";
 import { createProject, updateProject } from "@/app/(app)/proyectos/actions";
 import { toast } from "sonner";
+
+const RESPONSIBLE_PERSONS = [
+  "Álvaro Esparza",
+  "Ángela Schafer",
+  "Catalina Lastra",
+  "Claudia Cortés",
+  "Diego Verdugo",
+  "Gabriel Cruz",
+  "Gabriel Meriot",
+  "Graciela Páez",
+  "Katterin Gutiérrez",
+  "Macarena Toledo",
+  "Nicolás Cortés",
+  "Rodrigo Martínez",
+  "Vicente Santibáñez",
+];
 
 const schema = z.object({
   name: z.string().min(2, "Mínimo 2 caracteres"),
@@ -39,6 +56,8 @@ interface ProjectFormProps {
 export function ProjectForm({ projectId, defaultValues }: ProjectFormProps) {
   const router = useRouter();
   const [communes, setCommunes] = useState<string[]>([]);
+  const [personQuery, setPersonQuery] = useState("");
+  const [personOpen, setPersonOpen] = useState(false);
 
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -136,8 +155,55 @@ export function ProjectForm({ projectId, defaultValues }: ProjectFormProps) {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="responsible">Persona responsable *</Label>
-            <Input id="responsible" {...register("responsible")} placeholder="Nombre del responsable" />
+            <Label>Persona responsable *</Label>
+            {watch("responsible") ? (
+              <div className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2 border border-green-200">
+                <span className="text-sm font-medium text-green-900">{watch("responsible")}</span>
+                <button
+                  type="button"
+                  className="text-xs text-red-500 hover:text-red-700 shrink-0 ml-3"
+                  onClick={() => { setValue("responsible", "", { shouldValidate: true }); setPersonQuery(""); }}
+                >
+                  Cambiar
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <Input
+                    className="pl-9"
+                    placeholder="Buscar persona..."
+                    value={personQuery}
+                    onChange={(e) => setPersonQuery(e.target.value)}
+                    onFocus={() => setPersonOpen(true)}
+                    onBlur={() => setTimeout(() => setPersonOpen(false), 150)}
+                  />
+                </div>
+                {personOpen && (
+                  <div className="border rounded-lg max-h-52 overflow-y-auto divide-y bg-white shadow-sm">
+                    {(personQuery
+                      ? RESPONSIBLE_PERSONS.filter((p) => p.toLowerCase().includes(personQuery.toLowerCase()))
+                      : RESPONSIBLE_PERSONS
+                    ).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        className="w-full text-left px-3 py-2.5 hover:bg-green-50 text-sm"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setValue("responsible", p, { shouldValidate: true });
+                          setPersonQuery("");
+                          setPersonOpen(false);
+                        }}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
             {errors.responsible && <p className="text-xs text-red-500">{errors.responsible.message}</p>}
           </div>
 

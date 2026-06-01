@@ -71,6 +71,7 @@ export default async function OcurrenciasPage({
 
   const selectedCampaign = campaignId ? campaigns.find((c) => c.id === campaignId) : null;
   const isGrillaCampaign = selectedCampaign?.methodology === "GRILLA";
+  const isRescateCampaign = selectedCampaign?.methodology === "RESCATE_RELOC";
 
   // For GRILLA: load child grilla stations for the selected transecto
   const grillaStations = isGrillaCampaign && transectoId
@@ -111,10 +112,10 @@ export default async function OcurrenciasPage({
           <ButtonLink
             href={`/ocurrencias/nueva?stationId=${stationId}`}
             size="sm"
-            className="bg-green-700 hover:bg-green-800 text-white"
+            className={isRescateCampaign ? "bg-orange-600 hover:bg-orange-700 text-white" : "bg-green-700 hover:bg-green-800 text-white"}
           >
             <Plus className="h-4 w-4 mr-1" />
-            Nueva
+            {isRescateCampaign ? "Nueva captura" : "Nueva"}
           </ButtonLink>
         )}
       </div>
@@ -142,13 +143,18 @@ export default async function OcurrenciasPage({
         <Card>
           <CardContent className="py-12 text-center">
             <ClipboardList className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-            <p className="text-gray-500 font-medium">No hay ocurrencias registradas</p>
+            <p className="text-gray-500 font-medium">No hay registros en esta estación</p>
+            {isRescateCampaign && (
+              <p className="text-xs text-gray-400 mt-1 max-w-xs mx-auto">
+                Registra cada animal capturado con sus biometrías. Luego podrás registrar su relocalización.
+              </p>
+            )}
             <ButtonLink
               href={`/ocurrencias/nueva?stationId=${stationId}`}
               size="sm"
-              className="mt-4 inline-flex bg-green-700 hover:bg-green-800 text-white"
+              className={`mt-4 inline-flex ${isRescateCampaign ? "bg-orange-600 hover:bg-orange-700" : "bg-green-700 hover:bg-green-800"} text-white`}
             >
-              <Plus className="h-4 w-4 mr-1" /> Registrar
+              <Plus className="h-4 w-4 mr-1" /> {isRescateCampaign ? "Registrar captura" : "Registrar"}
             </ButtonLink>
           </CardContent>
         </Card>
@@ -221,18 +227,11 @@ export default async function OcurrenciasPage({
                         </p>
                       </div>
                       <div className="flex items-center gap-1">
-                        {isRescate && (
-                          <Link
-                            href={`/ocurrencias/${o.id}/relocalizacion?stationId=${stationId}`}
-                            className={`inline-flex items-center justify-center h-8 w-8 rounded-md border transition-colors ${
-                              o.relocation
-                                ? "border-orange-300 bg-orange-50 text-orange-600 hover:bg-orange-100"
-                                : "border-gray-200 hover:bg-gray-50 text-gray-400 hover:text-gray-600"
-                            }`}
-                            title={o.relocation ? "Ver relocalización" : "Relocalizar"}
-                          >
-                            <MapPin className="h-3.5 w-3.5" />
-                          </Link>
+                        {isRescate && o.relocation && (
+                          <span className="inline-flex items-center gap-1 px-2 h-7 rounded-md border border-blue-300 bg-blue-50 text-blue-600 text-xs font-medium">
+                            <MapPin className="h-3 w-3" />
+                            Relocalizado
+                          </span>
                         )}
                         <Link
                           href={`/ocurrencias/${o.id}/editar?stationId=${stationId}`}
