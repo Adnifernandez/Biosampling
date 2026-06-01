@@ -3,16 +3,14 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { TopBar } from "@/components/layout/TopBar";
-import { SyncManager } from "@/components/layout/SyncManager";
-import { SessionProvider } from "next-auth/react";
+import { ClientProviders } from "@/components/layout/ClientProviders";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session) redirect("/login");
 
   return (
-    <SessionProvider session={session}>
-      <SyncManager />
+    <ClientProviders session={session}>
       <div className="flex h-full">
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -23,6 +21,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </div>
       <BottomNav />
-    </SessionProvider>
+    </ClientProviders>
   );
 }

@@ -1,8 +1,9 @@
-﻿"use client";
+"use client";
 
 import { signOut } from "next-auth/react";
 import { useSession } from "next-auth/react";
-import { LogOut, Leaf, WifiOff, RefreshCw } from "lucide-react";
+import { useState, useEffect } from "react";
+import { LogOut, Leaf, WifiOff } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,11 +11,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useOnlineSync } from "@/hooks/useOnlineSync";
 
 export function TopBar() {
   const { data: session } = useSession();
-  const { isOnline, isSyncing, pendingCount, sync } = useOnlineSync();
+  const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    setIsOnline(navigator.onLine);
+    const on = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+  }, []);
 
   const initials = session?.user?.name
     ?.split(" ")
@@ -36,18 +45,6 @@ export function TopBar() {
             <WifiOff className="h-3.5 w-3.5 text-yellow-300" />
             <span className="text-xs text-yellow-200">Sin conexión</span>
           </div>
-        )}
-        {isOnline && pendingCount > 0 && (
-          <button
-            onClick={sync}
-            disabled={isSyncing}
-            className="flex items-center gap-1 bg-orange-500/20 border border-orange-400/40 rounded-full px-2 py-0.5"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 text-orange-300 ${isSyncing ? "animate-spin" : ""}`} />
-            <span className="text-xs text-orange-200">
-              {isSyncing ? "Sincronizando..." : `${pendingCount} pendiente${pendingCount > 1 ? "s" : ""}`}
-            </span>
-          </button>
         )}
 
         <DropdownMenu>
