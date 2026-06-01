@@ -1,6 +1,6 @@
 "use client";
 
-import { db } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import {
   createOccurrence,
   createGrillaOccurrences,
@@ -8,6 +8,7 @@ import {
 } from "@/app/(app)/proyectos/[id]/campanas/[cid]/estaciones/[sid]/ocurrencias/actions";
 
 export async function syncPendingOccurrences(): Promise<{ synced: number; failed: number }> {
+  const db = getDb();
   if (!db) return { synced: 0, failed: 0 };
   const pending = await db.pendingOccurrences.where("status").equals("pending").toArray();
   let synced = 0;
@@ -65,6 +66,8 @@ export async function syncPendingOccurrences(): Promise<{ synced: number; failed
 }
 
 export async function seedLocalCache(): Promise<void> {
+  const db = getDb();
+  if (!db) return;
   try {
     const res = await fetch("/api/seed-cache");
     if (!res.ok) return;

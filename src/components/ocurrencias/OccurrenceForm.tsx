@@ -23,7 +23,7 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { db } from "@/lib/db";
+import type { OccurrencePayload } from "@/lib/db";
 
 function latLngToUTM(lat: number, lng: number): { north: number; east: number; zone: string } {
   const a = 6378137.0, f = 1 / 298.257223563;
@@ -276,7 +276,7 @@ export function OccurrenceForm({
       if (seq === searchSeq.current) {
         setSpeciesList(results);
         setSearching(false);
-        if (results.length > 0) db.species.bulkPut(results.map(s => ({ ...s, type: surveyType }))).catch(() => {});
+        if (results.length > 0) import("@/lib/db").then(({ getDb }) => getDb()?.species.bulkPut(results.map(s => ({ ...s, type: surveyType })))).catch(() => {});
       }
     }, 250);
     return () => clearTimeout(timer);
@@ -409,7 +409,10 @@ export function OccurrenceForm({
     setIndividuals((prev) => prev.map((ind, idx) => idx === i ? { ...ind, [field]: value } : ind));
   }
 
-  async function saveOffline(payload: import("@/lib/db").OccurrencePayload, label: string) {
+  async function saveOffline(payload: OccurrencePayload, label: string) {
+    const { getDb } = await import("@/lib/db");
+    const db = getDb();
+    if (!db) return;
     await db.pendingOccurrences.add({
       stationId, projectId, campaignId, methodology, surveyType,
       payload, speciesLabel: label, createdAt: Date.now(), status: "pending",

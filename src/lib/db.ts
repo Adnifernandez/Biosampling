@@ -89,4 +89,9 @@ export class BioSamplingDB extends Dexie {
   }
 }
 
-export const db = typeof window !== "undefined" ? new BioSamplingDB() : null as unknown as BioSamplingDB;
+let _db: BioSamplingDB | null = null;
+export function getDb(): BioSamplingDB | null {
+  if (typeof window === "undefined") return null;
+  if (!_db) _db = new BioSamplingDB();
+  return _db;
+}
