@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -140,7 +140,7 @@ export function StationForm({ projectId, campaignId, surveyType, methodology, st
                   </div>
                 </div>
                 {calculatedArea && (
-                  <p className="text-xs text-green-700 bg-green-50 rounded px-3 py-1.5">
+                  <p className="text-xs text-teal-700 bg-teal-50 rounded px-3 py-1.5">
                     Área calculada: <span className="font-semibold">{calculatedArea} m²</span>
                   </p>
                 )}
@@ -157,7 +157,7 @@ export function StationForm({ projectId, campaignId, surveyType, methodology, st
                 <Input id="ha" type="number" step="0.0001" min="0" placeholder="Ej: 0.5"
                   value={ha} onChange={(e) => setHa(e.target.value)} />
                 {ha && !isNaN(parseFloat(ha)) && (
-                  <p className="text-xs text-green-700 bg-green-50 rounded px-3 py-1.5">
+                  <p className="text-xs text-teal-700 bg-teal-50 rounded px-3 py-1.5">
                     Equivale a <span className="font-semibold">{(parseFloat(ha) * 10000).toLocaleString("es-CL")} m²</span>
                   </p>
                 )}
@@ -180,7 +180,7 @@ export function StationForm({ projectId, campaignId, surveyType, methodology, st
             <Button type="button" variant="outline" className="flex-1" onClick={() => router.push(`/estaciones/${stationId}`)}>
               Cancelar
             </Button>
-            <Button type="submit" className="flex-1 bg-green-700 hover:bg-green-800" disabled={isSubmitting}>
+            <Button type="submit" className="flex-1 bg-teal-700 hover:bg-teal-800" disabled={isSubmitting}>
               {isSubmitting ? "Guardando..." : "Actualizar"}
             </Button>
           </div>

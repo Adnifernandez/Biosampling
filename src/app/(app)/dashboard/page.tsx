@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+﻿import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FolderOpen, Layers, MapPin, FileText } from "lucide-react";
@@ -20,7 +20,7 @@ export default async function DashboardPage() {
   ]);
 
   const stats = [
-    { label: "Proyectos activos", value: proyectos, icon: FolderOpen, href: "/proyectos", color: "text-green-600" },
+    { label: "Proyectos activos", value: proyectos, icon: FolderOpen, href: "/proyectos", color: "text-teal-600" },
     { label: "Campañas activas", value: campanas, icon: Layers, href: "/proyectos", color: "text-blue-600" },
     { label: "Estaciones", value: estaciones, icon: MapPin, href: "/proyectos", color: "text-orange-600" },
     { label: "Ocurrencias", value: ocurrencias, icon: FileText, href: "/reportes", color: "text-purple-600" },
@@ -66,7 +66,7 @@ export default async function DashboardPage() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-gray-800">Proyectos recientes</h2>
-          <Link href="/proyectos" className="text-sm text-green-700 hover:underline">
+          <Link href="/proyectos" className="text-sm text-teal-700 hover:underline">
             Ver todos
           </Link>
         </div>
@@ -75,7 +75,7 @@ export default async function DashboardPage() {
             <CardContent className="py-8 text-center text-gray-400">
               <FolderOpen className="h-10 w-10 mx-auto mb-2 opacity-30" />
               <p>No hay proyectos todavía.</p>
-              <Link href="/proyectos/nuevo" className="text-sm text-green-700 hover:underline mt-1 block">
+              <Link href="/proyectos/nuevo" className="text-sm text-teal-700 hover:underline mt-1 block">
                 Crear primer proyecto
               </Link>
             </CardContent>

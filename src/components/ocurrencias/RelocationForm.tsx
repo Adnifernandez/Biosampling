@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -151,7 +151,7 @@ export function RelocationForm({
                       <Input type="text" readOnly value={utmEast} className="bg-gray-50 font-mono text-sm" />
                     </div>
                   </div>
-                  <p className="text-xs text-green-700 bg-green-50 rounded px-3 py-1.5">
+                  <p className="text-xs text-teal-700 bg-teal-50 rounded px-3 py-1.5">
                     Zona: <span className="font-semibold">{utmZone}</span> · coordenadas calculadas automáticamente
                   </p>
                 </>
@@ -179,7 +179,7 @@ export function RelocationForm({
             </div>
 
             {saved && (
-              <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2 text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
                 <CheckCircle2 className="h-4 w-4 shrink-0" />
                 Relocalización guardada correctamente
               </div>

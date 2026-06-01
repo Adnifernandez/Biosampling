@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -610,7 +610,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
           {/* Summary cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: "Especies únicas",  value: stats.totalSpecies,     icon: selectedCampaign.surveyType === "FLORA" ? Leaf : Bird, color: "text-green-600" },
+              { label: "Especies únicas",  value: stats.totalSpecies,     icon: selectedCampaign.surveyType === "FLORA" ? Leaf : Bird, color: "text-teal-600" },
               { label: "Ocurrencias",      value: stats.totalOccurrences,  icon: ListTree,   color: "text-blue-600" },
               { label: "Individuos",       value: stats.totalIndividuals,  icon: BarChart2,  color: "text-orange-600" },
               { label: isGrilla ? "Grillas" : "Estaciones", value: stats.totalStations, icon: BarChart2, color: "text-purple-600" },

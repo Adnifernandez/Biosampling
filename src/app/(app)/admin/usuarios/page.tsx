@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+﻿import { prisma } from "@/lib/prisma";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Users } from "lucide-react";
@@ -39,7 +39,7 @@ export default async function UsuariosPage() {
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-sm text-gray-900">{u.name}</p>
                     <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
-                      u.active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                      u.active ? "bg-teal-100 text-teal-700" : "bg-red-100 text-red-700"
                     }`}>
                       {u.active ? "Activo" : "Inactivo"}
                     </span>

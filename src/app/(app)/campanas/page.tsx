@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+﻿import { prisma } from "@/lib/prisma";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Layers, Plus, Leaf, Bird, Pencil } from "lucide-react";
@@ -36,7 +36,7 @@ export default async function CampanasPage({
           <h1 className="text-2xl font-bold text-gray-900">Campañas</h1>
           <p className="text-gray-500 text-sm mt-0.5">{campaigns.length} campaña{campaigns.length !== 1 ? "s" : ""}</p>
         </div>
-        <ButtonLink href="/campanas/nueva" className="bg-green-700 hover:bg-green-800 text-white gap-2">
+        <ButtonLink href="/campanas/nueva" className="bg-teal-700 hover:bg-teal-800 text-white gap-2">
           <Plus className="h-4 w-4" /> Nueva
         </ButtonLink>
       </div>
@@ -48,7 +48,7 @@ export default async function CampanasPage({
           <CardContent className="py-12 text-center text-gray-400">
             <Layers className="h-10 w-10 mx-auto mb-2 opacity-30" />
             <p>{projectId ? "No hay campañas en este proyecto." : "No hay campañas todavía."}</p>
-            <ButtonLink href="/campanas/nueva" size="sm" className="mt-3 inline-flex bg-green-700 hover:bg-green-800 text-white">
+            <ButtonLink href="/campanas/nueva" size="sm" className="mt-3 inline-flex bg-teal-700 hover:bg-teal-800 text-white">
               <Plus className="h-4 w-4 mr-1" /> Crear campaña
             </ButtonLink>
           </CardContent>
@@ -59,9 +59,9 @@ export default async function CampanasPage({
             <Card key={c.id}>
               <CardContent className="py-3 px-4 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className={`p-2 rounded-lg shrink-0 ${c.surveyType === "FLORA" ? "bg-green-100" : "bg-blue-100"}`}>
+                  <div className={`p-2 rounded-lg shrink-0 ${c.surveyType === "FLORA" ? "bg-teal-100" : "bg-blue-100"}`}>
                     {c.surveyType === "FLORA"
-                      ? <Leaf className="h-4 w-4 text-green-700" />
+                      ? <Leaf className="h-4 w-4 text-teal-700" />
                       : <Bird className="h-4 w-4 text-blue-700" />}
                   </div>
                   <div className="min-w-0">

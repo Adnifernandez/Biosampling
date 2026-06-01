@@ -25,7 +25,7 @@ export default async function ProyectoDetailPage({ params }: { params: Promise<{
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-bold text-gray-900">{project.name}</h1>
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                project.status === "ACTIVE" ? "bg-green-100 text-green-800" :
+                project.status === "ACTIVE" ? "bg-teal-100 text-teal-800" :
                 project.status === "COMPLETED" ? "bg-blue-100 text-blue-800" :
                 "bg-gray-100 text-gray-600"
               }`}>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -41,7 +41,7 @@ export function NuevoUsuarioDialog() {
 
   return (
     <>
-      <Button size="sm" className="bg-green-700 hover:bg-green-800" onClick={() => setOpen(true)}>
+      <Button size="sm" className="bg-teal-700 hover:bg-teal-800" onClick={() => setOpen(true)}>
         <Plus className="h-4 w-4 mr-1" /> Nuevo usuario
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -69,7 +69,7 @@ export function NuevoUsuarioDialog() {
               <Button type="button" variant="outline" className="flex-1" onClick={() => setOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" className="flex-1 bg-green-700 hover:bg-green-800" disabled={isSubmitting}>
+              <Button type="submit" className="flex-1 bg-teal-700 hover:bg-teal-800" disabled={isSubmitting}>
                 {isSubmitting ? "Creando..." : "Crear usuario"}
               </Button>
             </div>

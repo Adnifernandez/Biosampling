@@ -37,7 +37,7 @@ export default async function CampanaDetailPage({
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-bold text-gray-900">{campaign.name}</h1>
               <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                campaign.surveyType === "FLORA" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
+                campaign.surveyType === "FLORA" ? "bg-teal-100 text-teal-700" : "bg-blue-100 text-blue-700"
               }`}>
                 {SURVEY_TYPE_LABELS[campaign.surveyType as SurveyType]}
               </span>

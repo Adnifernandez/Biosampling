@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { signOut } from "next-auth/react";
 import { useSession } from "next-auth/react";
@@ -24,9 +24,9 @@ export function TopBar() {
     .toUpperCase() ?? "U";
 
   return (
-    <header className="lg:hidden bg-green-800 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-30">
+    <header className="lg:hidden bg-teal-800 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-30">
       <div className="flex items-center gap-2">
-        <Leaf className="h-5 w-5 text-green-300" />
+        <Leaf className="h-5 w-5 text-teal-300" />
         <span className="font-semibold">BioSampling</span>
       </div>
 
@@ -51,9 +51,9 @@ export function TopBar() {
         )}
 
         <DropdownMenu>
-          <DropdownMenuTrigger className="p-1 rounded hover:bg-green-700 transition-colors">
+          <DropdownMenuTrigger className="p-1 rounded hover:bg-teal-700 transition-colors">
             <Avatar className="h-7 w-7">
-              <AvatarFallback className="bg-green-600 text-white text-xs">{initials}</AvatarFallback>
+              <AvatarFallback className="bg-teal-600 text-white text-xs">{initials}</AvatarFallback>
             </Avatar>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">

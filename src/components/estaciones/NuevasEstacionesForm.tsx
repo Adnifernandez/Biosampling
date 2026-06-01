@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -125,18 +125,18 @@ export function NuevasEstacionesForm({
           <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Tipo de campaña</p>
           <div className={cn(
             "flex items-center gap-3 p-3 rounded-lg border-2",
-            surveyType === "FLORA" ? "border-green-200 bg-green-50"
+            surveyType === "FLORA" ? "border-teal-200 bg-teal-50"
             : isRescate ? "border-orange-200 bg-orange-50"
             : "border-blue-200 bg-blue-50"
           )}>
             {surveyType === "FLORA"
-              ? <Leaf className="h-5 w-5 text-green-700 shrink-0" />
+              ? <Leaf className="h-5 w-5 text-teal-700 shrink-0" />
               : isRescate
                 ? <ShieldCheck className="h-5 w-5 text-orange-700 shrink-0" />
                 : <Bird className="h-5 w-5 text-blue-700 shrink-0" />}
             <div>
               <p className={cn("font-semibold text-sm",
-                surveyType === "FLORA" ? "text-green-800"
+                surveyType === "FLORA" ? "text-teal-800"
                 : isRescate ? "text-orange-800"
                 : "text-blue-800"
               )}>
@@ -223,7 +223,7 @@ export function NuevasEstacionesForm({
                 placeholder={areaUnit === "ha" ? "Ej: 1.5" : "Ej: 10000"}
                 value={area} onChange={(e) => setArea(e.target.value)} />
               {areaUnit === "ha" && area && !isNaN(parseFloat(area)) && (
-                <p className="text-xs text-green-700 bg-green-50 rounded px-3 py-1.5">
+                <p className="text-xs text-teal-700 bg-teal-50 rounded px-3 py-1.5">
                   Equivale a: <span className="font-semibold">{(parseFloat(area) * 10000).toLocaleString("es-CL")} m²</span>
                 </p>
               )}
@@ -259,7 +259,7 @@ export function NuevasEstacionesForm({
                   </div>
                 </div>
                 {calculatedArea && (
-                  <p className="text-xs text-green-700 bg-green-50 rounded px-3 py-1.5">
+                  <p className="text-xs text-teal-700 bg-teal-50 rounded px-3 py-1.5">
                     Área calculada: <span className="font-semibold">{calculatedArea} m²</span>
                   </p>
                 )}
@@ -299,7 +299,7 @@ export function NuevasEstacionesForm({
         </Button>
         <Button
           type="submit"
-          className="flex-1 bg-green-700 hover:bg-green-800"
+          className="flex-1 bg-teal-700 hover:bg-teal-800"
           disabled={isSubmitting}
         >
           {isSubmitting

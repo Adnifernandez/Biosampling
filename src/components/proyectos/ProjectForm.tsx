@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -157,8 +157,8 @@ export function ProjectForm({ projectId, defaultValues }: ProjectFormProps) {
           <div className="space-y-1.5">
             <Label>Persona responsable *</Label>
             {watch("responsible") ? (
-              <div className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2 border border-green-200">
-                <span className="text-sm font-medium text-green-900">{watch("responsible")}</span>
+              <div className="flex items-center justify-between bg-teal-50 rounded-lg px-3 py-2 border border-teal-200">
+                <span className="text-sm font-medium text-teal-900">{watch("responsible")}</span>
                 <button
                   type="button"
                   className="text-xs text-red-500 hover:text-red-700 shrink-0 ml-3"
@@ -189,7 +189,7 @@ export function ProjectForm({ projectId, defaultValues }: ProjectFormProps) {
                       <button
                         key={p}
                         type="button"
-                        className="w-full text-left px-3 py-2.5 hover:bg-green-50 text-sm"
+                        className="w-full text-left px-3 py-2.5 hover:bg-teal-50 text-sm"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
                           setValue("responsible", p, { shouldValidate: true });
@@ -221,7 +221,7 @@ export function ProjectForm({ projectId, defaultValues }: ProjectFormProps) {
             >
               Cancelar
             </Button>
-            <Button type="submit" className="flex-1 bg-green-700 hover:bg-green-800" disabled={isSubmitting}>
+            <Button type="submit" className="flex-1 bg-teal-700 hover:bg-teal-800" disabled={isSubmitting}>
               {isSubmitting ? "Guardando..." : projectId ? "Actualizar" : "Crear proyecto"}
             </Button>
           </div>

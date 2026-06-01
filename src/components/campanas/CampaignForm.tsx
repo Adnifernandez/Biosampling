@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -144,7 +144,7 @@ export function CampaignForm({ projectId, campaignId, defaultValues }: CampaignF
             <Button type="button" variant="outline" className="flex-1" onClick={() => router.back()}>
               Cancelar
             </Button>
-            <Button type="submit" className="flex-1 bg-green-700 hover:bg-green-800" disabled={isSubmitting}>
+            <Button type="submit" className="flex-1 bg-teal-700 hover:bg-teal-800" disabled={isSubmitting}>
               {isSubmitting ? "Guardando..." : campaignId ? "Actualizar" : "Crear campaña"}
             </Button>
           </div>

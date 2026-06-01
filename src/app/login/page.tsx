@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
@@ -45,11 +45,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-800 to-green-600 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-800 to-teal-600 px-4">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-8">
         <div className="flex flex-col items-center mb-6">
-          <div className="bg-green-100 p-3 rounded-full mb-3">
-            <Leaf className="h-8 w-8 text-green-700" />
+          <div className="bg-teal-100 p-3 rounded-full mb-3">
+            <Leaf className="h-8 w-8 text-teal-700" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">BioSampling</h1>
           <p className="text-sm text-gray-500 mt-1">Levantamiento de flora y fauna</p>
@@ -84,7 +84,7 @@ export default function LoginPage() {
             <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
           )}
 
-          <Button type="submit" className="w-full bg-green-700 hover:bg-green-800" disabled={isSubmitting}>
+          <Button type="submit" className="w-full bg-teal-700 hover:bg-teal-800" disabled={isSubmitting}>
             {isSubmitting ? "Ingresando..." : "Ingresar"}
           </Button>
         </form>

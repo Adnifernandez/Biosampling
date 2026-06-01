@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -723,7 +723,7 @@ export function OccurrenceForm({
           <Input type="text" readOnly value={utmEast} className="bg-gray-50 font-mono text-sm" />
         </div>
       </div>
-      <p className="text-xs text-green-700 bg-green-50 rounded px-3 py-1.5">
+      <p className="text-xs text-teal-700 bg-teal-50 rounded px-3 py-1.5">
         Zona: <span className="font-semibold">{utmZoneAuto}</span> · coordenadas calculadas automáticamente
       </p>
     </>
@@ -773,13 +773,13 @@ export function OccurrenceForm({
                     className={cn(
                       "flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-colors",
                       bbCover === code
-                        ? "border-green-600 bg-green-50"
+                        ? "border-teal-600 bg-teal-50"
                         : "border-gray-200 hover:border-gray-300"
                     )}
                   >
                     <span className={cn(
                       "font-mono font-bold text-sm w-6 shrink-0 text-center",
-                      bbCover === code ? "text-green-700" : "text-gray-600"
+                      bbCover === code ? "text-teal-700" : "text-gray-600"
                     )}>
                       {code}
                     </span>
@@ -862,9 +862,9 @@ export function OccurrenceForm({
                       : point.type === "species" ? point.label.split(" ").slice(0, 2).join(" ").slice(0, 10)
                       : "—";
                     const bg =
-                      isActive ? "border-green-600 bg-green-50"
+                      isActive ? "border-teal-600 bg-teal-50"
                       : point.type === "sinVeg" ? "border-gray-300 bg-gray-100"
-                      : point.type === "species" ? "border-green-300 bg-green-50"
+                      : point.type === "species" ? "border-teal-300 bg-teal-50"
                       : "border-gray-200 bg-white";
                     return (
                       <button
@@ -874,7 +874,7 @@ export function OccurrenceForm({
                         className={`rounded-lg border-2 p-2 text-center transition-all ${bg}`}
                       >
                         <p className="text-xs text-gray-400 font-mono leading-none mb-1">{idx + 1}</p>
-                        <p className={`text-xs font-medium leading-tight truncate ${point.type === "species" ? "italic text-green-800" : point.type === "sinVeg" ? "text-gray-500" : "text-gray-300"}`}>
+                        <p className={`text-xs font-medium leading-tight truncate ${point.type === "species" ? "italic text-teal-800" : point.type === "sinVeg" ? "text-gray-500" : "text-gray-300"}`}>
                           {label}
                         </p>
                       </button>
@@ -934,7 +934,7 @@ export function OccurrenceForm({
                           <button
                             key={sp.id}
                             type="button"
-                            className="w-full text-left px-3 py-2 hover:bg-green-50 text-sm"
+                            className="w-full text-left px-3 py-2 hover:bg-teal-50 text-sm"
                             onClick={() => {
                               const label = `${sp.genus} ${sp.species}${sp.commonName ? ` · ${sp.commonName}` : ""}`;
                               setGrillaPoints(prev => prev.map((p, i) => i === activePoint ? { type: "species", speciesId: sp.id, label } : p));
@@ -953,9 +953,9 @@ export function OccurrenceForm({
 
                 {/* Progress summary */}
                 {grillaPoints.some(p => p.type !== "empty") && (
-                  <div className="bg-green-50 rounded-lg px-3 py-2 space-y-1">
-                    <div className="w-full bg-green-200 rounded-full h-1.5">
-                      <div className="bg-green-600 h-1.5 rounded-full transition-all"
+                  <div className="bg-teal-50 rounded-lg px-3 py-2 space-y-1">
+                    <div className="w-full bg-teal-200 rounded-full h-1.5">
+                      <div className="bg-teal-600 h-1.5 rounded-full transition-all"
                         style={{ width: `${Math.round((grillaPoints.filter(p => p.type !== "empty").length / 16) * 100)}%` }} />
                     </div>
                     <p className="text-xs text-gray-600">
@@ -1155,7 +1155,7 @@ export function OccurrenceForm({
                   </Button>
                 </div>
                 {tfLat !== null ? (
-                  <p className="text-xs text-green-700 bg-green-50 rounded px-3 py-1.5 font-mono">
+                  <p className="text-xs text-teal-700 bg-teal-50 rounded px-3 py-1.5 font-mono">
                     {tfLat.toFixed(6)}, {tfLng!.toFixed(6)}
                   </p>
                 ) : (
@@ -1328,7 +1328,7 @@ export function OccurrenceForm({
           </div>
 
           {sessionCount > 0 && !occurrenceId && (
-            <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-2 text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
               <span>
                 {sessionCount} {sessionCount === 1 ? "especie registrada" : "especies registradas"} en esta estación
@@ -1340,7 +1340,7 @@ export function OccurrenceForm({
             <Button type="button" variant="outline" className="flex-1" onClick={() => router.back()}>
               {!occurrenceId && sessionCount > 0 ? "Finalizar estación" : "Cancelar"}
             </Button>
-            <Button type="submit" className="flex-1 bg-green-700 hover:bg-green-800" disabled={submitting}>
+            <Button type="submit" className="flex-1 bg-teal-700 hover:bg-teal-800" disabled={submitting}>
               {submitting ? "Guardando..."
                 : isGrilla
                   ? `${occurrenceId ? "Actualizar" : "Registrar"} grilla (${grillaPoints.filter(p => p.type !== "empty").length}/16 puntos)`
@@ -1372,7 +1372,7 @@ function SpeciesSearch({
     <div className="space-y-2">
       <Label>Especie <span className="text-red-500">*</span></Label>
       {selected ? (
-        <div className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2 border border-green-200">
+        <div className="flex items-center justify-between bg-teal-50 rounded-lg px-3 py-2 border border-teal-200">
           <div>
             <p className="text-sm font-medium italic">{selected.genus} {selected.species}</p>
             {selected.commonName && <p className="text-xs text-gray-500">{selected.commonName}</p>}
@@ -1408,7 +1408,7 @@ function SpeciesSearch({
             <button
               key={sp.id}
               type="button"
-              className="w-full text-left px-3 py-2 hover:bg-green-50 text-sm"
+              className="w-full text-left px-3 py-2 hover:bg-teal-50 text-sm"
               onClick={() => { setSelected(sp); setQuery(`${sp.genus} ${sp.species}`); }}
             >
               <span className="italic font-medium">{sp.genus} {sp.species}</span>

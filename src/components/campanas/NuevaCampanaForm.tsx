@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -70,8 +70,8 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
     (surveyType !== "FAUNA" || ["TRANSECTO_LINEAL_FAUNA", "RESCATE_RELOC"].includes(m.id))
   );
 
-  const methodologyActiveClass = surveyType === "FLORA" ? "border-green-600 bg-green-50" : "border-blue-600 bg-blue-50";
-  const methodologyDotClass = surveyType === "FLORA" ? "border-green-600 bg-green-600" : "border-blue-600 bg-blue-600";
+  const methodologyActiveClass = surveyType === "FLORA" ? "border-teal-600 bg-teal-50" : "border-blue-600 bg-blue-50";
+  const methodologyDotClass = surveyType === "FLORA" ? "border-teal-600 bg-teal-600" : "border-blue-600 bg-blue-600";
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -141,7 +141,7 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
                   className={cn(
                     "flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 text-xs font-medium transition-all",
                     season === id
-                      ? "border-green-600 bg-green-50"
+                      ? "border-teal-600 bg-teal-50"
                       : "border-gray-200 hover:border-gray-300 bg-white"
                   )}
                 >
@@ -167,7 +167,7 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
             <Label>Tipo de levantamiento <span className="text-red-500">*</span></Label>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { type: "FLORA" as const, label: "Flora", sub: "Parcelas", Icon: Leaf, color: "text-green-600", bg: "bg-green-50 border-green-600" },
+                { type: "FLORA" as const, label: "Flora", sub: "Parcelas", Icon: Leaf, color: "text-teal-600", bg: "bg-teal-50 border-teal-600" },
                 { type: "FAUNA" as const, label: "Fauna", sub: "Transectos", Icon: Bird, color: "text-blue-600", bg: "bg-blue-50 border-blue-600" },
               ].map(({ type, label, sub, Icon, color, bg }) => (
                 <button
@@ -258,7 +258,7 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
             <Button type="button" variant="outline" className="flex-1" onClick={() => router.back()}>
               Cancelar
             </Button>
-            <Button type="submit" className="flex-1 bg-green-700 hover:bg-green-800" disabled={submitting}>
+            <Button type="submit" className="flex-1 bg-teal-700 hover:bg-teal-800" disabled={submitting}>
               {submitting ? "Guardando..." : isEdit ? "Actualizar campaña" : "Crear campaña"}
             </Button>
           </div>

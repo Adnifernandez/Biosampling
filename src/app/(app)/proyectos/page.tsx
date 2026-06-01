@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+﻿import { prisma } from "@/lib/prisma";
 import { Card, CardContent } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Plus, FolderOpen, MapPin, User, Pencil } from "lucide-react";
@@ -7,7 +7,7 @@ import { DeleteProjectButton } from "@/components/proyectos/DeleteProjectButton"
 import { CloseProjectButton } from "@/components/proyectos/CloseProjectButton";
 
 const STATUS_COLORS: Record<ProjectStatus, string> = {
-  ACTIVE: "bg-green-100 text-green-800",
+  ACTIVE: "bg-teal-100 text-teal-800",
   INACTIVE: "bg-gray-100 text-gray-600",
   COMPLETED: "bg-blue-100 text-blue-800",
 };
@@ -24,7 +24,7 @@ export default async function ProyectosPage() {
           <h1 className="text-xl font-bold text-gray-900">Proyectos</h1>
           <p className="text-sm text-gray-500">{projects.length} proyecto{projects.length !== 1 ? "s" : ""}</p>
         </div>
-        <ButtonLink href="/proyectos/nuevo" size="sm" className="bg-green-700 hover:bg-green-800 text-white">
+        <ButtonLink href="/proyectos/nuevo" size="sm" className="bg-teal-700 hover:bg-teal-800 text-white">
           <Plus className="h-4 w-4 mr-1" />
           Nuevo
         </ButtonLink>
@@ -36,7 +36,7 @@ export default async function ProyectosPage() {
             <FolderOpen className="h-12 w-12 mx-auto mb-3 text-gray-300" />
             <p className="text-gray-500 font-medium">No hay proyectos</p>
             <p className="text-sm text-gray-400 mt-1">Crea tu primer proyecto para comenzar</p>
-            <ButtonLink href="/proyectos/nuevo" className="mt-4 inline-flex bg-green-700 hover:bg-green-800 text-white" size="sm">
+            <ButtonLink href="/proyectos/nuevo" className="mt-4 inline-flex bg-teal-700 hover:bg-teal-800 text-white" size="sm">
               <Plus className="h-4 w-4 mr-1" /> Crear proyecto
             </ButtonLink>
           </CardContent>

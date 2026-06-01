@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+﻿import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Card, CardContent } from "@/components/ui/card";
@@ -112,7 +112,7 @@ export default async function OcurrenciasPage({
           <ButtonLink
             href={`/ocurrencias/nueva?stationId=${stationId}`}
             size="sm"
-            className={isRescateCampaign ? "bg-orange-600 hover:bg-orange-700 text-white" : "bg-green-700 hover:bg-green-800 text-white"}
+            className={isRescateCampaign ? "bg-orange-600 hover:bg-orange-700 text-white" : "bg-teal-700 hover:bg-teal-800 text-white"}
           >
             <Plus className="h-4 w-4 mr-1" />
             {isRescateCampaign ? "Nueva captura" : "Nueva"}
@@ -152,7 +152,7 @@ export default async function OcurrenciasPage({
             <ButtonLink
               href={`/ocurrencias/nueva?stationId=${stationId}`}
               size="sm"
-              className={`mt-4 inline-flex ${isRescateCampaign ? "bg-orange-600 hover:bg-orange-700" : "bg-green-700 hover:bg-green-800"} text-white`}
+              className={`mt-4 inline-flex ${isRescateCampaign ? "bg-orange-600 hover:bg-orange-700" : "bg-teal-700 hover:bg-teal-800"} text-white`}
             >
               <Plus className="h-4 w-4 mr-1" /> {isRescateCampaign ? "Registrar captura" : "Registrar"}
             </ButtonLink>

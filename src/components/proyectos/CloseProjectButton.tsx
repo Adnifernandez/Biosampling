@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { Lock, LockOpen } from "lucide-react";
@@ -27,7 +27,7 @@ export function CloseProjectButton({ id, status }: { id: string; status: string 
       onClick={handleToggle}
       disabled={loading}
       title={isClosed ? "Reabrir proyecto" : "Cerrar proyecto"}
-      className={isClosed ? "text-green-700 border-green-300 hover:bg-green-50" : "text-gray-500 hover:text-orange-600 hover:border-orange-300"}
+      className={isClosed ? "text-teal-700 border-teal-300 hover:bg-teal-50" : "text-gray-500 hover:text-orange-600 hover:border-orange-300"}
     >
       {isClosed ? <LockOpen className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
     </Button>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ export function ToggleUserButton({ id, active }: { id: string; active: boolean }
     <Button
       variant="outline"
       size="sm"
-      className={currentActive ? "text-red-500 hover:text-red-700" : "text-green-600 hover:text-green-800"}
+      className={currentActive ? "text-red-500 hover:text-red-700" : "text-teal-600 hover:text-teal-800"}
       onClick={handleToggle}
       disabled={loading}
     >

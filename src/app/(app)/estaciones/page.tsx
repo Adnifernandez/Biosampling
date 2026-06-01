@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+﻿import { prisma } from "@/lib/prisma";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Card, CardContent } from "@/components/ui/card";
 import { LayoutList, Plus, MapPin, Leaf, Bird, Pencil } from "lucide-react";
@@ -59,7 +59,7 @@ export default async function EstacionesPage({
         {campaignId && projectId && (
           <ButtonLink
             href={`/estaciones/nueva?projectId=${projectId}&campaignId=${campaignId}`}
-            className="bg-green-700 hover:bg-green-800 text-white gap-2"
+            className="bg-teal-700 hover:bg-teal-800 text-white gap-2"
           >
             <Plus className="h-4 w-4" /> Nueva
           </ButtonLink>
@@ -75,7 +75,7 @@ export default async function EstacionesPage({
       {selectedCampaign && (
         <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg w-fit ${
           selectedCampaign.surveyType === "FLORA"
-            ? "bg-green-50 text-green-700"
+            ? "bg-teal-50 text-teal-700"
             : "bg-blue-50 text-blue-700"
         }`}>
           {selectedCampaign.surveyType === "FLORA"
@@ -104,7 +104,7 @@ export default async function EstacionesPage({
               <ButtonLink
                 href={`/estaciones/nueva?projectId=${projectId}&campaignId=${campaignId}`}
                 size="sm"
-                className="mt-3 inline-flex bg-green-700 hover:bg-green-800 text-white"
+                className="mt-3 inline-flex bg-teal-700 hover:bg-teal-800 text-white"
               >
                 <Plus className="h-4 w-4 mr-1" /> Crear estaciones
               </ButtonLink>
@@ -119,7 +119,7 @@ export default async function EstacionesPage({
                 <div className="flex items-center gap-3 min-w-0">
                   <span className={`text-xs font-bold px-2 py-1 rounded font-mono shrink-0 ${
                     s.type === "PARCELA"
-                      ? "bg-green-100 text-green-800"
+                      ? "bg-teal-100 text-teal-800"
                       : "bg-blue-100 text-blue-800"
                   }`}>
                     {s.name}
