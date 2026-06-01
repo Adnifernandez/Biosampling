@@ -11,19 +11,19 @@ export function useOnlineSync() {
   const [isSyncing, setIsSyncing] = useState(false);
 
   const pendingCount = useLiveQuery(
-    () => db.pendingOccurrences.where("status").equals("pending").count(),
+    () => db ? db.pendingOccurrences.where("status").equals("pending").count() : Promise.resolve(0),
     [],
     0
   );
 
   const errorCount = useLiveQuery(
-    () => db.pendingOccurrences.where("status").equals("error").count(),
+    () => db ? db.pendingOccurrences.where("status").equals("error").count() : Promise.resolve(0),
     [],
     0
   );
 
   const sync = useCallback(async () => {
-    if (isSyncing || !navigator.onLine) return;
+    if (!db || isSyncing || !navigator.onLine) return;
     const count = await db.pendingOccurrences.where("status").equals("pending").count();
     if (count === 0) return;
 
@@ -38,7 +38,7 @@ export function useOnlineSync() {
   }, [isSyncing]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !db) return;
 
     setIsOnline(navigator.onLine);
 
@@ -49,16 +49,13 @@ export function useOnlineSync() {
     };
     const handleOffline = () => setIsOnline(false);
     const handleVisibility = () => {
-      if (document.visibilityState === "visible" && navigator.onLine) {
-        sync();
-      }
+      if (document.visibilityState === "visible" && navigator.onLine) sync();
     };
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
     document.addEventListener("visibilitychange", handleVisibility);
 
-    // Seed cache on first mount if online
     if (navigator.onLine) seedLocalCache();
 
     return () => {

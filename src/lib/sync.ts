@@ -8,6 +8,7 @@ import {
 } from "@/app/(app)/proyectos/[id]/campanas/[cid]/estaciones/[sid]/ocurrencias/actions";
 
 export async function syncPendingOccurrences(): Promise<{ synced: number; failed: number }> {
+  if (!db) return { synced: 0, failed: 0 };
   const pending = await db.pendingOccurrences.where("status").equals("pending").toArray();
   let synced = 0;
   let failed = 0;
