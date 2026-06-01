@@ -276,7 +276,7 @@ export function OccurrenceForm({
       if (seq === searchSeq.current) {
         setSpeciesList(results);
         setSearching(false);
-        if (results.length > 0) db.species.bulkPut(results).catch(() => {});
+        if (results.length > 0) db.species.bulkPut(results.map(s => ({ ...s, type: surveyType }))).catch(() => {});
       }
     }, 250);
     return () => clearTimeout(timer);
