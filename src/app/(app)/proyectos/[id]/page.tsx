@@ -37,9 +37,6 @@ export default async function ProyectoDetailPage({ params }: { params: Promise<{
                 <MapPin className="h-3.5 w-3.5" />
                 {region?.name ?? project.region} · {project.commune}
               </span>
-              <span className="flex items-center gap-1">
-                <User className="h-3.5 w-3.5" /> {project.responsible}
-              </span>
             </div>
           </div>
         </div>

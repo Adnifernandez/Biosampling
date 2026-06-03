@@ -13,6 +13,7 @@ export async function createCampana(formData: FormData) {
   const startDate = formData.get("startDate") as string;
   const endDate = formData.get("endDate") as string;
   const notes = formData.get("notes") as string;
+  const responsible = (formData.get("responsible") as string) || null;
 
   if (!projectId || !season || !surveyType || !methodology || !startDate || !endDate) {
     return { error: "Completa todos los campos requeridos" };
@@ -32,6 +33,7 @@ export async function createCampana(formData: FormData) {
       startDate: new Date(startDate),
       endDate: new Date(endDate),
       notes: notes || null,
+      responsible,
       status: "ACTIVE",
     },
   });
@@ -50,6 +52,7 @@ export async function updateCampana(campaignId: string, formData: FormData) {
   const startDate = formData.get("startDate") as string;
   const endDate = formData.get("endDate") as string;
   const notes = formData.get("notes") as string;
+  const responsible = (formData.get("responsible") as string) || null;
 
   if (!season || !surveyType || !methodology || !startDate || !endDate) {
     return { error: "Completa todos los campos requeridos" };
@@ -69,6 +72,7 @@ export async function updateCampana(campaignId: string, formData: FormData) {
       startDate: new Date(startDate),
       endDate: new Date(endDate),
       notes: notes || null,
+      responsible,
     },
   });
 

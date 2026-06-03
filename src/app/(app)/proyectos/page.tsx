@@ -57,9 +57,6 @@ export default async function ProyectosPage() {
                     <span className="flex items-center gap-1">
                       <MapPin className="h-3 w-3" /> {p.region} · {p.commune}
                     </span>
-                    <span className="flex items-center gap-1">
-                      <User className="h-3 w-3" /> {p.responsible}
-                    </span>
                   </div>
                 </div>
                 <div className="flex gap-1 shrink-0">

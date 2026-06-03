@@ -26,7 +26,6 @@ export default async function EditarProyectoPage({ params }: { params: Promise<{
           name: project.name,
           region: project.region,
           commune: project.commune,
-          responsible: project.responsible,
           description: project.description ?? "",
         }}
       />

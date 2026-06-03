@@ -9,12 +9,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { Sun, Leaf, Snowflake, Flower2, Bird, FolderOpen } from "lucide-react";
+import { Sun, Leaf, Snowflake, Flower2, Bird, FolderOpen, Search } from "lucide-react";
 import { METHODOLOGIES } from "@/lib/methodologies";
 import { createCampana, updateCampana } from "@/app/(app)/campanas/actions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+
+const RESPONSIBLE_PERSONS = [
+  "Álvaro Esparza","Ángela Schafer","Catalina Lastra","Claudia Cortés",
+  "Diego Verdugo","Gabriel Cruz","Gabriel Meriot","Graciela Páez",
+  "Katterin Gutiérrez","Macarena Toledo","Nicolás Cortés","Rodrigo Martínez","Vicente Santibáñez",
+];
 
 const SEASONS = [
   { id: "Verano",    label: "Verano",    icon: Sun,       color: "text-yellow-500" },
@@ -35,6 +41,7 @@ interface DefaultValues {
   name?: string;
   surveyType?: "FLORA" | "FAUNA";
   methodology?: string;
+  responsible?: string;
   startDate?: string;
   endDate?: string;
   notes?: string;
@@ -59,6 +66,9 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
   const [suffix, setSuffix] = useState(parsed.suffix);
   const [surveyType, setSurveyType] = useState<"FLORA" | "FAUNA">(defaultValues?.surveyType ?? "FLORA");
   const [methodology, setMethodology] = useState(defaultValues?.methodology ?? "");
+  const [responsible, setResponsible] = useState(defaultValues?.responsible ?? "");
+  const [personQuery, setPersonQuery] = useState("");
+  const [personOpen, setPersonOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const finalName = suffix.trim()
@@ -88,6 +98,7 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
     fd.set("season", season);
     fd.set("surveyType", surveyType);
     fd.set("methodology", methodology);
+    fd.set("responsible", responsible);
 
     const result = isEdit
       ? await updateCampana(campaignId, fd)
@@ -240,6 +251,42 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
                 defaultValue={defaultValues?.endDate}
               />
             </div>
+          </div>
+
+          {/* Persona responsable */}
+          <div className="space-y-1.5">
+            <Label>Persona responsable <span className="text-gray-400 text-xs font-normal">(opcional)</span></Label>
+            {responsible ? (
+              <div className="flex items-center justify-between bg-teal-50 rounded-lg px-3 py-2 border border-teal-200">
+                <span className="text-sm font-medium text-teal-900">{responsible}</span>
+                <button type="button" className="text-xs text-red-500 hover:text-red-700 ml-3"
+                  onClick={() => { setResponsible(""); setPersonQuery(""); }}>
+                  Cambiar
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <Input className="pl-9" placeholder="Buscar persona..." value={personQuery}
+                    onChange={(e) => setPersonQuery(e.target.value)}
+                    onFocus={() => setPersonOpen(true)}
+                    onBlur={() => setTimeout(() => setPersonOpen(false), 150)} />
+                </div>
+                {personOpen && (
+                  <div className="border rounded-lg max-h-52 overflow-y-auto divide-y bg-white shadow-sm">
+                    {(personQuery ? RESPONSIBLE_PERSONS.filter(p => p.toLowerCase().includes(personQuery.toLowerCase())) : RESPONSIBLE_PERSONS)
+                      .map(p => (
+                        <button key={p} type="button" className="w-full text-left px-3 py-2.5 hover:bg-teal-50 text-sm"
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => { setResponsible(p); setPersonQuery(""); setPersonOpen(false); }}>
+                          {p}
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           {/* Comentarios */}

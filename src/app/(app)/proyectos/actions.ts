@@ -9,7 +9,6 @@ const projectSchema = z.object({
   name: z.string().min(2, "Mínimo 2 caracteres"),
   region: z.string().min(1, "Selecciona una región"),
   commune: z.string().min(1, "Selecciona una comuna"),
-  responsible: z.string().min(2, "Mínimo 2 caracteres"),
   description: z.string().optional(),
 });
 
@@ -21,7 +20,6 @@ export async function createProject(formData: FormData) {
     name: formData.get("name"),
     region: formData.get("region"),
     commune: formData.get("commune"),
-    responsible: formData.get("responsible"),
     description: formData.get("description"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -39,7 +37,6 @@ export async function updateProject(id: string, formData: FormData) {
     name: formData.get("name"),
     region: formData.get("region"),
     commune: formData.get("commune"),
-    responsible: formData.get("responsible"),
     description: formData.get("description"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };

@@ -8,7 +8,7 @@ export async function GET() {
 
   const [projects, campaigns, stations, species] = await Promise.all([
     prisma.project.findMany({
-      select: { id: true, name: true, region: true, commune: true, responsible: true, status: true },
+      select: { id: true, name: true, region: true, commune: true, status: true },
       orderBy: { name: "asc" },
     }),
     prisma.campaign.findMany({
