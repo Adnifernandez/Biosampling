@@ -22,7 +22,7 @@ export default async function EditarOcurrenciaPage({
       station: {
         include: {
           campaign: {
-            select: { id: true, name: true, surveyType: true, methodology: true, projectId: true },
+            select: { id: true, name: true, surveyType: true, methodology: true, projectId: true, shermanTrapCount: true, cameraTrapCount: true },
           },
         },
       },
@@ -102,6 +102,8 @@ export default async function EditarOcurrenciaPage({
         }))}
         transectoId={parentId ?? undefined}
         transectoCoords={transectoStation ? { latitude: transectoStation.latitude, longitude: transectoStation.longitude } : undefined}
+        shermanTrapCount={occurrence.station.campaign.shermanTrapCount ?? 0}
+        cameraTrapCount={occurrence.station.campaign.cameraTrapCount ?? 0}
       />
     </div>
   );

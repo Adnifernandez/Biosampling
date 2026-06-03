@@ -16,7 +16,7 @@ export default async function NuevaOcurrenciaPage({
     where: { id: stationId },
     include: {
       campaign: {
-        select: { id: true, name: true, surveyType: true, methodology: true, projectId: true },
+        select: { id: true, name: true, surveyType: true, methodology: true, projectId: true, shermanTrapCount: true, cameraTrapCount: true },
       },
     },
   });
@@ -53,6 +53,8 @@ export default async function NuevaOcurrenciaPage({
         methodology={station.campaign.methodology}
         transectoId={transectoStation?.id ?? undefined}
         transectoCoords={transectoStation ? { latitude: transectoStation.latitude, longitude: transectoStation.longitude } : undefined}
+        shermanTrapCount={station.campaign.shermanTrapCount ?? 0}
+        cameraTrapCount={station.campaign.cameraTrapCount ?? 0}
       />
     </div>
   );

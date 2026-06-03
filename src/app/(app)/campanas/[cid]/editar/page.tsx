@@ -33,6 +33,8 @@ export default async function EditarCampanaPage({ params }: { params: Promise<{ 
           surveyType: campaign.surveyType as "FLORA" | "FAUNA",
           methodology: campaign.methodology,
           responsible: campaign.responsible ?? "",
+          shermanTrapCount: campaign.shermanTrapCount?.toString() ?? "",
+          cameraTrapCount: campaign.cameraTrapCount?.toString() ?? "",
           startDate: format(new Date(campaign.startDate), "yyyy-MM-dd"),
           endDate: format(new Date(campaign.endDate), "yyyy-MM-dd"),
           notes: campaign.notes ?? "",

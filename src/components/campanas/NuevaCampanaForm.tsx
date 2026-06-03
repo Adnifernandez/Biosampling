@@ -42,6 +42,8 @@ interface DefaultValues {
   surveyType?: "FLORA" | "FAUNA";
   methodology?: string;
   responsible?: string;
+  shermanTrapCount?: string;
+  cameraTrapCount?: string;
   startDate?: string;
   endDate?: string;
   notes?: string;
@@ -69,6 +71,8 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
   const [responsible, setResponsible] = useState(defaultValues?.responsible ?? "");
   const [personQuery, setPersonQuery] = useState("");
   const [personOpen, setPersonOpen] = useState(false);
+  const [shermanTrapCount, setShermanTrapCount] = useState(defaultValues?.shermanTrapCount ?? "");
+  const [cameraTrapCount, setCameraTrapCount] = useState(defaultValues?.cameraTrapCount ?? "");
   const [submitting, setSubmitting] = useState(false);
 
   const finalName = suffix.trim()
@@ -99,6 +103,8 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
     fd.set("surveyType", surveyType);
     fd.set("methodology", methodology);
     fd.set("responsible", responsible);
+    fd.set("shermanTrapCount", shermanTrapCount || "0");
+    fd.set("cameraTrapCount", cameraTrapCount || "0");
 
     const result = isEdit
       ? await updateCampana(campaignId, fd)
@@ -252,6 +258,37 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
               />
             </div>
           </div>
+
+          {/* Trampas — solo para FAUNA Transecto */}
+          {surveyType === "FAUNA" && methodology === "TRANSECTO_LINEAL_FAUNA" && (
+            <div className="space-y-2">
+              <Label>Dispositivos de monitoreo <span className="text-gray-400 text-xs font-normal">(opcional)</span></Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-gray-600">Trampas Sherman (TS)</Label>
+                  <Input
+                    type="number" min={0} step={1} placeholder="0"
+                    value={shermanTrapCount}
+                    onChange={(e) => setShermanTrapCount(e.target.value)}
+                  />
+                  {parseInt(shermanTrapCount) > 0 && (
+                    <p className="text-xs text-gray-400">TS1 — TS{shermanTrapCount}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-gray-600">Cámaras Trampa (CT)</Label>
+                  <Input
+                    type="number" min={0} step={1} placeholder="0"
+                    value={cameraTrapCount}
+                    onChange={(e) => setCameraTrapCount(e.target.value)}
+                  />
+                  {parseInt(cameraTrapCount) > 0 && (
+                    <p className="text-xs text-gray-400">CT1 — CT{cameraTrapCount}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Persona responsable */}
           <div className="space-y-1.5">

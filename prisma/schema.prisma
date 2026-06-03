@@ -40,10 +40,12 @@ model Campaign {
   id          String    @id @default(cuid())
   projectId   String
   name        String
-  surveyType   String
-  methodology  String
-  responsible  String?
-  startDate    DateTime
+  surveyType        String
+  methodology       String
+  responsible       String?
+  shermanTrapCount  Int?
+  cameraTrapCount   Int?
+  startDate         DateTime
   endDate      DateTime
   status       String    @default("ACTIVE")
   notes        String?

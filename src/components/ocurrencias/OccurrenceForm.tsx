@@ -55,6 +55,16 @@ type SpeciesResult = {
 type Individual = { dat: string; dap: string; altura: string };
 type GrillaPoint = { type: "empty" } | { type: "sinVeg" } | { type: "species"; speciesId: string; label: string };
 
+type TrapEntry = {
+  speciesId: string;
+  speciesLabel: string;
+  date: string;
+  time: string;
+  latitude: number | null;
+  longitude: number | null;
+  abundance: string;
+};
+
 interface OccurrenceFormProps {
   projectId: string;
   campaignId: string;
@@ -66,6 +76,14 @@ interface OccurrenceFormProps {
   grillaOccurrences?: { speciesId: string; abundance: number; label: string; individuos?: number }[];
   transectoId?: string;
   transectoCoords?: { latitude: number | null; longitude: number | null };
+  shermanTrapCount?: number;
+  cameraTrapCount?: number;
+}
+
+function buildTrapOptions(method: string, shermanCount: number, cameraCount: number): string[] {
+  if (method === "Trampa Sherman") return Array.from({ length: shermanCount }, (_, i) => `TS${i + 1}`);
+  if (method === "Cámara trampa") return Array.from({ length: cameraCount }, (_, i) => `CT${i + 1}`);
+  return [];
 }
 
 export function OccurrenceForm({
@@ -79,6 +97,8 @@ export function OccurrenceForm({
   grillaOccurrences,
   transectoId,
   transectoCoords,
+  shermanTrapCount,
+  cameraTrapCount,
 }: OccurrenceFormProps) {
   const router = useRouter();
   const isBB = methodology === "BRAUN_BLANQUET";
@@ -139,6 +159,10 @@ export function OccurrenceForm({
   const [shermanCaptures, setShermanCaptures] = useState<{ date: string; abundance: string }[]>([
     { date: format(new Date(), "yyyy-MM-dd"), abundance: "" },
   ]);
+  const [trapId, setTrapId] = useState("");
+  const [trapEntries, setTrapEntries] = useState<TrapEntry[]>([
+    { speciesId: "", speciesLabel: "", date: format(new Date(), "yyyy-MM-dd"), time: format(new Date(), "HH:mm"), latitude: null, longitude: null, abundance: "" }
+  ]);
 
   // Load methodology data in edit mode
   useEffect(() => {
@@ -172,6 +196,8 @@ export function OccurrenceForm({
         const md = JSON.parse(defaultValues.methodologyData);
         if (md.time) setTfTime(md.time);
         if (md.deviceId) setTfDeviceId(String(md.deviceId));
+        if (md.trapId) setTrapId(md.trapId);           // ADD THIS
+        else if (md.deviceId) setTrapId(`TS${md.deviceId}`); // backward compat
       } catch {}
     }
   }, []);
@@ -271,6 +297,8 @@ export function OccurrenceForm({
     setTfLng(null);
     setTfAbundance("");
     setShermanCaptures([{ date: format(new Date(), "yyyy-MM-dd"), abundance: "" }]);
+    setTrapId("");
+    setTrapEntries([{ speciesId: "", speciesLabel: "", date: format(new Date(), "yyyy-MM-dd"), time: format(new Date(), "HH:mm"), latitude: null, longitude: null, abundance: "" }]);
   }
 
   function captureGPS() {
@@ -403,58 +431,37 @@ export function OccurrenceForm({
       const speciesId = selectedSpecies?.id ?? defaultValues?.speciesId ?? "";
       if (!speciesId) { toast.error("Selecciona una especie"); return; }
       if (!tfDetectionMethod) { toast.error("Selecciona el método de detección"); return; }
-      const needsDevice = tfDetectionMethod === "Trampa Sherman" || tfDetectionMethod === "Cámara trampa";
-      if (needsDevice && !tfDeviceId) {
-        toast.error(`Ingresa el N° de ${tfDetectionMethod === "Trampa Sherman" ? "trampa" : "cámara"}`);
-        return;
-      }
-
       const buildMethodologyData = () => JSON.stringify({
         ...(tfTime ? { time: tfTime } : {}),
         ...(tfDeviceId ? { deviceId: parseInt(tfDeviceId) } : {}),
       });
 
-      if (!occurrenceId && tfDetectionMethod === "Trampa Sherman") {
-        const validCaptures = shermanCaptures.filter(c => c.date && c.abundance);
-        if (validCaptures.length === 0) { toast.error("Agrega al menos una captura"); return; }
-
-        if (!navigator.onLine) {
-          await saveOffline({
-            kind: "sherman", data: {
-              speciesId, detectionMethod: tfDetectionMethod,
-              deviceId: tfDeviceId || undefined,
-              latitude: tfLat !== null ? String(tfLat) : undefined,
-              longitude: tfLng !== null ? String(tfLng) : undefined,
-              notes: notes || undefined,
-              methodologyData: buildMethodologyData(),
-              captures: validCaptures,
-            }
-          }, selectedSpecies ? `${selectedSpecies.genus} ${selectedSpecies.species}` : "Especie");
-          return;
-        }
-
+      if (!occurrenceId && (tfDetectionMethod === "Trampa Sherman" || tfDetectionMethod === "Cámara trampa")) {
+        if (!trapId) { toast.error("Selecciona la trampa"); return; }
+        const validEntries = trapEntries.filter(e => e.speciesId && e.date && e.abundance);
+        if (validEntries.length === 0) { toast.error("Agrega al menos un registro válido"); return; }
         setSubmitting(true);
-        const methodologyData = buildMethodologyData();
         let count = 0;
-        for (const capture of validCaptures) {
+        for (const entry of validEntries) {
           const result = await createOccurrence(projectId, campaignId, stationId, {
-            speciesId,
-            date: capture.date,
-            abundance: capture.abundance,
+            speciesId: entry.speciesId,
+            date: entry.date,
+            abundance: entry.abundance,
             detectionMethod: tfDetectionMethod,
-            latitude: tfLat !== null ? String(tfLat) : undefined,
-            longitude: tfLng !== null ? String(tfLng) : undefined,
+            latitude: entry.latitude !== null ? String(entry.latitude) : undefined,
+            longitude: entry.longitude !== null ? String(entry.longitude) : undefined,
             notes: notes || undefined,
-            methodologyData,
+            methodologyData: JSON.stringify({ trapId, time: entry.time }),
           });
           if ("success" in result) count++;
         }
         setSubmitting(false);
         if (count > 0) {
-          toast.success(`${count} captura${count === 1 ? "" : "s"} de trampa Sherman registrada${count === 1 ? "" : "s"}`);
+          toast.success(`${count} registro${count === 1 ? "" : "s"} guardado${count === 1 ? "" : "s"}`);
           setSessionCount(n => n + count);
           resetForm();
         }
+        return;
       } else {
         if (!tfAbundance) { toast.error("Ingresa el N° de individuos"); return; }
         const methodologyData = buildMethodologyData();
@@ -926,59 +933,42 @@ export function OccurrenceForm({
                 </Select>
               </div>
 
-              {/* Device ID — Sherman or Camera */}
-              {(tfDetectionMethod === "Trampa Sherman" || tfDetectionMethod === "Cámara trampa") && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="tfDeviceId">
-                    N° de {tfDetectionMethod === "Trampa Sherman" ? "trampa" : "cámara"} <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="tfDeviceId"
-                    type="number"
-                    min={1}
-                    step={1}
-                    placeholder="Ej: 1"
-                    value={tfDeviceId}
-                    onChange={(e) => setTfDeviceId(e.target.value)}
-                    className="max-w-[140px]"
-                  />
-                </div>
-              )}
+              {/* Trap selector — Sherman or Camera */}
+              {(tfDetectionMethod === "Trampa Sherman" || tfDetectionMethod === "Cámara trampa") && (() => {
+                const trapOptions = buildTrapOptions(tfDetectionMethod, shermanTrapCount ?? 0, cameraTrapCount ?? 0);
+                const trapLabel = tfDetectionMethod === "Trampa Sherman" ? "Trampa Sherman" : "Cámara Trampa";
+                return (
+                  <div className="space-y-1.5">
+                    <Label>Seleccionar {trapLabel} <span className="text-red-500">*</span></Label>
+                    {trapOptions.length > 0 ? (
+                      <Select value={trapId} onValueChange={(v) => setTrapId(v ?? "")}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={`Seleccionar ${trapLabel}...`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {trapOptions.map(opt => (
+                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        placeholder="Ej: TS1 o CT2"
+                        value={trapId}
+                        onChange={(e) => setTrapId(e.target.value)}
+                      />
+                    )}
+                  </div>
+                );
+              })()}
 
-              {/* Sherman: multi-row captures by day */}
-              {!occurrenceId && tfDetectionMethod === "Trampa Sherman" ? (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Capturas por día <span className="text-red-500">*</span></Label>
-                    <Button type="button" variant="outline" size="sm" onClick={addShermanCapture} className="gap-1 h-7 text-xs">
-                      <Plus className="h-3.5 w-3.5" /> Agregar día
-                    </Button>
-                  </div>
-                  <div className="space-y-2">
-                    {shermanCaptures.map((capture, i) => (
-                      <div key={i} className="flex gap-2 items-end bg-gray-50 rounded-lg p-2">
-                        <div className="flex-1 space-y-1">
-                          <Label className="text-xs">Fecha</Label>
-                          <Input type="date" value={capture.date}
-                            onChange={(e) => updateShermanCapture(i, "date", e.target.value)}
-                            className="h-8 text-sm" />
-                        </div>
-                        <div className="w-28 space-y-1">
-                          <Label className="text-xs">N° individuos</Label>
-                          <Input type="number" min={0} placeholder="0" value={capture.abundance}
-                            onChange={(e) => updateShermanCapture(i, "abundance", e.target.value)}
-                            className="h-8 text-sm" />
-                        </div>
-                        {shermanCaptures.length > 1 && (
-                          <button type="button" onClick={() => removeShermanCapture(i)}
-                            className="text-red-400 hover:text-red-600 pb-1">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              {/* Trap multi-entry or single date/abundance */}
+              {!occurrenceId && (tfDetectionMethod === "Trampa Sherman" || tfDetectionMethod === "Cámara trampa") ? (
+                <TrapMultiEntry
+                  entries={trapEntries}
+                  onChange={setTrapEntries}
+                  surveyType={surveyType}
+                />
               ) : (
                 /* All other methods or edit mode: single date + time + abundance */
                 <div className="space-y-3">
@@ -1133,6 +1123,183 @@ function SpeciesSearch({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Trap multi-entry sub-component ──
+function TrapMultiEntry({
+  entries,
+  onChange,
+  surveyType,
+}: {
+  entries: TrapEntry[];
+  onChange: (entries: TrapEntry[]) => void;
+  surveyType: "FLORA" | "FAUNA";
+}) {
+  function addEntry() {
+    onChange([...entries, {
+      speciesId: "", speciesLabel: "",
+      date: format(new Date(), "yyyy-MM-dd"),
+      time: format(new Date(), "HH:mm"),
+      latitude: null, longitude: null, abundance: "",
+    }]);
+  }
+  function removeEntry(i: number) {
+    onChange(entries.filter((_, idx) => idx !== i));
+  }
+  function updateEntry(i: number, patch: Partial<TrapEntry>) {
+    onChange(entries.map((e, idx) => idx === i ? { ...e, ...patch } : e));
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <Label>Registros <span className="text-red-500">*</span></Label>
+        <Button type="button" variant="outline" size="sm" onClick={addEntry} className="gap-1 h-7 text-xs">
+          <Plus className="h-3.5 w-3.5" /> Agregar registro
+        </Button>
+      </div>
+      <div className="space-y-3">
+        {entries.map((entry, i) => (
+          <TrapEntryRow
+            key={i}
+            index={i}
+            entry={entry}
+            canRemove={entries.length > 1}
+            surveyType={surveyType}
+            onUpdate={(patch) => updateEntry(i, patch)}
+            onRemove={() => removeEntry(i)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Trap entry row sub-component ──
+function TrapEntryRow({
+  index,
+  entry,
+  canRemove,
+  surveyType,
+  onUpdate,
+  onRemove,
+}: {
+  index: number;
+  entry: TrapEntry;
+  canRemove: boolean;
+  surveyType: "FLORA" | "FAUNA";
+  onUpdate: (patch: Partial<TrapEntry>) => void;
+  onRemove: () => void;
+}) {
+  const [query, setQuery] = useState(entry.speciesLabel || "");
+  const [list, setList] = useState<SpeciesResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const seq = useRef(0);
+
+  useEffect(() => {
+    if (!query || query.length < 1 || entry.speciesId) { setList([]); setSearching(false); return; }
+    setSearching(true);
+    const s = ++seq.current;
+    const t = setTimeout(async () => {
+      const results = await searchSpecies(query, surveyType);
+      if (s === seq.current) { setList(results); setSearching(false); }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [query, surveyType, entry.speciesId]);
+
+  function captureGPS() {
+    setGpsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        onUpdate({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+        setGpsLoading(false);
+      },
+      () => { toast.error("No se pudo obtener ubicación GPS"); setGpsLoading(false); },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  return (
+    <div className="bg-gray-50 rounded-lg p-3 space-y-2 border border-gray-200">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-gray-500">Registro {index + 1}</span>
+        {canRemove && (
+          <button type="button" onClick={onRemove} className="text-red-400 hover:text-red-600">
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* Species */}
+      {entry.speciesId ? (
+        <div className="flex items-center justify-between bg-teal-50 rounded px-3 py-1.5 border border-teal-200">
+          <span className="text-sm italic font-medium text-teal-900">{entry.speciesLabel.split(" · ")[0]}</span>
+          <button type="button" className="text-xs text-red-500 hover:text-red-700 ml-2"
+            onClick={() => { onUpdate({ speciesId: "", speciesLabel: "" }); setQuery(""); setList([]); }}>
+            Cambiar
+          </button>
+        </div>
+      ) : (
+        <div>
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            <Input className="pl-9" placeholder="Buscar especie..." value={query}
+              onChange={(e) => { setQuery(e.target.value); }} />
+          </div>
+          {searching && <p className="text-xs text-gray-400 mt-1">Buscando...</p>}
+          {list.length > 0 && (
+            <div className="border rounded-lg max-h-40 overflow-y-auto divide-y bg-white mt-1">
+              {list.map(sp => (
+                <button key={sp.id} type="button" className="w-full text-left px-3 py-2 hover:bg-teal-50 text-sm"
+                  onClick={() => {
+                    const label = `${sp.genus} ${sp.species}${sp.commonName ? ` · ${sp.commonName}` : ""}`;
+                    onUpdate({ speciesId: sp.id, speciesLabel: label });
+                    setQuery(label.split(" · ")[0]);
+                    setList([]);
+                  }}>
+                  <span className="italic font-medium">{sp.genus} {sp.species}</span>
+                  {sp.commonName && <span className="text-gray-500 ml-2">· {sp.commonName}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Date + Time */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <Label className="text-xs text-gray-600">Fecha</Label>
+          <Input type="date" value={entry.date} onChange={(e) => onUpdate({ date: e.target.value })} className="h-8 text-sm" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-gray-600">Hora</Label>
+          <Input type="time" value={entry.time} onChange={(e) => onUpdate({ time: e.target.value })} className="h-8 text-sm" />
+        </div>
+      </div>
+
+      {/* Abundance */}
+      <div className="space-y-1">
+        <Label className="text-xs text-gray-600">N° individuos</Label>
+        <Input type="number" min={0} placeholder="0" value={entry.abundance}
+          onChange={(e) => onUpdate({ abundance: e.target.value })} className="h-8 text-sm max-w-[120px]" />
+      </div>
+
+      {/* GPS */}
+      <div className="flex items-center gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={captureGPS}
+          disabled={gpsLoading} className="gap-1.5 h-7 text-xs">
+          {gpsLoading
+            ? <><Loader2 className="h-3 w-3 animate-spin" /> Obteniendo...</>
+            : <><MapPin className="h-3 w-3" /> Capturar GPS</>}
+        </Button>
+        {entry.latitude !== null && (
+          <p className="text-xs text-teal-700 font-mono">{entry.latitude.toFixed(5)}, {entry.longitude!.toFixed(5)}</p>
+        )}
+      </div>
     </div>
   );
 }

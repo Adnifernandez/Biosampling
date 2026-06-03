@@ -14,6 +14,8 @@ export async function createCampana(formData: FormData) {
   const endDate = formData.get("endDate") as string;
   const notes = formData.get("notes") as string;
   const responsible = (formData.get("responsible") as string) || null;
+  const shermanTrapCount = formData.get("shermanTrapCount") ? parseInt(formData.get("shermanTrapCount") as string) : null;
+  const cameraTrapCount = formData.get("cameraTrapCount") ? parseInt(formData.get("cameraTrapCount") as string) : null;
 
   if (!projectId || !season || !surveyType || !methodology || !startDate || !endDate) {
     return { error: "Completa todos los campos requeridos" };
@@ -34,6 +36,8 @@ export async function createCampana(formData: FormData) {
       endDate: new Date(endDate),
       notes: notes || null,
       responsible,
+      shermanTrapCount,
+      cameraTrapCount,
       status: "ACTIVE",
     },
   });
@@ -53,6 +57,8 @@ export async function updateCampana(campaignId: string, formData: FormData) {
   const endDate = formData.get("endDate") as string;
   const notes = formData.get("notes") as string;
   const responsible = (formData.get("responsible") as string) || null;
+  const shermanTrapCount = formData.get("shermanTrapCount") ? parseInt(formData.get("shermanTrapCount") as string) : null;
+  const cameraTrapCount = formData.get("cameraTrapCount") ? parseInt(formData.get("cameraTrapCount") as string) : null;
 
   if (!season || !surveyType || !methodology || !startDate || !endDate) {
     return { error: "Completa todos los campos requeridos" };
@@ -73,6 +79,8 @@ export async function updateCampana(campaignId: string, formData: FormData) {
       endDate: new Date(endDate),
       notes: notes || null,
       responsible,
+      shermanTrapCount,
+      cameraTrapCount,
     },
   });
 
