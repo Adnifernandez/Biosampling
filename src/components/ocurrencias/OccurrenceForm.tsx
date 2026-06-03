@@ -913,7 +913,7 @@ export function OccurrenceForm({
             <>
               {/* Detection method */}
               <div className="space-y-1.5">
-                <Label>Método de detección <span className="text-red-500">*</span></Label>
+                <Label>Método de registro <span className="text-red-500">*</span></Label>
                 <Select value={tfDetectionMethod} onValueChange={(v) => setTfDetectionMethod(v ?? "")}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar..." />
