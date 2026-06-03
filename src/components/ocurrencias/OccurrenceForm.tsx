@@ -428,15 +428,16 @@ export function OccurrenceForm({
 
     // Fauna transecto flow
     if (isTransectoFauna) {
+      const isTrapMethod = tfDetectionMethod === "Trampa Sherman" || tfDetectionMethod === "Cámara trampa";
       const speciesId = selectedSpecies?.id ?? defaultValues?.speciesId ?? "";
-      if (!speciesId) { toast.error("Selecciona una especie"); return; }
-      if (!tfDetectionMethod) { toast.error("Selecciona el método de detección"); return; }
+      if (!isTrapMethod && !speciesId) { toast.error("Selecciona una especie"); return; }
+      if (!tfDetectionMethod) { toast.error("Selecciona el método de registro"); return; }
       const buildMethodologyData = () => JSON.stringify({
         ...(tfTime ? { time: tfTime } : {}),
         ...(tfDeviceId ? { deviceId: parseInt(tfDeviceId) } : {}),
       });
 
-      if (!occurrenceId && (tfDetectionMethod === "Trampa Sherman" || tfDetectionMethod === "Cámara trampa")) {
+      if (!occurrenceId && isTrapMethod) {
         if (!trapId) { toast.error("Selecciona la trampa"); return; }
         const validEntries = trapEntries.filter(e => e.speciesId && e.date && e.abundance);
         if (validEntries.length === 0) { toast.error("Agrega al menos un registro válido"); return; }
