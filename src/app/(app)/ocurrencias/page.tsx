@@ -43,7 +43,7 @@ export default async function OcurrenciasPage({
     campaignId
       ? prisma.station.findMany({
           where: { campaignId, parentId: null },
-          orderBy: { name: "asc" },
+          orderBy: { createdAt: "asc" },
           select: { id: true, name: true },
         })
       : ([] as { id: string; name: string }[]),
@@ -72,7 +72,7 @@ export default async function OcurrenciasPage({
   const grillaStations = isGrillaCampaign && transectoId
     ? await prisma.station.findMany({
         where: { parentId: transectoId },
-        orderBy: { name: "asc" },
+        orderBy: { createdAt: "asc" },
         select: { id: true, name: true },
       })
     : [];

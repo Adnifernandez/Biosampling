@@ -17,7 +17,7 @@ export async function GET() {
     }),
     prisma.station.findMany({
       select: { id: true, campaignId: true, name: true, parentId: true, latitude: true, longitude: true },
-      orderBy: { name: "asc" },
+      orderBy: { createdAt: "asc" },
     }),
     prisma.species.findMany({
       select: { id: true, family: true, genus: true, species: true, commonName: true, type: true, conservationStatus: true },

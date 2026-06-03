@@ -28,12 +28,12 @@ export default async function EstacionesPage({
   const stations = campaignId
     ? await prisma.station.findMany({
         where: { campaignId, parentId: null },
-        orderBy: { name: "asc" },
+        orderBy: { createdAt: "asc" },
         include: {
           campaign: {
             select: { id: true, name: true, surveyType: true, methodology: true, projectId: true },
           },
-          children: { select: { id: true, name: true }, orderBy: { name: "asc" } },
+          children: { select: { id: true, name: true }, orderBy: { createdAt: "asc" } },
         },
       })
     : [];
