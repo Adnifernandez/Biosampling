@@ -597,8 +597,25 @@ export function OccurrenceForm({
       <CardContent className="pt-5">
         <form onSubmit={handleSubmit} className="space-y-4">
 
-          {/* Species search — hidden in GRILLA (grid handles species selection) */}
-          {!isGrilla && (
+          {/* Método de registro — shown FIRST for transecto fauna */}
+          {isTransectoFauna && (
+            <div className="space-y-1.5">
+              <Label>Método de registro <span className="text-red-500">*</span></Label>
+              <Select value={tfDetectionMethod} onValueChange={(v) => setTfDetectionMethod(v ?? "")}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {["POA", "Trampa Sherman", "Cámara trampa", "Observación directa", "Captura manual", "Otro"].map((m) => (
+                    <SelectItem key={m} value={m}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Species search — hidden in GRILLA and when trap/camera selected in transecto */}
+          {!isGrilla && !(isTransectoFauna && (tfDetectionMethod === "Trampa Sherman" || tfDetectionMethod === "Cámara trampa")) && (
             <SpeciesSearch
               query={speciesQuery}
               setQuery={setSpeciesQuery}
@@ -918,21 +935,6 @@ export function OccurrenceForm({
           {/* ── TRANSECTO LINEAL FAUNA ── */}
           {isTransectoFauna && (
             <>
-              {/* Detection method */}
-              <div className="space-y-1.5">
-                <Label>Método de registro <span className="text-red-500">*</span></Label>
-                <Select value={tfDetectionMethod} onValueChange={(v) => setTfDetectionMethod(v ?? "")}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {["POA", "Trampa Sherman", "Cámara trampa", "Observación directa", "Captura manual", "Otro"].map((m) => (
-                      <SelectItem key={m} value={m}>{m}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
               {/* Trap selector — Sherman or Camera */}
               {(tfDetectionMethod === "Trampa Sherman" || tfDetectionMethod === "Cámara trampa") && (() => {
                 const trapOptions = buildTrapOptions(tfDetectionMethod, shermanTrapCount ?? 0, cameraTrapCount ?? 0);
