@@ -4,7 +4,6 @@ import { getDb } from "@/lib/db";
 import {
   createOccurrence,
   createGrillaOccurrences,
-  createRescateOccurrence,
 } from "@/app/(app)/proyectos/[id]/campanas/[cid]/estaciones/[sid]/ocurrencias/actions";
 
 export async function syncPendingOccurrences(): Promise<{ synced: number; failed: number }> {
@@ -23,8 +22,6 @@ export async function syncPendingOccurrences(): Promise<{ synced: number; failed
         result = await createOccurrence(projectId, campaignId, stationId, payload.data);
       } else if (payload.kind === "grilla") {
         result = await createGrillaOccurrences(projectId, campaignId, stationId, payload.data);
-      } else if (payload.kind === "rescate") {
-        result = await createRescateOccurrence(projectId, campaignId, stationId, payload.data);
       } else if (payload.kind === "sherman") {
         const { speciesId, detectionMethod, deviceId, latitude, longitude, notes, methodologyData, captures } = payload.data;
         let lastResult: typeof result = {};

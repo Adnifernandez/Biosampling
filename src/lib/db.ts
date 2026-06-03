@@ -18,7 +18,6 @@ export interface PendingOccurrence {
 export type OccurrencePayload =
   | { kind: "single"; data: SingleOccurrenceData }
   | { kind: "grilla"; data: GrillaOccurrenceData }
-  | { kind: "rescate"; data: RescateOccurrenceData }
   | { kind: "sherman"; data: ShermanCaptureData }
 
 export interface SingleOccurrenceData {
@@ -34,13 +33,6 @@ export interface SingleOccurrenceData {
 export interface GrillaOccurrenceData {
   date: string; notes?: string; sinVegetacion: number; photo?: string;
   species: { speciesId: string; count: number; individuos?: number }[];
-}
-export interface RescateOccurrenceData {
-  speciesId: string; date: string;
-  latitude?: string; longitude?: string;
-  utmNorth?: string; utmEast?: string; utmZone?: string;
-  peso?: string; largo?: string; ancho?: string; notes?: string;
-  relocLatitude?: string; relocLongitude?: string; relocNotes?: string;
 }
 export interface ShermanCaptureData {
   speciesId: string;

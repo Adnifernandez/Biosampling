@@ -17,8 +17,6 @@ import {
   createGrillaOccurrences,
   updateGrillaOccurrences,
   updateTransectoCoordinates,
-  createRescateOccurrence,
-  updateRescateOccurrence,
 } from "@/app/(app)/proyectos/[id]/campanas/[cid]/estaciones/[sid]/ocurrencias/actions";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -88,7 +86,6 @@ export function OccurrenceForm({
   const isForestal = methodology === "PARCELAS_FORESTALES";
   const isGrilla = methodology === "GRILLA";
   const isTransectoFauna = methodology === "TRANSECTO_LINEAL_FAUNA";
-  const isRescate = methodology === "RESCATE_RELOC";
 
   // Single-species search
   const [speciesQuery, setSpeciesQuery] = useState("");
@@ -143,30 +140,6 @@ export function OccurrenceForm({
     { date: format(new Date(), "yyyy-MM-dd"), abundance: "" },
   ]);
 
-  // Rescate state — Módulo 1: Captura
-  const [rescatePeso, setRescatePeso] = useState("");
-  const [rescateLargo, setRescateLargo] = useState("");
-  const [rescateAncho, setRescateAncho] = useState("");
-  const [rescateUtmNorth, setRescateUtmNorth] = useState("");
-  const [rescateUtmEast, setRescateUtmEast] = useState("");
-  const [rescateUtmZone, setRescateUtmZone] = useState("19S");
-  const [rescateLat, setRescateLat] = useState<number | null>(
-    isRescate && defaultValues?.latitude ? parseFloat(defaultValues.latitude) : null
-  );
-  const [rescateLng, setRescateLng] = useState<number | null>(
-    isRescate && defaultValues?.longitude ? parseFloat(defaultValues.longitude) : null
-  );
-  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
-
-  // Rescate state — Módulo 2: Relocalización
-  const [relocUtmNorth, setRelocUtmNorth] = useState("");
-  const [relocUtmEast, setRelocUtmEast] = useState("");
-  const [relocUtmZone, setRelocUtmZone] = useState("19S");
-  const [relocLat, setRelocLat] = useState<number | null>(null);
-  const [relocLng, setRelocLng] = useState<number | null>(null);
-  const [relocNotes, setRelocNotes] = useState("");
-  const [relocGpsLoading, setRelocGpsLoading] = useState(false);
-
   // Load methodology data in edit mode
   useEffect(() => {
     if (!defaultValues?.methodologyData) return;
@@ -184,29 +157,7 @@ export function OccurrenceForm({
       if (isGrilla) {
         if (md.photo) setGrillaPhoto(md.photo);
       }
-      if (isRescate) {
-        if (md.utm_north) setRescateUtmNorth(String(md.utm_north));
-        if (md.utm_east) setRescateUtmEast(String(md.utm_east));
-        if (md.utm_zone) setRescateUtmZone(md.utm_zone);
-        if (md.peso) setRescatePeso(String(md.peso));
-        if (md.largo) setRescateLargo(String(md.largo));
-        if (md.ancho) setRescateAncho(String(md.ancho));
-      }
     } catch {}
-    // Load relocation data in edit mode
-    if (isRescate && defaultValues) {
-      if (defaultValues.relocLat) {
-        const lat = parseFloat(defaultValues.relocLat);
-        const lng = parseFloat(defaultValues.relocLng ?? "0");
-        setRelocLat(lat);
-        setRelocLng(lng);
-        const { north, east, zone } = latLngToUTM(lat, lng);
-        setRelocUtmNorth(String(north));
-        setRelocUtmEast(String(east));
-        setRelocUtmZone(zone);
-      }
-      if (defaultValues.relocNotes) setRelocNotes(defaultValues.relocNotes);
-    }
   }, []);
 
   // Load fauna transecto fields in edit mode
@@ -336,40 +287,6 @@ export function OccurrenceForm({
         setGpsLoading(false);
       },
       () => { toast.error("No se pudo obtener ubicación GPS"); setGpsLoading(false); },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  }
-
-  function captureGPSRescate() {
-    setGpsLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { north, east, zone } = latLngToUTM(pos.coords.latitude, pos.coords.longitude);
-        setRescateUtmNorth(String(north));
-        setRescateUtmEast(String(east));
-        setRescateUtmZone(zone);
-        setRescateLat(pos.coords.latitude);
-        setRescateLng(pos.coords.longitude);
-        setGpsLoading(false);
-      },
-      () => { toast.error("No se pudo obtener ubicación GPS"); setGpsLoading(false); },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  }
-
-  function captureGPSReloc() {
-    setRelocGpsLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { north, east, zone } = latLngToUTM(pos.coords.latitude, pos.coords.longitude);
-        setRelocUtmNorth(String(north));
-        setRelocUtmEast(String(east));
-        setRelocUtmZone(zone);
-        setRelocLat(pos.coords.latitude);
-        setRelocLng(pos.coords.longitude);
-        setRelocGpsLoading(false);
-      },
-      () => { toast.error("No se pudo obtener ubicación GPS"); setRelocGpsLoading(false); },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   }
@@ -577,74 +494,6 @@ export function OccurrenceForm({
           toast.success("Especie registrada");
           setSessionCount(n => n + 1);
           resetForm();
-        }
-      }
-      return;
-    }
-
-    // Rescate flow
-    if (isRescate) {
-      const speciesId = selectedSpecies?.id ?? defaultValues?.speciesId ?? "";
-      if (!speciesId) { toast.error("Selecciona una especie"); return; }
-      const rescateData = {
-        speciesId,
-        date: date || format(new Date(), "yyyy-MM-dd"),
-        latitude: rescateLat !== null ? String(rescateLat) : undefined,
-        longitude: rescateLng !== null ? String(rescateLng) : undefined,
-        utmNorth: rescateUtmNorth || undefined,
-        utmEast: rescateUtmEast || undefined,
-        utmZone: rescateUtmZone || undefined,
-        peso: rescatePeso || undefined,
-        largo: rescateLargo || undefined,
-        ancho: rescateAncho || undefined,
-        notes: notes || undefined,
-        relocLatitude: relocLat !== null ? String(relocLat) : undefined,
-        relocLongitude: relocLng !== null ? String(relocLng) : undefined,
-        relocNotes: relocNotes || undefined,
-      };
-
-      if (!occurrenceId && !navigator.onLine) {
-        await saveOffline({ kind: "rescate", data: rescateData },
-          selectedSpecies ? `${selectedSpecies.genus} ${selectedSpecies.species}` : "Especie");
-        return;
-      }
-
-      setSubmitting(true);
-      if (occurrenceId) {
-        const result = await updateRescateOccurrence(projectId, campaignId, stationId, occurrenceId, rescateData);
-        setSubmitting(false);
-        if ("error" in result && result.error) {
-          toast.error(String(result.error));
-        } else {
-          toast.success("Captura actualizada");
-          router.push(`/ocurrencias?projectId=${projectId}&campaignId=${campaignId}&stationId=${stationId}`);
-        }
-      } else {
-        const result = await createRescateOccurrence(projectId, campaignId, stationId, rescateData);
-        setSubmitting(false);
-        if ("error" in result && result.error) {
-          toast.error(String(result.error));
-        } else if ("success" in result) {
-          const code = result.individualCode ?? "";
-          setGeneratedCode(code);
-          toast.success(`Captura registrada — Código: ${code}`);
-          setSessionCount((n) => n + 1);
-          setSelectedSpecies(null);
-          setSpeciesQuery("");
-          setSpeciesList([]);
-          setRescatePeso("");
-          setRescateLargo("");
-          setRescateAncho("");
-          setRescateUtmNorth("");
-          setRescateUtmEast("");
-          setRescateLat(null);
-          setRescateLng(null);
-          setRelocUtmNorth("");
-          setRelocUtmEast("");
-          setRelocLat(null);
-          setRelocLng(null);
-          setRelocNotes("");
-          setNotes("");
         }
       }
       return;
@@ -1170,145 +1019,6 @@ export function OccurrenceForm({
             </>
           )}
 
-          {/* ── RESCATE: two modules ── */}
-          {isRescate && (
-            <div className="space-y-3">
-
-              {/* ── Módulo 1: Captura ── */}
-              <div className="rounded-lg border-2 border-orange-200 overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 text-white">
-                  <span className="text-xs font-bold bg-white text-orange-600 rounded-full w-5 h-5 flex items-center justify-center shrink-0">1</span>
-                  <span className="text-sm font-semibold">Captura</span>
-                </div>
-                <div className="p-4 space-y-3 bg-orange-50/30">
-                  {/* GPS UTM */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm">Coordenadas UTM <span className="text-xs text-gray-400 font-normal">(opcional)</span></Label>
-                      <Button type="button" variant="outline" size="sm" disabled={gpsLoading} onClick={captureGPSRescate} className="gap-1.5 h-8 text-xs">
-                        {gpsLoading ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Obteniendo...</> : <><MapPin className="h-3.5 w-3.5" /> Capturar GPS</>}
-                      </Button>
-                    </div>
-                    {(rescateUtmNorth || rescateUtmEast) ? (
-                      <>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-gray-600">Norte</Label>
-                            <Input type="text" readOnly value={rescateUtmNorth} className="bg-gray-50 font-mono text-sm" />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-gray-600">Este</Label>
-                            <Input type="text" readOnly value={rescateUtmEast} className="bg-gray-50 font-mono text-sm" />
-                          </div>
-                        </div>
-                        <p className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded px-3 py-1.5">
-                          Zona: <span className="font-semibold">{rescateUtmZone}</span>
-                        </p>
-                      </>
-                    ) : (
-                      <p className="text-xs text-gray-400 bg-gray-50 rounded px-3 py-2">
-                        Presiona "Capturar GPS" para las coordenadas del punto de captura.
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Biometrics */}
-                  <div className="space-y-2">
-                    <Label className="text-sm">Biometría <span className="text-xs text-gray-400 font-normal">(opcional)</span></Label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="space-y-1">
-                        <Label className="text-xs text-gray-600">Peso (g)</Label>
-                        <Input type="number" step="0.1" min="0" placeholder="—" value={rescatePeso} onChange={(e) => setRescatePeso(e.target.value)} className="h-9 text-sm" />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-gray-600">Largo (cm)</Label>
-                        <Input type="number" step="0.1" min="0" placeholder="—" value={rescateLargo} onChange={(e) => setRescateLargo(e.target.value)} className="h-9 text-sm" />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-gray-600">Ancho (cm)</Label>
-                        <Input type="number" step="0.1" min="0" placeholder="—" value={rescateAncho} onChange={(e) => setRescateAncho(e.target.value)} className="h-9 text-sm" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Individual code */}
-                  {occurrenceId && defaultValues?.individualCode && (
-                    <div className="flex items-center gap-2 bg-white border border-orange-200 rounded-lg px-3 py-2.5">
-                      <MapPin className="h-4 w-4 text-orange-600 shrink-0" />
-                      <div>
-                        <p className="text-xs text-gray-500">Código del individuo</p>
-                        <p className="text-sm font-bold font-mono text-orange-700">{defaultValues.individualCode}</p>
-                      </div>
-                    </div>
-                  )}
-                  {!occurrenceId && generatedCode && (
-                    <div className="flex items-center gap-2 bg-white border border-orange-200 rounded-lg px-3 py-2.5">
-                      <CheckCircle2 className="h-4 w-4 text-orange-600 shrink-0" />
-                      <div>
-                        <p className="text-xs text-gray-500">Último código generado</p>
-                        <p className="text-sm font-bold font-mono text-orange-700">{generatedCode}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* ── Módulo 2: Relocalización ── */}
-              <div className="rounded-lg border-2 border-blue-200 overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white">
-                  <span className="text-xs font-bold bg-white text-blue-600 rounded-full w-5 h-5 flex items-center justify-center shrink-0">2</span>
-                  <span className="text-sm font-semibold">Relocalización</span>
-                  <span className="ml-auto text-xs bg-blue-500/60 px-1.5 py-0.5 rounded">opcional</span>
-                </div>
-                <div className="p-4 space-y-3 bg-blue-50/20">
-                  {/* GPS UTM relocation */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm">Coordenadas UTM</Label>
-                      <Button type="button" variant="outline" size="sm" disabled={relocGpsLoading} onClick={captureGPSReloc} className="gap-1.5 h-8 text-xs">
-                        {relocGpsLoading ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Obteniendo...</> : <><MapPin className="h-3.5 w-3.5" /> Capturar GPS</>}
-                      </Button>
-                    </div>
-                    {(relocUtmNorth || relocUtmEast) ? (
-                      <>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-gray-600">Norte</Label>
-                            <Input type="text" readOnly value={relocUtmNorth} className="bg-gray-50 font-mono text-sm" />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-gray-600">Este</Label>
-                            <Input type="text" readOnly value={relocUtmEast} className="bg-gray-50 font-mono text-sm" />
-                          </div>
-                        </div>
-                        <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-1.5">
-                          Zona: <span className="font-semibold">{relocUtmZone}</span>
-                        </p>
-                      </>
-                    ) : (
-                      <p className="text-xs text-gray-400 bg-gray-50 rounded px-3 py-2">
-                        Presiona "Capturar GPS" para las coordenadas del punto de relocalización.
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Relocation notes */}
-                  <div className="space-y-1.5">
-                    <Label className="text-sm" htmlFor="relocNotes">Notas <span className="text-xs text-gray-400 font-normal">(opcional)</span></Label>
-                    <Textarea
-                      id="relocNotes"
-                      value={relocNotes}
-                      onChange={(e) => setRelocNotes(e.target.value)}
-                      placeholder="Observaciones de la relocalización..."
-                      rows={2}
-                    />
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          )}
-
           {/* ── FAUNA dynamic fields ── */}
           {!isBB && !isMicroruteo && !isForestal && !isGrilla && !isTransectoFauna && surveyType === "FAUNA" && (
             <FaunaFields
@@ -1347,9 +1057,7 @@ export function OccurrenceForm({
               {submitting ? "Guardando..."
                 : isGrilla
                   ? `${occurrenceId ? "Actualizar" : "Registrar"} grilla (${grillaPoints.filter(p => p.type !== "empty").length}/16 puntos)`
-                  : isRescate
-                    ? (occurrenceId ? "Actualizar captura" : "Registrar captura")
-                    : occurrenceId ? "Actualizar" : "Registrar especie"}
+                  : occurrenceId ? "Actualizar" : "Registrar especie"}
             </Button>
           </div>
         </form>

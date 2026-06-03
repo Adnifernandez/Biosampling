@@ -75,10 +75,7 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
     ? `${season} ${year} — ${suffix.trim()}`
     : `${season} ${year}`;
 
-  const methodologies = METHODOLOGIES.filter((m) =>
-    m.surveyType === surveyType &&
-    (surveyType !== "FAUNA" || ["TRANSECTO_LINEAL_FAUNA", "RESCATE_RELOC"].includes(m.id))
-  );
+  const methodologies = METHODOLOGIES.filter((m) => m.surveyType === surveyType);
 
   const methodologyActiveClass = surveyType === "FLORA" ? "border-teal-600 bg-teal-50" : "border-blue-600 bg-blue-50";
   const methodologyDotClass = surveyType === "FLORA" ? "border-teal-600 bg-teal-600" : "border-blue-600 bg-blue-600";

@@ -8,7 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { MapPin, Loader2, CheckCircle2 } from "lucide-react";
-import { updateRelocation } from "@/app/(app)/proyectos/[id]/campanas/[cid]/estaciones/[sid]/ocurrencias/actions";
+// updateRelocation removed — stub kept to satisfy type-checker while component remains dormant
+async function updateRelocation(
+  _projectId: string, _campaignId: string, _stationId: string, _occurrenceId: string,
+  _data: { latitude?: string; longitude?: string; notes?: string }
+): Promise<{ success?: boolean; error?: unknown }> {
+  return { error: "Not implemented" };
+}
 import { toast } from "sonner";
 
 function latLngToUTM(lat: number, lng: number): { north: number; east: number; zone: string } {

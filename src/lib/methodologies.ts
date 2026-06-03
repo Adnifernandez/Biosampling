@@ -129,13 +129,6 @@ export const METHODOLOGIES: Methodology[] = [
     ],
   },
   {
-    id: "RESCATE_RELOC",
-    name: "Rescate y Relocalización",
-    description: "Captura y relocalización",
-    surveyType: "FAUNA",
-    fields: [],
-  },
-  {
     id: "VES",
     name: "VES",
     description: "Visual Encounter Survey",
