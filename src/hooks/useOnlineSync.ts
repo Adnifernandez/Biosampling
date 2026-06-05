@@ -60,11 +60,9 @@ export function useOnlineSync() {
     document.addEventListener("visibilitychange", handleVisibility);
     if (navigator.onLine) {
       runSeedCache();
-      // Pre-cache key pages in background so they work offline
+      // Pre-cache key pages so they work offline — runs always when online
       const KEY_PAGES = ["/proyectos", "/campanas", "/estaciones", "/ocurrencias"];
-      if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-        KEY_PAGES.forEach((url) => fetch(url, { credentials: "same-origin" }).catch(() => {}));
-      }
+      KEY_PAGES.forEach((url) => fetch(url, { credentials: "same-origin" }).catch(() => {}));
     }
 
     return () => {
