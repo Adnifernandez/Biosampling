@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sin conexión — BioSampling</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f9fafb;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100dvh;
+      padding: 24px;
+      color: #374151;
+    }
+    .logo {
+      width: 80px;
+      height: 80px;
+      border-radius: 18px;
+      margin-bottom: 24px;
+    }
+    h1 { font-size: 1.25rem; font-weight: 700; color: #111827; margin-bottom: 8px; }
+    p  { font-size: 0.9rem; color: #6b7280; text-align: center; max-width: 280px; line-height: 1.5; }
+    .tip {
+      margin-top: 20px;
+      background: #f0fdfa;
+      border: 1px solid #99f6e4;
+      border-radius: 12px;
+      padding: 14px 18px;
+      font-size: 0.8rem;
+      color: #0f766e;
+      max-width: 300px;
+      line-height: 1.5;
+    }
+    .tip strong { display: block; margin-bottom: 4px; }
+    button {
+      margin-top: 28px;
+      background: #0f766e;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 28px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:active { opacity: 0.85; }
+  </style>
+</head>
+<body>
+  <img src="/icons/icon-192.png" alt="BioSampling" class="logo" />
+  <h1>Sin conexión</h1>
+  <p>No hay acceso a internet. Las páginas que hayas visitado antes seguirán disponibles.</p>
+
+  <div class="tip">
+    <strong>¿Registrando en terreno?</strong>
+    Puedes seguir creando ocurrencias — se guardarán localmente y se subirán al reconectarte.
+  </div>
+
+  <button onclick="location.reload()">Reintentar</button>
+
+  <script>
+    // If back online, go to the last visited page or home
+    window.addEventListener("online", () => {
+      const last = sessionStorage.getItem("lastPage") || "/proyectos";
+      location.href = last;
+    });
+  </script>
+</body>
+</html>
