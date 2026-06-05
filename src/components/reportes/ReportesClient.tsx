@@ -350,7 +350,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
           (boldLastRow && ri === data.length - 1) ||
           (boldFromBottom > 0 && ri >= data.length - boldFromBottom);
 
-        const borderStyle = { style: "thin" as const, color: { argb: "FFB0B0B0" } };
+        const borderStyle = { style: "thin" as const, color: { argb: "FF000000" } };
         const allBorders = { top: borderStyle, left: borderStyle, bottom: borderStyle, right: borderStyle };
 
         exRow.eachCell({ includeEmpty: true }, (cell, col) => {
@@ -362,13 +362,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
             // ── Header row ──
             cell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: HDR_BG } };
             cell.font  = { ...BASE, bold: true, color: { argb: HDR_FG } };
-            // Columns up to and including "Nombre Común": left-aligned horizontal
-            // Columns after "Nombre Común": centered
-            if (cnIdx >= 0 && ci <= cnIdx) {
-              cell.alignment = { horizontal: "left", vertical: "middle" };
-            } else {
-              cell.alignment = { horizontal: "center", vertical: "middle" };
-            }
+            cell.alignment = { horizontal: "center", vertical: "middle" };
           } else {
             // ── Data rows ──
             const isSpeciesCol = spIdx >= 0 && ci === spIdx;
