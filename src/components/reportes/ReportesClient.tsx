@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Download, BarChart2, ListTree, Leaf, Bird } from "lucide-react";
-import * as XLSX from "xlsx";
+// ExcelJS loaded dynamically inside exportXLSX to avoid SSR issues
 import { SURVEY_TYPE_LABELS } from "@/lib/types";
 import { getMethodologyById } from "@/lib/methodologies";
 
@@ -302,97 +302,163 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     return { grillaStations, rows, sinVegPerGrilla, grillaHasData, hydroByTransecto };
   })();
 
-  // ── XLSX export (all tables, one sheet each) ──
-  function exportXLSX() {
+  // ── XLSX export with full styling (ExcelJS) ──
+  async function exportXLSX() {
     if (!selectedCampaign || !stats || !selectedProject) return;
-    const wb = XLSX.utils.book_new();
+
+    // Dynamic import — ExcelJS is browser-compatible
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook();
+
     const safe = (s: string) => s.replace(/[/\\?*[\]]/g, "-").replace(/\s+/g, "_");
     const fname = `${safe(selectedProject.name)}-${safe(selectedCampaign.name)}`;
 
-    function addSheet(name: string, rows: (string | number | null | undefined)[][]) {
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      if (rows.length > 0) {
-        const cols = rows[0].length;
-        ws["!cols"] = Array.from({ length: cols }, (_, c) => ({
-          wch: Math.min(50, Math.max(10, ...rows.map((r) => String(r[c] ?? "").length))),
-        }));
-      }
-      XLSX.utils.book_append_sheet(wb, ws, name);
+    const HDR_BG  = "FF08697E"; // teal header fill (ARGB)
+    const HDR_FG  = "FFFFFFFF"; // white header font
+    const BASE    = { name: "Tahoma", size: 10 } as const;
+
+    /**
+     * addSheet — creates a styled worksheet.
+     * @param boldFromBottom  number of trailing data rows to bold (e.g. 2 for Sin veg + Total)
+     * @param boldLastRow     bold only the very last row
+     */
+    function addSheet(
+      sheetName: string,
+      data: (string | number | null | undefined)[][],
+      boldLastRow = false,
+      boldFromBottom = 0,
+    ) {
+      if (data.length === 0) return;
+      const ws = wb.addWorksheet(sheetName);
+
+      const headers   = data[0] as string[];
+      // Column indices (0-based) for key columns
+      const cnIdx = headers.findIndex((h) => h === "Nombre Común");
+      const spIdx = headers.findIndex((h) => h === "Especie");
+
+      // Auto column widths
+      ws.columns = headers.map((_, ci) => ({
+        width: Math.min(50, Math.max(8,
+          Math.max(...data.map((r) => String(r[ci] ?? "").length)) + 2,
+        )),
+      }));
+
+      data.forEach((rowData, ri) => {
+        const exRow = ws.addRow(rowData.map((v) => v ?? ""));
+        const isHdr  = ri === 0;
+        const isBold =
+          (boldLastRow && ri === data.length - 1) ||
+          (boldFromBottom > 0 && ri >= data.length - boldFromBottom);
+
+        if (isHdr) exRow.height = 55; // taller row for rotated text
+
+        exRow.eachCell({ includeEmpty: true }, (cell, col) => {
+          const ci = col - 1; // 0-based
+
+          if (isHdr) {
+            // ── Header row ──
+            cell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: HDR_BG } };
+            cell.font  = { ...BASE, bold: true, color: { argb: HDR_FG } };
+            // Columns up to and including "Nombre Común": inclined 45°
+            // Columns after "Nombre Común": centered
+            if (cnIdx >= 0 && ci <= cnIdx) {
+              cell.alignment = { textRotation: 45, horizontal: "center", vertical: "bottom" };
+            } else {
+              cell.alignment = { horizontal: "center", vertical: "middle" };
+            }
+          } else {
+            // ── Data rows ──
+            const isSpeciesCol = spIdx >= 0 && ci === spIdx;
+            cell.font = {
+              ...BASE,
+              italic: isSpeciesCol,
+              bold:   isBold,
+            };
+            // Center data cells that are after "Nombre Común"
+            if (cnIdx >= 0 && ci > cnIdx) {
+              cell.alignment = { horizontal: "center", vertical: "middle" };
+            }
+          }
+        });
+      });
     }
+
+    // ── Generate sheets ──
 
     if (isBB && bbData) {
       const { sortedStations, rows, habitoRows, origenRows } = bbData;
       addSheet("Parcelas BB", [
-        ["División", "Clase", "Familia", "Especie", "Nombre Común", "Hábito", "Origen", "Estado Conservación", ...sortedStations.map((s) => s.name)],
-        ...rows.map(({ sp, stMap }) => [
-          sp.division ?? "", sp.clase ?? "", sp.family, `${sp.genus} ${sp.species}`,
-          sp.commonName ?? "", sp.habito ?? "", sp.origen ?? "", primaryStatus(sp.conservationStatus),
-          ...sortedStations.map((s) => stMap.get(s.id) ?? ""),
+        ["División","Clase","Familia","Especie","Nombre Común","Hábito","Origen","Estado Conservación",...sortedStations.map((s)=>s.name)],
+        ...rows.map(({sp,stMap})=>[
+          sp.division??"",sp.clase??"",sp.family,`${sp.genus} ${sp.species}`,
+          sp.commonName??"",sp.habito??"",sp.origen??"",primaryStatus(sp.conservationStatus),
+          ...sortedStations.map((s)=>stMap.get(s.id)??""),
         ]),
       ]);
-      addSheet("Hábito", [["Hábito", "N° Especies"], ...habitoRows.map(([h, n]) => [h, n])]);
-      addSheet("Origen", [["Origen", "N° Especies"], ...origenRows.map(([o, n]) => [o, n])]);
+      addSheet("Hábito",  [["Hábito","N° Especies"],...habitoRows.map(([h,n])=>[h,n])]);
+      addSheet("Origen",  [["Origen","N° Especies"],...origenRows.map(([o,n])=>[o,n])]);
     }
 
     if (isMicroruteo && microData) {
       const { rows, habitoRows, origenRows } = microData;
       addSheet("Microruteo", [
-        ["División", "Clase", "Familia", "Especie", "Nombre Común", "Hábito", "Origen", "Estado Conservación", "Individuo", "Este (m E)", "Norte (m S)"],
-        ...rows.map(({ sp, individuo, utmEast, utmNorth }) => [
-          sp.division ?? "", sp.clase ?? "", sp.family, `${sp.genus} ${sp.species}`,
-          sp.commonName ?? "", sp.habito ?? "", sp.origen ?? "", primaryStatus(sp.conservationStatus),
+        ["División","Clase","Familia","Especie","Nombre Común","Hábito","Origen","Estado Conservación","Individuo","Este (m E)","Norte (m S)"],
+        ...rows.map(({sp,individuo,utmEast,utmNorth})=>[
+          sp.division??"",sp.clase??"",sp.family,`${sp.genus} ${sp.species}`,
+          sp.commonName??"",sp.habito??"",sp.origen??"",primaryStatus(sp.conservationStatus),
           individuo,
-          utmEast != null ? Math.round(utmEast) : "",
-          utmNorth != null ? Math.round(utmNorth) : "",
+          utmEast!=null?Math.round(utmEast):"",
+          utmNorth!=null?Math.round(utmNorth):"",
         ]),
       ]);
-      addSheet("Hábito", [["Hábito", "N° Especies"], ...habitoRows.map(([h, n]) => [h, n])]);
-      addSheet("Origen", [["Origen", "N° Especies"], ...origenRows.map(([o, n]) => [o, n])]);
+      addSheet("Hábito", [["Hábito","N° Especies"],...habitoRows.map(([h,n])=>[h,n])]);
+      addSheet("Origen", [["Origen","N° Especies"],...origenRows.map(([o,n])=>[o,n])]);
     }
 
     if (isPF && pfData) {
       const { speciesRows, individualRows } = pfData;
       addSheet("Especies", [
-        ["División", "Clase", "Familia", "Especie", "Nombre Común", "Hábito", "Origen", "Estado Conservación"],
-        ...speciesRows.map((sp) => [
-          sp.division ?? "", sp.clase ?? "", sp.family, `${sp.genus} ${sp.species}`,
-          sp.commonName ?? "", sp.habito ?? "", sp.origen ?? "", primaryStatus(sp.conservationStatus),
+        ["División","Clase","Familia","Especie","Nombre Común","Hábito","Origen","Estado Conservación"],
+        ...speciesRows.map((sp)=>[
+          sp.division??"",sp.clase??"",sp.family,`${sp.genus} ${sp.species}`,
+          sp.commonName??"",sp.habito??"",sp.origen??"",primaryStatus(sp.conservationStatus),
         ]),
       ]);
       addSheet("Individuos", [
-        ["Parcela", "Especie", "Individuo", "DAP (cm)", "DAT (cm)", "Altura (m)"],
-        ...individualRows.map((r) => [
-          r.parcela, `${r.sp.genus} ${r.sp.species}`, r.individuo, r.dap ?? "", r.dat ?? "", r.altura ?? "",
+        ["Parcela","Especie","Individuo","DAP (cm)","DAT (cm)","Altura (m)"],
+        ...individualRows.map((r)=>[
+          r.parcela,`${r.sp.genus} ${r.sp.species}`,r.individuo,r.dap??"",r.dat??"",r.altura??"",
         ]),
       ]);
     }
 
     if (isGrilla && grillaData) {
       const { grillaStations, rows, sinVegPerGrilla, grillaHasData, hydroByTransecto } = grillaData;
-      const gNames = grillaStations.map((g) => g.name);
+      const gNames = grillaStations.map((g)=>g.name);
       addSheet("Grilla", [
-        ["División", "Clase", "Familia", "Especie", "Nombre Común", "Hábito", "Hábito Hidrófito", "Origen", "E.C.", ...gNames],
-        ...rows.map(({ sp, perGrilla }) => [
-          sp.division ?? "", sp.clase ?? "", sp.family, `${sp.genus} ${sp.species}`,
-          sp.commonName ?? "", sp.habito ?? "", sp.macrofitasHabito ?? "", sp.origen ?? "",
+        ["División","Clase","Familia","Especie","Nombre Común","Hábito","Hábito Hidrófito","Origen","E.C.",...gNames],
+        ...rows.map(({sp,perGrilla})=>[
+          sp.division??"",sp.clase??"",sp.family,`${sp.genus} ${sp.species}`,
+          sp.commonName??"",sp.habito??"",sp.macrofitasHabito??"",sp.origen??"",
           primaryStatus(sp.conservationStatus),
-          ...grillaStations.map((g) => perGrilla.get(g.id) ?? ""),
+          ...grillaStations.map((g)=>perGrilla.get(g.id)??""),
         ]),
-        ["", "", "", "", "", "", "", "", "Sin vegetación", ...grillaStations.map((g) => grillaHasData.has(g.id) ? (sinVegPerGrilla.get(g.id) ?? 0) : "")],
-        ["", "", "", "", "", "", "", "", "Total", ...grillaStations.map((g) => grillaHasData.has(g.id) ? 16 : "")],
-      ]);
+        ["","","","","","","","","Sin vegetación",...grillaStations.map((g)=>grillaHasData.has(g.id)?(sinVegPerGrilla.get(g.id)??0):"")],
+        ["","","","","","","","","Total",...grillaStations.map((g)=>grillaHasData.has(g.id)?16:"")],
+      ], false, 2); // last 2 rows bold
+
       if (hydroByTransecto.length > 0) {
-        const hydroRows: (string | number)[][] = [["Transecto", "Grilla", "Intersecciones Hidrófitas", "Sin Hidrófitas", "Total"]];
-        for (const { transectoName, grillas, siCounts, noCounts } of hydroByTransecto) {
-          for (let i = 0; i < grillas.length; i++) {
-            hydroRows.push([transectoName, grillas[i].name, siCounts[i], noCounts[i], siCounts[i] + noCounts[i]]);
+        const hydroRows: (string|number)[][] = [["Transecto","Grilla","Intersecciones Hidrófitas","Sin Hidrófitas","Total"]];
+        for (const {transectoName,grillas,siCounts,noCounts} of hydroByTransecto) {
+          for (let i=0;i<grillas.length;i++) {
+            hydroRows.push([transectoName,grillas[i].name,siCounts[i],noCounts[i],siCounts[i]+noCounts[i]]);
           }
         }
         addSheet("Hidrófitas", hydroRows);
         addSheet("Condición Humedal", [
-          ["Transecto", "Intersecciones Hidrófitas", "Total Intersecciones", "% Hidrófitas", "Condición"],
-          ...hydroByTransecto.map(({ transectoName, siTotal, grandTotal, siPct }) => [
-            transectoName, siTotal, grandTotal, siPct / 100, siPct > 50 ? "Humedal" : "No Humedal",
+          ["Transecto","Intersecciones Hidrófitas","Total Intersecciones","% Hidrófitas","Condición"],
+          ...hydroByTransecto.map(({transectoName,siTotal,grandTotal,siPct})=>[
+            transectoName,siTotal,grandTotal,siPct/100,siPct>50?"Humedal":"No Humedal",
           ]),
         ]);
       }
@@ -401,48 +467,58 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     if (isTransectoFauna && transectoFaunaData) {
       const { rows, totalAbundance } = transectoFaunaData;
       addSheet("Consolidado", [
-        ["Clase", "Orden", "Familia", "Especie", "Nombre Común", "Origen", "E.C.", "Abundancia Total"],
-        ...rows.map(({ sp, abundance }) => [
-          sp.clase ?? "", sp.orden ?? "", sp.family,
-          `${sp.genus} ${sp.species}`, sp.commonName ?? "",
-          sp.origen ?? "", primaryStatus(sp.conservationStatus), abundance,
+        ["Clase","Orden","Familia","Especie","Nombre Común","Origen","E.C.","Abundancia Total"],
+        ...rows.map(({sp,abundance})=>[
+          sp.clase??"",sp.orden??"",sp.family,
+          `${sp.genus} ${sp.species}`,sp.commonName??"",
+          sp.origen??"",primaryStatus(sp.conservationStatus),abundance,
         ]),
-        ["", "", "", "", "", "", "Total", totalAbundance],
-      ]);
+        ["","","","","","","Total",totalAbundance],
+      ], true); // last row bold
     }
+
     if (isTransectoFauna && communityParamsData && communityParamsData.length > 0) {
       addSheet("Parámetros", [
-        ["Transecto", "Riqueza (S)", "Abundancia (N)", "Shannon (H')", "Equidad (J')"],
-        ...communityParamsData.map((r) => [r.name, r.S, r.N, r.H, r.J]),
+        ["Transecto","Riqueza (S)","Abundancia (N)","Shannon (H')","Equidad (J')"],
+        ...communityParamsData.map((r)=>[r.name,r.S,r.N,r.H,r.J]),
       ]);
     }
+
     if (isTransectoFauna && transectoFaunaData && transectoFaunaData.origenRows.length > 0) {
       addSheet("Origen", [
-        ["Origen", "Cantidad de especies"],
-        ...transectoFaunaData.origenRows.map(([o, n]) => [o, n]),
+        ["Origen","Cantidad de especies"],
+        ...transectoFaunaData.origenRows.map(([o,n])=>[o,n]),
       ]);
     }
 
     if (!isBB && !isMicroruteo && !isPF && !isGrilla && !isTransectoFauna) {
       addSheet("Lista de Especies", [
-        ["Familia", "Género", "Especie", "Nombre Común", "Tipo", "Estado Conservación", "Nº Registros", "Abundancia Total"],
-        ...stats.speciesList.map(({ sp, count, abundance }) => [
-          sp.family, sp.genus, sp.species, sp.commonName ?? "", sp.type,
-          primaryStatus(sp.conservationStatus), count, abundance,
+        ["Familia","Género","Especie","Nombre Común","Tipo","Estado Conservación","Nº Registros","Abundancia Total"],
+        ...stats.speciesList.map(({sp,count,abundance})=>[
+          sp.family,sp.genus,sp.species,sp.commonName??"",sp.type,
+          primaryStatus(sp.conservationStatus),count,abundance,
         ]),
       ]);
     }
 
     if (stats.endangered.length > 0) {
       addSheet("Conservación", [
-        ["Familia", "Especie", "Nombre Común", "Estado Conservación"],
-        ...stats.endangered.map(({ sp }) => [
-          sp.family, `${sp.genus} ${sp.species}`, sp.commonName ?? "", primaryStatus(sp.conservationStatus),
+        ["Familia","Especie","Nombre Común","Estado Conservación"],
+        ...stats.endangered.map(({sp})=>[
+          sp.family,`${sp.genus} ${sp.species}`,sp.commonName??"",primaryStatus(sp.conservationStatus),
         ]),
       ]);
     }
 
-    XLSX.writeFile(wb, `${fname}.xlsx`);
+    // Trigger download
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `${fname}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   // ── Parcelas Forestales: species list + individuals ──
