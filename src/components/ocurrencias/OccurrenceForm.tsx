@@ -23,6 +23,34 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { OccurrencePayload } from "@/lib/db";
 
+// Search species: tries server first, falls back to Dexie cache when offline
+async function searchSpeciesFallback(query: string, surveyType: string): Promise<SpeciesResult[]> {
+  if (navigator.onLine) {
+    try {
+      return await searchSpecies(query, surveyType);
+    } catch {}
+  }
+  // Offline fallback: search cached species in Dexie
+  const { getDb } = await import("@/lib/db");
+  const db = getDb();
+  if (!db) return [];
+  const q = query.toLowerCase();
+  const all = await db.species.where("type").equals(surveyType).toArray();
+  return all
+    .filter((s) =>
+      s.genus.toLowerCase().includes(q) ||
+      s.species.toLowerCase().includes(q) ||
+      (s.commonName ?? "").toLowerCase().includes(q) ||
+      (s.family ?? "").toLowerCase().includes(q)
+    )
+    .slice(0, 15)
+    .map((s) => ({
+      id: s.id, genus: s.genus, species: s.species,
+      commonName: s.commonName, family: s.family,
+      conservationStatus: s.conservationStatus,
+    }));
+}
+
 function latLngToUTM(lat: number, lng: number): { north: number; east: number; zone: string } {
   const a = 6378137.0, f = 1 / 298.257223563;
   const b = a * (1 - f), e2 = 1 - (b * b) / (a * a), k0 = 0.9996;
@@ -249,11 +277,12 @@ export function OccurrenceForm({
     setSearching(true);
     const seq = ++searchSeq.current;
     const timer = setTimeout(async () => {
-      const results = await searchSpecies(speciesQuery, surveyType);
+      const results = await searchSpeciesFallback(speciesQuery, surveyType);
       if (seq === searchSeq.current) {
         setSpeciesList(results);
         setSearching(false);
-        if (results.length > 0) import("@/lib/db").then(({ getDb }) => getDb()?.species.bulkPut(results.map(s => ({ ...s, type: surveyType })))).catch(() => {});
+        if (results.length > 0 && navigator.onLine)
+          import("@/lib/db").then(({ getDb }) => getDb()?.species.bulkPut(results.map(s => ({ ...s, type: surveyType })))).catch(() => {});
       }
     }, 250);
     return () => clearTimeout(timer);
@@ -266,7 +295,7 @@ export function OccurrenceForm({
     setSearchingGrilla(true);
     const seq = ++grillaSearchSeq.current;
     const timer = setTimeout(async () => {
-      const results = await searchSpecies(grillaQuery, surveyType);
+      const results = await searchSpeciesFallback(grillaQuery, surveyType);
       if (seq === grillaSearchSeq.current) { setGrillaSearchList(results); setSearchingGrilla(false); }
     }, 250);
     return () => clearTimeout(timer);
@@ -1207,7 +1236,7 @@ function TrapEntryRow({
     setSearching(true);
     const s = ++seq.current;
     const t = setTimeout(async () => {
-      const results = await searchSpecies(query, surveyType);
+      const results = await searchSpeciesFallback(query, surveyType);
       if (s === seq.current) { setList(results); setSearching(false); }
     }, 250);
     return () => clearTimeout(t);
