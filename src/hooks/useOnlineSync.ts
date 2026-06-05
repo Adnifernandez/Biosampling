@@ -15,6 +15,20 @@ async function runSeedCache() {
   return seedLocalCache();
 }
 
+async function precachePages() {
+  if (!("caches" in window)) return;
+  const KEY_PAGES = ["/proyectos", "/campanas", "/estaciones", "/ocurrencias"];
+  try {
+    const cache = await caches.open("bio-pages-v3");
+    for (const url of KEY_PAGES) {
+      try {
+        const res = await fetch(url, { credentials: "same-origin" });
+        if (res.ok) await cache.put(url, res);
+      } catch {}
+    }
+  } catch {}
+}
+
 export function useOnlineSync() {
   const [isOnline, setIsOnline] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -60,9 +74,8 @@ export function useOnlineSync() {
     document.addEventListener("visibilitychange", handleVisibility);
     if (navigator.onLine) {
       runSeedCache();
-      // Pre-cache key pages so they work offline — runs always when online
-      const KEY_PAGES = ["/proyectos", "/campanas", "/estaciones", "/ocurrencias"];
-      KEY_PAGES.forEach((url) => fetch(url, { credentials: "same-origin" }).catch(() => {}));
+      // Directly cache key pages using Cache API (reliable, no SW interception needed)
+      precachePages();
     }
 
     return () => {
