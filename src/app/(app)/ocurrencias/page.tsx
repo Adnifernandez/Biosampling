@@ -103,14 +103,13 @@ export default async function OcurrenciasPage({
           )}
         </div>
         <div className="flex items-center gap-2">
-          <ButtonLink
+          {/* Regular <a> (not Next.js Link) so the SW can serve the cached page offline */}
+          <a
             href="/offline/registro"
-            size="sm"
-            variant="outline"
-            className="text-teal-700 border-teal-300 hover:bg-teal-50"
+            className="inline-flex items-center justify-center rounded-md text-sm font-medium h-8 px-3 border border-teal-300 text-teal-700 hover:bg-teal-50 transition-colors"
           >
             Terreno
-          </ButtonLink>
+          </a>
           {/* Nueva button: hide for GRILLA when data already exists */}
           {stationId && !(isGrillaCampaign && occurrences.length > 0) && (
             <ButtonLink

@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { WifiOff, Wifi, ArrowLeft, Plus, ChevronRight, CheckCircle2, Clock, AlertCircle, X } from "lucide-react";
-import Link from "next/link";
 import { METHODOLOGIES } from "@/lib/methodologies";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -466,9 +465,10 @@ export default function OfflineRegistroPage() {
     <div className="max-w-xl space-y-4">
       {/* Header */}
       <div className="flex items-center gap-2">
-        <Link href="/ocurrencias" className="text-gray-400 hover:text-gray-600">
+        {/* Regular <a> so it works offline (Next.js Link requires RSC fetch) */}
+        <a href="/ocurrencias" className="text-gray-400 hover:text-gray-600">
           <ArrowLeft className="h-5 w-5" />
-        </Link>
+        </a>
         <div className="flex-1">
           <h1 className="text-xl font-bold text-gray-900">Registro en terreno</h1>
           <p className="text-sm text-gray-500">Funciona sin internet</p>

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -6,11 +6,20 @@ import { cn } from "@/lib/utils";
 import { FolderOpen, Layers, LayoutList, ClipboardList } from "lucide-react";
 
 const navItems = [
-  { href: "/proyectos",  label: "Proyectos",  icon: FolderOpen    },
-  { href: "/campanas",   label: "Campañas",   icon: Layers        },
-  { href: "/estaciones", label: "Réplicas",   icon: LayoutList    },
-  { href: "/ocurrencias",label: "Ocurrencias",icon: ClipboardList },
+  { href: "/proyectos",   label: "Proyectos",   icon: FolderOpen    },
+  { href: "/campanas",    label: "Campañas",    icon: Layers        },
+  { href: "/estaciones",  label: "Réplicas",    icon: LayoutList    },
+  { href: "/ocurrencias", label: "Ocurrencias", icon: ClipboardList },
 ];
+
+// When offline, Next.js client-side navigation fails (requires RSC fetch from server).
+// Force a full page reload instead so the service worker can serve the cached HTML.
+function handleNavClick(e: React.MouseEvent<HTMLAnchorElement>, href: string) {
+  if (!navigator.onLine) {
+    e.preventDefault();
+    window.location.href = href;
+  }
+}
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -24,6 +33,7 @@ export function BottomNav() {
             <Link
               key={href}
               href={href}
+              onClick={(e) => handleNavClick(e, href)}
               className={cn(
                 "flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors",
                 active ? "text-teal-700" : "text-gray-500 hover:text-gray-700"
