@@ -12,7 +12,7 @@ export async function GET() {
       orderBy: { name: "asc" },
     }),
     prisma.campaign.findMany({
-      select: { id: true, projectId: true, name: true, surveyType: true, methodology: true, status: true },
+      select: { id: true, projectId: true, name: true, surveyType: true, methodology: true, status: true, shermanTrapCount: true, cameraTrapCount: true },
       orderBy: { name: "asc" },
     }),
     prisma.station.findMany({

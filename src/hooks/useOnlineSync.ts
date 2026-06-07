@@ -17,7 +17,7 @@ async function runSeedCache() {
 
 async function precachePages() {
   if (!("caches" in window)) return;
-  const KEY_PAGES = ["/proyectos", "/campanas", "/estaciones", "/ocurrencias"];
+  const KEY_PAGES = ["/proyectos", "/campanas", "/estaciones", "/ocurrencias", "/offline/registro"];
   try {
     const cache = await caches.open("bio-pages-v3");
     for (const url of KEY_PAGES) {

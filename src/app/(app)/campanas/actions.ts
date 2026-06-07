@@ -47,6 +47,42 @@ export async function createCampana(formData: FormData) {
   return { success: true, id: campaign.id, projectId };
 }
 
+export async function createCampanaData(data: {
+  projectId: string;
+  name: string;
+  surveyType: string;
+  methodology: string;
+  startDate: string;
+  endDate: string;
+  notes?: string;
+  responsible?: string;
+  shermanTrapCount?: number;
+  cameraTrapCount?: number;
+}) {
+  const project = await prisma.project.findUnique({ where: { id: data.projectId }, select: { status: true } });
+  if (project?.status === "COMPLETED") return { error: "El proyecto está cerrado y no permite cambios" };
+
+  const campaign = await prisma.campaign.create({
+    data: {
+      projectId: data.projectId,
+      name: data.name,
+      surveyType: data.surveyType,
+      methodology: data.methodology,
+      startDate: new Date(data.startDate),
+      endDate: new Date(data.endDate),
+      notes: data.notes || null,
+      responsible: data.responsible || null,
+      shermanTrapCount: data.shermanTrapCount ?? null,
+      cameraTrapCount: data.cameraTrapCount ?? null,
+      status: "ACTIVE",
+    },
+  });
+
+  revalidatePath("/campanas");
+  revalidatePath(`/proyectos/${data.projectId}`);
+  return { success: true, id: campaign.id, projectId: data.projectId };
+}
+
 export async function updateCampana(campaignId: string, formData: FormData) {
   const season = formData.get("season") as string;
   const suffix = (formData.get("suffix") as string)?.trim();

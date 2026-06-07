@@ -106,6 +106,7 @@ interface OccurrenceFormProps {
   transectoCoords?: { latitude: number | null; longitude: number | null };
   shermanTrapCount?: number;
   cameraTrapCount?: number;
+  stationLocalKey?: string;   // set when station is pending (offline creation)
 }
 
 function buildTrapOptions(method: string, shermanCount: number, cameraCount: number): string[] {
@@ -127,6 +128,7 @@ export function OccurrenceForm({
   transectoCoords,
   shermanTrapCount,
   cameraTrapCount,
+  stationLocalKey,
 }: OccurrenceFormProps) {
   const router = useRouter();
   const isBB = methodology === "BRAUN_BLANQUET";
@@ -388,7 +390,9 @@ export function OccurrenceForm({
     const db = getDb();
     if (!db) return;
     await db.pendingOccurrences.add({
-      stationId, projectId, campaignId, methodology, surveyType,
+      stationId: stationId || "pending",
+      stationLocalKey,
+      projectId, campaignId, methodology, surveyType,
       payload, speciesLabel: label, createdAt: Date.now(), status: "pending",
     });
     toast.success("Sin conexión — registro guardado localmente", {
@@ -397,6 +401,9 @@ export function OccurrenceForm({
     setSessionCount(n => n + 1);
     resetForm();
   }
+
+  // When station is pending (offline creation), always save offline
+  const isOfflineStation = !!stationLocalKey;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -425,7 +432,7 @@ export function OccurrenceForm({
         })),
       };
 
-      if (!occurrenceId && !navigator.onLine) {
+      if (!occurrenceId && (!navigator.onLine || isOfflineStation)) {
         await saveOffline({ kind: "grilla", data: gridPayload }, `Grilla (${gridPayload.species.length} esp.)`);
         return;
       }
@@ -496,7 +503,7 @@ export function OccurrenceForm({
         if (!tfAbundance) { toast.error("Ingresa el N° de individuos"); return; }
         const methodologyData = buildMethodologyData();
 
-        if (!occurrenceId && !navigator.onLine) {
+        if (!occurrenceId && (!navigator.onLine || isOfflineStation)) {
           await saveOffline({ kind: "single", data: {
             speciesId, date: date || format(new Date(), "yyyy-MM-dd"),
             abundance: tfAbundance, detectionMethod: tfDetectionMethod,
@@ -561,7 +568,7 @@ export function OccurrenceForm({
       ...(!isBB && !isMicroruteo && !isForestal ? fieldValues : {}),
     };
 
-    if (!occurrenceId && !navigator.onLine) {
+    if (!occurrenceId && (!navigator.onLine || isOfflineStation)) {
       await saveOffline({ kind: "single", data: payload },
         selectedSpecies ? `${selectedSpecies.genus} ${selectedSpecies.species}` : "Especie");
       return;

@@ -4,6 +4,7 @@ import Dexie, { type Table } from "dexie";
 export interface PendingOccurrence {
   localId?: number;
   stationId: string;
+  stationLocalKey?: string;    // set when station is also pending
   projectId: string;
   campaignId: string;
   methodology: string;
@@ -12,6 +13,46 @@ export interface PendingOccurrence {
   speciesLabel: string;
   createdAt: number;
   status: "pending" | "error";
+  errorMessage?: string;
+}
+
+// ── Pending campaigns (created offline) ──
+export interface PendingCampaign {
+  localId?: number;
+  localKey: string;
+  projectId: string;
+  name: string;
+  surveyType: string;
+  methodology: string;
+  startDate: string;
+  endDate: string;
+  notes?: string;
+  responsible?: string;
+  shermanTrapCount?: number;
+  cameraTrapCount?: number;
+  createdAt: number;
+  status: "pending" | "synced" | "error";
+  serverId?: string;
+  errorMessage?: string;
+}
+
+// ── Pending stations (created offline) ──
+export interface PendingStation {
+  localId?: number;
+  localKey: string;
+  campaignLocalKey?: string;   // if campaign is also pending
+  campaignId?: string;         // real server ID (filled when campaign syncs or when station linked to real campaign)
+  name: string;
+  type: string;
+  area?: number;
+  length?: number;
+  width?: number;
+  latitude?: number | null;
+  longitude?: number | null;
+  notes?: string;
+  createdAt: number;
+  status: "pending" | "synced" | "error";
+  serverId?: string;
   errorMessage?: string;
 }
 
@@ -45,12 +86,12 @@ export interface ShermanCaptureData {
 
 // ── Read-only cached reference data ──
 export interface CachedProject {
-  id: string; name: string; region: string; commune: string;
-  responsible: string; status: string;
+  id: string; name: string; region: string; commune: string; status: string;
 }
 export interface CachedCampaign {
   id: string; projectId: string; name: string;
   surveyType: string; methodology: string; status: string;
+  shermanTrapCount?: number | null; cameraTrapCount?: number | null;
 }
 export interface CachedStation {
   id: string; campaignId: string; name: string;
@@ -64,6 +105,8 @@ export interface CachedSpecies {
 
 export class BioSamplingDB extends Dexie {
   pendingOccurrences!: Table<PendingOccurrence>;
+  pendingCampaigns!: Table<PendingCampaign>;
+  pendingStations!: Table<PendingStation>;
   projects!: Table<CachedProject>;
   campaigns!: Table<CachedCampaign>;
   stations!: Table<CachedStation>;
@@ -73,6 +116,15 @@ export class BioSamplingDB extends Dexie {
     super("biosampling");
     this.version(1).stores({
       pendingOccurrences: "++localId, stationId, status, createdAt",
+      projects:           "id, status",
+      campaigns:          "id, projectId",
+      stations:           "id, campaignId, parentId",
+      species:            "id, type, genus",
+    });
+    this.version(2).stores({
+      pendingOccurrences: "++localId, stationId, stationLocalKey, status, createdAt",
+      pendingCampaigns:   "++localId, localKey, projectId, status",
+      pendingStations:    "++localId, localKey, campaignLocalKey, campaignId, status",
       projects:           "id, status",
       campaigns:          "id, projectId",
       stations:           "id, campaignId, parentId",

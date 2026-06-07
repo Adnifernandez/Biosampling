@@ -102,17 +102,27 @@ export default async function OcurrenciasPage({
             <p className="text-sm text-gray-500">{selectedStation.name}</p>
           )}
         </div>
-        {/* Nueva button: hide for GRILLA when data already exists */}
-        {stationId && !(isGrillaCampaign && occurrences.length > 0) && (
+        <div className="flex items-center gap-2">
           <ButtonLink
-            href={`/ocurrencias/nueva?stationId=${stationId}`}
+            href="/offline/registro"
             size="sm"
-            className="bg-teal-700 hover:bg-teal-800 text-white"
+            variant="outline"
+            className="text-teal-700 border-teal-300 hover:bg-teal-50"
           >
-            <Plus className="h-4 w-4 mr-1" />
-            Nueva
+            Terreno
           </ButtonLink>
-        )}
+          {/* Nueva button: hide for GRILLA when data already exists */}
+          {stationId && !(isGrillaCampaign && occurrences.length > 0) && (
+            <ButtonLink
+              href={`/ocurrencias/nueva?stationId=${stationId}`}
+              size="sm"
+              className="bg-teal-700 hover:bg-teal-800 text-white"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Nueva
+            </ButtonLink>
+          )}
+        </div>
       </div>
 
       <OcurrenciasFiltro
