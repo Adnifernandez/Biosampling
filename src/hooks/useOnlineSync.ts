@@ -19,10 +19,16 @@ async function precachePages() {
   if (!("caches" in window)) return;
   const KEY_PAGES = ["/proyectos", "/campanas", "/estaciones", "/ocurrencias", "/offline/registro"];
   try {
-    const cache = await caches.open("bio-pages-v3");
+    const cache = await caches.open("bio-pages-v4");
     for (const url of KEY_PAGES) {
       try {
-        const res = await fetch(url, { credentials: "same-origin" });
+        // Request as a navigation (text/html) so Next.js returns the full HTML
+        // page instead of an RSC payload. Without this, client-side fetches can
+        // cache RSC data under the page URL and break offline navigation.
+        const res = await fetch(url, {
+          credentials: "same-origin",
+          headers: { Accept: "text/html,application/xhtml+xml,*/*;q=0.9" },
+        });
         if (res.ok) await cache.put(url, res);
       } catch {}
     }

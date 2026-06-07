@@ -1,7 +1,7 @@
-const STATIC_CACHE = "bio-static-v3";
-const PAGES_CACHE  = "bio-pages-v3";
+const STATIC_CACHE = "bio-static-v4";
+const PAGES_CACHE  = "bio-pages-v4";
 
-// Pages cached immediately on install (these are public / don't need auth)
+// Always-cached static assets (public, no auth needed)
 const PRECACHE = [
   "/offline.html",
   "/icons/icon-192.png",
@@ -31,17 +31,24 @@ self.addEventListener("activate", (e) => {
   self.clients.claim();
 });
 
+// ── Helpers ──
+function isHtml(response) {
+  const ct = response.headers.get("Content-Type") || "";
+  return ct.includes("text/html");
+}
+
 // ── Fetch ──
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
 
   const url = new URL(e.request.url);
 
-  // Never cache: API, auth endpoints
+  // Skip: API, auth, Next.js internals
   if (url.pathname.startsWith("/api/")) return;
+  if (url.pathname.startsWith("/_next/data/")) return;
 
   // ── 1. Next.js static chunks (JS/CSS with content hash) → Cache-First ──
-  //    These never change, so once cached they load instantly forever.
+  //    Content-hashed filenames never change; once cached they're permanent.
   if (url.pathname.startsWith("/_next/static/")) {
     e.respondWith(
       caches.open(STATIC_CACHE).then(async (cache) => {
@@ -52,44 +59,44 @@ self.addEventListener("fetch", (e) => {
           if (res.ok) cache.put(e.request, res.clone());
           return res;
         } catch {
-          return hit ?? new Response("", { status: 504 });
+          return new Response("", { status: 504 });
         }
       })
     );
     return;
   }
 
-  // Skip non-static _next/ (HMR, webpack, etc.)
+  // Skip other internal Next.js paths (HMR, webpack, RSC headers, etc.)
   if (url.pathname.startsWith("/_next/")) return;
 
-  // ── 2. App pages → Stale-While-Revalidate ──
-  //    Serve cached page immediately (fast!), refresh cache in background.
-  //    If offline and no cache yet → show offline.html.
+  // ── 2. App pages → only intercept real browser navigations ──
+  //    RSC fetches (client-side router) have mode !== "navigate" and carry
+  //    Next-Router-State-Tree / RSC headers — we must NOT cache those.
+  //    We only cache full HTML responses so offline.html links work correctly.
+  if (e.request.mode !== "navigate") return;
+
   e.respondWith(
     caches.open(PAGES_CACHE).then(async (cache) => {
+      // Only serve from cache if it's actually HTML (not RSC payload)
       const cached = await cache.match(e.request);
-
-      // Background network fetch
-      const networkPromise = fetch(e.request)
-        .then((res) => {
-          if (res.ok) cache.put(e.request, res.clone());
-          return res;
-        })
-        .catch(() => null);
-
-      if (cached) {
-        // Serve cache immediately, update in background
-        networkPromise.catch(() => {});
+      if (cached && isHtml(cached)) {
+        // Serve immediately; refresh in background when online
+        fetch(e.request)
+          .then((res) => { if (res.ok && isHtml(res)) cache.put(e.request, res.clone()); })
+          .catch(() => {});
         return cached;
       }
 
-      // No cache → wait for network, fallback to offline page
-      const netRes = await networkPromise;
-      if (netRes) return netRes;
-
-      // Truly offline with no cached version
-      const offlinePage = await cache.match("/offline.html");
-      return offlinePage ?? new Response("Sin conexión", { status: 503 });
+      // Cache miss or stale non-HTML entry → fetch from network
+      try {
+        const res = await fetch(e.request);
+        if (res.ok && isHtml(res)) cache.put(e.request, res.clone());
+        return res;
+      } catch {
+        // Truly offline with no valid cached page → serve offline fallback
+        const offlinePage = await cache.match("/offline.html");
+        return offlinePage ?? new Response("Sin conexión", { status: 503 });
+      }
     })
   );
 });
