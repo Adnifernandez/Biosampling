@@ -257,26 +257,23 @@ export async function updateTransectoCoordinates(
 }
 
 export async function searchSpecies(query: string, surveyType: string) {
-  const species = await prisma.species.findMany({
-    where: {
-      type: surveyType,
-      OR: [
-        { genus: { contains: query, mode: "insensitive" } },
-        { species: { contains: query, mode: "insensitive" } },
-        { commonName: { contains: query, mode: "insensitive" } },
-        { family: { contains: query, mode: "insensitive" } },
-      ],
-    },
-    select: {
-      id: true,
-      genus: true,
-      species: true,
-      commonName: true,
-      family: true,
-      conservationStatus: true,
-    },
-    take: 50,
-    orderBy: { genus: "asc" },
-  });
+  // SQLite ignores Prisma's mode:"insensitive" on contains — use raw SQL with LOWER()
+  // so searches like "erizo" match "Erizo", "ERIZO", etc.
+  const q = `%${query.toLowerCase()}%`;
+  const species = await prisma.$queryRaw<
+    { id: string; genus: string; species: string; commonName: string | null; family: string; conservationStatus: string | null }[]
+  >`
+    SELECT id, genus, species, "commonName", family, "conservationStatus"
+    FROM "Species"
+    WHERE type = ${surveyType}
+      AND (
+        LOWER(genus)         LIKE ${q}
+        OR LOWER(species)    LIKE ${q}
+        OR LOWER("commonName") LIKE ${q}
+        OR LOWER(family)     LIKE ${q}
+      )
+    ORDER BY genus
+    LIMIT 50
+  `;
   return species;
 }
