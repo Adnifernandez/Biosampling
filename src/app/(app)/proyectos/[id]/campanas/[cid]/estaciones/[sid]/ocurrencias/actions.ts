@@ -257,20 +257,20 @@ export async function updateTransectoCoordinates(
 }
 
 export async function searchSpecies(query: string, surveyType: string) {
-  // SQLite ignores Prisma's mode:"insensitive" on contains — use raw SQL with LOWER()
-  // so searches like "erizo" match "Erizo", "ERIZO", etc.
-  const q = `%${query.toLowerCase()}%`;
+  // Use ILIKE (PostgreSQL native case-insensitive LIKE) instead of
+  // mode:"insensitive" which Prisma only partially supports via the ORM layer.
+  const q = `%${query}%`;
   const species = await prisma.$queryRaw<
     { id: string; genus: string; species: string; commonName: string | null; family: string; conservationStatus: string | null }[]
   >`
     SELECT id, genus, species, "commonName", family, "conservationStatus"
     FROM "Species"
-    WHERE type = ${surveyType}
+    WHERE "type" = ${surveyType}
       AND (
-        LOWER(genus)         LIKE ${q}
-        OR LOWER(species)    LIKE ${q}
-        OR LOWER("commonName") LIKE ${q}
-        OR LOWER(family)     LIKE ${q}
+        genus          ILIKE ${q}
+        OR species     ILIKE ${q}
+        OR "commonName" ILIKE ${q}
+        OR family      ILIKE ${q}
       )
     ORDER BY genus
     LIMIT 50
