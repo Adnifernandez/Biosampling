@@ -59,6 +59,17 @@ type ProjectRow = {
   campaigns: CampaignRow[];
 };
 
+// Left-to-right alphabetical sort: División → Clase → Familia → Especie
+function spSort(a: SpeciesRow, b: SpeciesRow): number {
+  const d = (a.division || "").localeCompare(b.division || "", "es");
+  if (d !== 0) return d;
+  const c = (a.clase || "").localeCompare(b.clase || "", "es");
+  if (c !== 0) return c;
+  const f = (a.family || "").localeCompare(b.family || "", "es");
+  if (f !== 0) return f;
+  return `${a.genus} ${a.species}`.localeCompare(`${b.genus} ${b.species}`, "es");
+}
+
 function primaryStatus(raw: string | null): string {
   if (!raw) return "LC";
   const m = raw.match(/^(CR|EN|VU|NT|LC|DD|EW|EX|NE|NA)/i);
@@ -111,7 +122,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
       if (ex) { ex.count++; ex.abundance += n; }
       else speciesMap.set(key, { sp: occ.species, count: 1, abundance: n });
     }
-    const speciesList = Array.from(speciesMap.values()).sort((a, b) => b.abundance - a.abundance);
+    const speciesList = Array.from(speciesMap.values()).sort((a, b) => spSort(a.sp, b.sp));
     const stationData = isGrilla
       ? selectedCampaign.stations
           .flatMap((s) => s.children ?? [])
@@ -160,10 +171,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
         }
       }
     }
-    const rows = Array.from(speciesMap.values()).sort((a, b) => {
-      const f = (a.sp.family || "").localeCompare(b.sp.family || "");
-      return f !== 0 ? f : `${a.sp.genus} ${a.sp.species}`.localeCompare(`${b.sp.genus} ${b.sp.species}`);
-    });
+    const rows = Array.from(speciesMap.values()).sort((a, b) => spSort(a.sp, b.sp));
     // Summary counts
     const habitoCounts = new Map<string, number>();
     const origenCounts = new Map<string, number>();
@@ -174,8 +182,8 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
         origenCounts.set(o, (origenCounts.get(o) ?? 0) + 1);
       }
     }
-    const habitoRows = Array.from(habitoCounts.entries()).sort((a, b) => b[1] - a[1]);
-    const origenRows = Array.from(origenCounts.entries()).sort((a, b) => b[1] - a[1]);
+    const habitoRows = Array.from(habitoCounts.entries()).sort((a, b) => a[0].localeCompare(b[0], "es"));
+    const origenRows = Array.from(origenCounts.entries()).sort((a, b) => a[0].localeCompare(b[0], "es"));
 
     return { sortedStations, rows, habitoRows, origenRows };
   })();
@@ -202,10 +210,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
       }
     }
 
-    raw.sort((a, b) => {
-      const f = (a.sp.family || "").localeCompare(b.sp.family || "");
-      return f !== 0 ? f : `${a.sp.genus} ${a.sp.species}`.localeCompare(`${b.sp.genus} ${b.sp.species}`);
-    });
+    raw.sort((a, b) => spSort(a.sp, b.sp));
 
     const speciesCounts = new Map<string, number>();
     const rows: MRow[] = raw.map((o) => {
@@ -227,8 +232,8 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
         }
       }
     }
-    const habitoRows = Array.from(habitoCounts.entries()).sort((a, b) => b[1] - a[1]);
-    const origenRows = Array.from(origenCounts.entries()).sort((a, b) => b[1] - a[1]);
+    const habitoRows = Array.from(habitoCounts.entries()).sort((a, b) => a[0].localeCompare(b[0], "es"));
+    const origenRows = Array.from(origenCounts.entries()).sort((a, b) => a[0].localeCompare(b[0], "es"));
 
     return { rows, habitoRows, origenRows };
   })();
@@ -270,10 +275,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
       }
     }
 
-    const rows = Array.from(speciesMap.values()).sort((a, b) => {
-      const f = (a.sp.family || "").localeCompare(b.sp.family || "");
-      return f !== 0 ? f : `${a.sp.genus} ${a.sp.species}`.localeCompare(`${b.sp.genus} ${b.sp.species}`);
-    });
+    const rows = Array.from(speciesMap.values()).sort((a, b) => spSort(a.sp, b.sp));
 
     // Hydrophyte summary per transecto
     const hydroByTransecto = transectos
@@ -554,10 +556,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     for (const row of individualRows) {
       if (!speciesMap.has(row.sp.id)) speciesMap.set(row.sp.id, row.sp);
     }
-    const speciesRows = Array.from(speciesMap.values()).sort((a, b) => {
-      const f = (a.family || "").localeCompare(b.family || "");
-      return f !== 0 ? f : `${a.genus} ${a.species}`.localeCompare(`${b.genus} ${b.species}`);
-    });
+    const speciesRows = Array.from(speciesMap.values()).sort(spSort);
 
     return { individualRows, speciesRows };
   })();
@@ -591,7 +590,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
         origenCounts.set(o, (origenCounts.get(o) ?? 0) + 1);
       }
     }
-    const origenRows = Array.from(origenCounts.entries()).sort((a, b) => b[1] - a[1]);
+    const origenRows = Array.from(origenCounts.entries()).sort((a, b) => a[0].localeCompare(b[0], "es"));
     return { rows, totalAbundance, origenRows };
   })();
 
