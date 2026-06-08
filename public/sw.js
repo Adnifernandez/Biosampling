@@ -93,7 +93,17 @@ self.addEventListener("fetch", (e) => {
         if (res.ok && isHtml(res)) cache.put(e.request, res.clone());
         return res;
       } catch {
-        // Truly offline with no valid cached page → serve offline fallback
+        // Truly offline with no exact cache match.
+        // Fallback cascade:
+        //   1. Try same path without query string (e.g. /ocurrencias for /ocurrencias?projectId=x)
+        //      → the base page is pre-cached and is better than the error screen.
+        //   2. offline.html
+        //   3. bare text error
+        if (url.search) {
+          const basePath = url.origin + url.pathname;
+          const baseCached = await cache.match(basePath);
+          if (baseCached && isHtml(baseCached)) return baseCached;
+        }
         const offlinePage = await cache.match("/offline.html");
         return offlinePage ?? new Response("Sin conexión", { status: 503 });
       }

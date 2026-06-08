@@ -9,6 +9,11 @@ const SyncManager = dynamic(
   { ssr: false }
 );
 
+const OfflineNavFix = dynamic(
+  () => import("@/components/layout/OfflineNavFix").then((m) => m.OfflineNavFix),
+  { ssr: false }
+);
+
 export function ClientProviders({
   session,
   children,
@@ -19,6 +24,7 @@ export function ClientProviders({
   return (
     <SessionProvider session={session}>
       <SyncManager />
+      <OfflineNavFix />
       {children}
     </SessionProvider>
   );

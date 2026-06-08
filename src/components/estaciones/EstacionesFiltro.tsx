@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { navigate } from "@/lib/offline-nav";
 import {
   Select,
   SelectContent,
@@ -31,20 +32,17 @@ export function EstacionesFiltro({
   const campaigns = selectedProject?.campaigns ?? [];
 
   function handleProjectChange(v: string) {
-    if (v) {
-      router.push(`/estaciones?projectId=${v}`);
-    } else {
-      router.push("/estaciones");
-    }
+    navigate(router, v ? `/estaciones?projectId=${v}` : "/estaciones");
   }
 
   function handleCampaignChange(v: string | null) {
     const val = v ?? "";
-    if (val && val !== "all") {
-      router.push(`/estaciones?projectId=${selectedProjectId}&campaignId=${val}`);
-    } else {
-      router.push(`/estaciones?projectId=${selectedProjectId}`);
-    }
+    navigate(
+      router,
+      val && val !== "all"
+        ? `/estaciones?projectId=${selectedProjectId}&campaignId=${val}`
+        : `/estaciones?projectId=${selectedProjectId}`
+    );
   }
 
   return (

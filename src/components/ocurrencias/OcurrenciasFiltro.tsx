@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { navigate } from "@/lib/offline-nav";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Label } from "@/components/ui/label";
@@ -44,24 +45,26 @@ export function OcurrenciasFiltro({
 
   function onProjectChange(val: string | null) {
     const v = val ?? "";
-    router.push(v ? `/ocurrencias?projectId=${v}` : `/ocurrencias`);
+    navigate(router, v ? `/ocurrencias?projectId=${v}` : `/ocurrencias`);
   }
 
   function onCampaignChange(val: string | null) {
     const v = val ?? "";
-    router.push(v ? `/ocurrencias?projectId=${selectedProjectId}&campaignId=${v}` : `/ocurrencias?projectId=${selectedProjectId}`);
+    navigate(router, v ? `/ocurrencias?projectId=${selectedProjectId}&campaignId=${v}` : `/ocurrencias?projectId=${selectedProjectId}`);
   }
 
   function onStationChange(val: string | null) {
     const v = val ?? "";
     if (isGrilla) {
-      router.push(
+      navigate(
+        router,
         v
           ? `/ocurrencias?projectId=${selectedProjectId}&campaignId=${selectedCampaignId}&transectoId=${v}`
           : `/ocurrencias?projectId=${selectedProjectId}&campaignId=${selectedCampaignId}`
       );
     } else {
-      router.push(
+      navigate(
+        router,
         v
           ? `/ocurrencias?projectId=${selectedProjectId}&campaignId=${selectedCampaignId}&stationId=${v}`
           : `/ocurrencias?projectId=${selectedProjectId}&campaignId=${selectedCampaignId}`
@@ -71,7 +74,8 @@ export function OcurrenciasFiltro({
 
   function onGrillaChange(val: string | null) {
     const v = val ?? "";
-    router.push(
+    navigate(
+      router,
       v
         ? `/ocurrencias?projectId=${selectedProjectId}&campaignId=${selectedCampaignId}&transectoId=${selectedTransectoId}&stationId=${v}`
         : `/ocurrencias?projectId=${selectedProjectId}&campaignId=${selectedCampaignId}&transectoId=${selectedTransectoId}`
