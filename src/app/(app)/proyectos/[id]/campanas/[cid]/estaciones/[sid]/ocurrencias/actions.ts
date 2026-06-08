@@ -275,7 +275,7 @@ export async function searchSpecies(query: string, surveyType: string) {
       family: true,
       conservationStatus: true,
     },
-    take: 15,
+    take: 50,
     orderBy: { genus: "asc" },
   });
   return species;

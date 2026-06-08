@@ -44,7 +44,9 @@ const species = dataRows
   })
   .map((row) => {
     const origen = col(row, "ORIGEN") ?? null;
-    const tipo   = (col(row, "TIPO") ?? "").toString().toUpperCase(); // "Fauna" → "FAUNA"
+    // LIMNO (macrófitas acuáticas) se agrupa bajo FLORA para las búsquedas de campaña
+    const tipoRaw = (col(row, "TIPO") ?? "").toString().toUpperCase();
+    const tipo = tipoRaw === "LIMNO" ? "FLORA" : tipoRaw;
 
     return {
       id:                 String(col(row, "IDESPECIE")),
