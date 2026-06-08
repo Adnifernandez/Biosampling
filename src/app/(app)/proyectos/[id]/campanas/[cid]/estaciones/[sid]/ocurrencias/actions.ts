@@ -257,23 +257,21 @@ export async function updateTransectoCoordinates(
 }
 
 export async function searchSpecies(query: string, surveyType: string) {
-  // Use ILIKE (PostgreSQL native case-insensitive LIKE) instead of
-  // mode:"insensitive" which Prisma only partially supports via the ORM layer.
-  const q = `%${query}%`;
-  const species = await prisma.$queryRaw<
-    { id: string; genus: string; species: string; commonName: string | null; family: string; conservationStatus: string | null }[]
-  >`
-    SELECT id, genus, species, "commonName", family, "conservationStatus"
-    FROM "Species"
-    WHERE "type" = ${surveyType}
-      AND (
-        genus          ILIKE ${q}
-        OR species     ILIKE ${q}
-        OR "commonName" ILIKE ${q}
-        OR family      ILIKE ${q}
-      )
-    ORDER BY genus
-    LIMIT 50
-  `;
-  return species;
+  return prisma.species.findMany({
+    where: {
+      type: surveyType,
+      OR: [
+        { genus:      { contains: query, mode: "insensitive" } },
+        { species:    { contains: query, mode: "insensitive" } },
+        { commonName: { contains: query, mode: "insensitive" } },
+        { family:     { contains: query, mode: "insensitive" } },
+      ],
+    },
+    select: {
+      id: true, genus: true, species: true,
+      commonName: true, family: true, conservationStatus: true,
+    },
+    take: 50,
+    orderBy: { genus: "asc" },
+  });
 }
