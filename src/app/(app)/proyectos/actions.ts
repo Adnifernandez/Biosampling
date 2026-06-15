@@ -24,7 +24,7 @@ export async function createProject(formData: FormData) {
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const project = await prisma.project.create({ data: parsed.data });
+  const project = await prisma.project.create({ data: { ...parsed.data, createdBy: session.user?.name ?? null } });
   revalidatePath("/proyectos");
   return { success: true, id: project.id };
 }

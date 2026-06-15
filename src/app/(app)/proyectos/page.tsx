@@ -1,7 +1,7 @@
 ﻿import { prisma } from "@/lib/prisma";
 import { Card, CardContent } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button-link";
-import { Plus, FolderOpen, MapPin, User, Pencil } from "lucide-react";
+import { Plus, FolderOpen, MapPin, User2, Pencil } from "lucide-react";
 import { PROJECT_STATUS_LABELS, type ProjectStatus } from "@/lib/types";
 import { DeleteProjectButton } from "@/components/proyectos/DeleteProjectButton";
 import { CloseProjectButton } from "@/components/proyectos/CloseProjectButton";
@@ -57,6 +57,11 @@ export default async function ProyectosPage() {
                     <span className="flex items-center gap-1">
                       <MapPin className="h-3 w-3" /> {p.region} · {p.commune}
                     </span>
+                    {p.createdBy && (
+                      <span className="flex items-center gap-1">
+                        <User2 className="h-3 w-3" /> {p.createdBy}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-1 shrink-0">

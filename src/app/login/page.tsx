@@ -25,7 +25,7 @@ export default function LoginPage() {
     resolver: zodResolver(schema),
     defaultValues: {
       email: "admin@biosampling.cl",
-      password: "biosampling2024",
+      password: "biosampling2026",
     },
   });
 
