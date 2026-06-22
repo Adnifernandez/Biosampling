@@ -34,14 +34,16 @@ async function searchSpeciesFallback(query: string, surveyType: string): Promise
   const { getDb } = await import("@/lib/db");
   const db = getDb();
   if (!db) return [];
-  const q = query.toLowerCase();
+  const normalize = (s: string) =>
+    s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const q = normalize(query);
   const all = await db.species.where("type").equals(surveyType).toArray();
   return all
     .filter((s) =>
-      s.genus.toLowerCase().includes(q) ||
-      s.species.toLowerCase().includes(q) ||
-      (s.commonName ?? "").toLowerCase().includes(q) ||
-      (s.family ?? "").toLowerCase().includes(q)
+      normalize(s.genus).includes(q) ||
+      normalize(s.species).includes(q) ||
+      normalize(s.commonName ?? "").includes(q) ||
+      normalize(s.family ?? "").includes(q)
     )
     .slice(0, 15)
     .map((s) => ({
@@ -1395,3 +1397,4 @@ function FaunaFields({
     </>
   );
 }
+

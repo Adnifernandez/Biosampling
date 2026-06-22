@@ -257,21 +257,21 @@ export async function updateTransectoCoordinates(
 }
 
 export async function searchSpecies(query: string, surveyType: string) {
-  return prisma.species.findMany({
-    where: {
-      type: surveyType,
-      OR: [
-        { genus:      { contains: query, mode: "insensitive" } },
-        { species:    { contains: query, mode: "insensitive" } },
-        { commonName: { contains: query, mode: "insensitive" } },
-        { family:     { contains: query, mode: "insensitive" } },
-      ],
-    },
-    select: {
-      id: true, genus: true, species: true,
-      commonName: true, family: true, conservationStatus: true,
-    },
-    take: 50,
-    orderBy: { genus: "asc" },
-  });
+  const pattern = `%${query}%`;
+  return prisma.$queryRaw<Array<{
+    id: string; genus: string; species: string;
+    commonName: string | null; family: string; conservationStatus: string | null;
+  }>>`
+    SELECT id, genus, species, "commonName", family, "conservationStatus"
+    FROM "Species"
+    WHERE "type" = ${surveyType}
+      AND (
+        unaccent(genus)        ILIKE unaccent(${pattern}) OR
+        unaccent(species)      ILIKE unaccent(${pattern}) OR
+        unaccent("commonName") ILIKE unaccent(${pattern}) OR
+        unaccent(family)       ILIKE unaccent(${pattern})
+      )
+    ORDER BY genus
+    LIMIT 50
+  `;
 }
