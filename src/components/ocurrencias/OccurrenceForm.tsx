@@ -40,6 +40,7 @@ async function searchSpeciesFallback(query: string, surveyType: string): Promise
   const all = await db.species.where("type").equals(surveyType).toArray();
   return all
     .filter((s) =>
+      normalize(`${s.genus} ${s.species}`).includes(q) ||
       normalize(s.genus).includes(q) ||
       normalize(s.species).includes(q) ||
       normalize(s.commonName ?? "").includes(q) ||

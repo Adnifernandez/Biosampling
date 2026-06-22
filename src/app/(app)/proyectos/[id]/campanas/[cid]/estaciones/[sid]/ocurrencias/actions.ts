@@ -266,6 +266,7 @@ export async function searchSpecies(query: string, surveyType: string) {
     FROM "Species"
     WHERE "type" = ${surveyType}
       AND (
+        unaccent(genus || ' ' || species) ILIKE unaccent(${pattern}) OR
         unaccent(genus)        ILIKE unaccent(${pattern}) OR
         unaccent(species)      ILIKE unaccent(${pattern}) OR
         unaccent("commonName") ILIKE unaccent(${pattern}) OR
