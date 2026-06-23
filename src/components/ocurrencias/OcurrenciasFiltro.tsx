@@ -111,9 +111,7 @@ export function OcurrenciasFiltro({
             {campaigns.map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.name}
-                <span className={`ml-1.5 text-xs font-medium ${c.surveyType === "FLORA" ? "text-teal-600" : "text-blue-600"}`}>
-                  {c.surveyType === "FLORA" ? "Flora" : "Fauna"}
-                </span>
+                <span className="text-gray-400 ml-1">· {c.surveyType === "FLORA" ? "Flora" : "Fauna"}</span>
                 {c.methodology && <span className="text-gray-400 ml-1">· {getMethodologyById(c.methodology)?.name ?? c.methodology}</span>}
               </SelectItem>
             ))}
