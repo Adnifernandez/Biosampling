@@ -68,6 +68,9 @@ export default async function CampanasPage({
                     <p className="font-medium text-sm text-gray-900 truncate">{c.name}</p>
                     <p className="text-xs text-gray-500 truncate">
                       {c.project.name}
+                      <span className={`ml-1.5 px-1.5 py-0.5 rounded font-medium ${c.surveyType === "FLORA" ? "bg-teal-50 text-teal-700" : "bg-blue-50 text-blue-700"}`}>
+                        {c.surveyType === "FLORA" ? "Flora" : "Fauna"}
+                      </span>
                       {c.methodology && <span className="text-gray-400"> · {getMethodologyById(c.methodology)?.name ?? c.methodology}</span>}
                     </p>
                   </div>
