@@ -650,7 +650,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
                 <SelectTrigger>
                   <SelectValue>
                     {selectedCampaign
-                      ? `${selectedCampaign.name} · ${getMethodologyById(selectedCampaign.methodology)?.name ?? selectedCampaign.methodology}`
+                      ? `${selectedCampaign.name} · ${selectedCampaign.surveyType === "FLORA" ? "Flora" : "Fauna"} · ${getMethodologyById(selectedCampaign.methodology)?.name ?? selectedCampaign.methodology}`
                       : <span className="text-muted-foreground">
                           {selectedProject ? "Seleccionar campaña..." : "Primero elige proyecto"}
                         </span>}
@@ -659,7 +659,9 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
                 <SelectContent className="min-w-max">
                   {campaigns.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      {c.name} · {getMethodologyById(c.methodology)?.name ?? c.methodology}
+                      {c.name}
+                      <span className="text-gray-400 ml-1">· {c.surveyType === "FLORA" ? "Flora" : "Fauna"}</span>
+                      <span className="text-gray-400 ml-1">· {getMethodologyById(c.methodology)?.name ?? c.methodology}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
