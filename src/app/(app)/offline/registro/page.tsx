@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { getDb } from "@/lib/db";
 import type { CachedProject, CachedCampaign, CachedStation, PendingCampaign, PendingStation, PendingOccurrence, SingleOccurrenceData } from "@/lib/db";
@@ -453,6 +453,7 @@ export default function OfflineRegistroPage() {
   // Pending occurrences for current station (step 4)
   const [pendingOccurrences, setPendingOccurrences] = useState<PendingOccurrence[]>([]);
   const [editingOccurrence, setEditingOccurrence] = useState<PendingOccurrence | null>(null);
+  const formTopRef = useRef<HTMLDivElement>(null);
 
   // Online status
   useEffect(() => {
@@ -798,70 +799,11 @@ export default function OfflineRegistroPage() {
             </p>
           </div>
 
-          {/* Pending occurrences list */}
-          {pendingOccurrences.length > 0 && (
-            <div className="space-y-1.5">
-              <p className="text-xs text-gray-400 font-medium">
-                Registros guardados en esta réplica ({pendingOccurrences.length})
-              </p>
-              {pendingOccurrences.map((occ) => (
-                <div key={occ.localId}
-                  className={cn(
-                    "flex items-center gap-2 rounded-xl px-3 py-2 border",
-                    editingOccurrence?.localId === occ.localId
-                      ? "bg-amber-50 border-amber-300"
-                      : "bg-orange-50 border-orange-200"
-                  )}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate italic">{occ.speciesLabel}</p>
-                    <p className="text-xs text-gray-400">
-                      {occ.payload.kind === "single"
-                        ? occ.payload.data.date
-                        : occ.payload.kind === "grilla"
-                          ? `Grilla · ${occ.payload.data.date}`
-                          : `Sherman · ${occ.payload.data.captures.length} visita${occ.payload.data.captures.length !== 1 ? "s" : ""}`}
-                    </p>
-                  </div>
-                  <div className="flex gap-0.5 shrink-0">
-                    {occ.payload.kind === "single" && (
-                      <button
-                        onClick={() => setEditingOccurrence(
-                          editingOccurrence?.localId === occ.localId ? null : occ
-                        )}
-                        className={cn(
-                          "p-1.5 rounded transition-colors",
-                          editingOccurrence?.localId === occ.localId
-                            ? "text-amber-600 hover:text-amber-700"
-                            : "text-gray-400 hover:text-teal-600"
-                        )}
-                        title="Editar registro">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                    <button
-                      onClick={async () => {
-                        if (!confirm(`¿Eliminar el registro de "${occ.speciesLabel}"?`)) return;
-                        const db = getDb();
-                        if (!db) return;
-                        await db.pendingOccurrences.delete(occ.localId!);
-                        if (editingOccurrence?.localId === occ.localId) setEditingOccurrence(null);
-                        loadPendingOccurrences(selectedStation);
-                      }}
-                      className="text-gray-400 hover:text-red-500 p-1.5 rounded transition-colors"
-                      title="Eliminar registro">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Edit mode banner */}
+          {/* Edit mode banner — shown above the form when editing */}
           {editingOccurrence && (
-            <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+            <div ref={formTopRef} className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
               <div>
-                <p className="text-xs text-amber-600 font-medium">Modo edición</p>
+                <p className="text-xs text-amber-600 font-medium">Editando registro</p>
                 <p className="text-sm text-gray-700 italic truncate">{editingOccurrence.speciesLabel}</p>
               </div>
               <button
@@ -895,6 +837,68 @@ export default function OfflineRegistroPage() {
               loadPendingOccurrences(selectedStation);
             }}
           />
+
+          {/* Pending occurrences list — shown BELOW the form so it's visible after registering */}
+          {pendingOccurrences.length > 0 && (
+            <div className="space-y-1.5 pb-4">
+              <p className="text-xs text-gray-500 font-medium pt-1">
+                Registros en esta réplica ({pendingOccurrences.length}) — toca el lápiz para editar
+              </p>
+              {pendingOccurrences.map((occ) => (
+                <div key={occ.localId}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl px-3 py-2.5 border",
+                    editingOccurrence?.localId === occ.localId
+                      ? "bg-amber-50 border-amber-300"
+                      : "bg-white border-gray-200"
+                  )}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate italic">{occ.speciesLabel}</p>
+                    <p className="text-xs text-gray-400">
+                      {occ.payload.kind === "single"
+                        ? occ.payload.data.date
+                        : occ.payload.kind === "grilla"
+                          ? `Grilla · ${occ.payload.data.date}`
+                          : `Sherman · ${occ.payload.data.captures.length} visita${occ.payload.data.captures.length !== 1 ? "s" : ""}`}
+                    </p>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    {occ.payload.kind === "single" && (
+                      <button
+                        onClick={() => {
+                          setEditingOccurrence(
+                            editingOccurrence?.localId === occ.localId ? null : occ
+                          );
+                          setTimeout(() => formTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                        }}
+                        className={cn(
+                          "flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors",
+                          editingOccurrence?.localId === occ.localId
+                            ? "bg-amber-100 text-amber-700 border-amber-300"
+                            : "bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100"
+                        )}>
+                        <Pencil className="h-3 w-3" />
+                        {editingOccurrence?.localId === occ.localId ? "Editando" : "Editar"}
+                      </button>
+                    )}
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`¿Eliminar el registro de "${occ.speciesLabel}"?`)) return;
+                        const db = getDb();
+                        if (!db) return;
+                        await db.pendingOccurrences.delete(occ.localId!);
+                        if (editingOccurrence?.localId === occ.localId) setEditingOccurrence(null);
+                        loadPendingOccurrences(selectedStation);
+                      }}
+                      className="p-1.5 text-gray-300 hover:text-red-500 rounded-lg transition-colors"
+                      title="Eliminar">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
