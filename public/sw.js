@@ -1,5 +1,5 @@
-const STATIC_CACHE = "bio-static-v5";
-const PAGES_CACHE  = "bio-pages-v5";
+const STATIC_CACHE = "bio-static-v6";
+const PAGES_CACHE  = "bio-pages-v6";
 
 // Always-cached static assets (public, no auth needed)
 const PRECACHE = [
