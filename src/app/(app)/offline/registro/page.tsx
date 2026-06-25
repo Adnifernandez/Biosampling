@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { getDb } from "@/lib/db";
 import type { CachedProject, CachedCampaign, CachedStation, PendingCampaign, PendingStation, OccurrencePayload, SingleOccurrenceData } from "@/lib/db";
@@ -461,6 +461,16 @@ export default function OfflineRegistroPage() {
   const [editingOccurrence, setEditingOccurrence] = useState<SessionOccurrence | null>(null);
   const formTopRef = useRef<HTMLDivElement>(null);
 
+  // Set of speciesIds already registered this session — used for Flora dedup check
+  const sessionSpeciesIds = useMemo(() =>
+    new Set(
+      sessionOccurrences
+        .filter(o => o.payload.kind === "single")
+        .map(o => (o.payload.data as SingleOccurrenceData).speciesId)
+    ),
+    [sessionOccurrences]
+  );
+
   // Online status
   useEffect(() => {
     setIsOnline(navigator.onLine);
@@ -816,6 +826,16 @@ export default function OfflineRegistroPage() {
             cameraTrapCount={selectedCampaign.cameraTrapCount ?? undefined}
             forceOffline={true}
             defaultValues={editingOccurrence ? sessionOccurrenceToDefaultValues(editingOccurrence) : undefined}
+            existingSpeciesIds={selectedCampaign.surveyType === "FLORA" && !editingOccurrence ? sessionSpeciesIds : undefined}
+            onRequestEdit={(speciesId) => {
+              const existing = sessionOccurrences.find(
+                o => o.payload.kind === "single" && (o.payload.data as SingleOccurrenceData).speciesId === speciesId
+              );
+              if (existing) {
+                setEditingOccurrence(existing);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }
+            }}
             onRegistered={async (label, payload, localId) => {
               if (editingOccurrence) {
                 // Edit flow: replace old item, delete old Dexie record

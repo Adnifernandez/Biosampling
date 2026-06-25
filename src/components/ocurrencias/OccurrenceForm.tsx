@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, Plus, Trash2, MapPin, Loader2, CheckCircle2 } from "lucide-react";
+import { Search, Plus, Trash2, MapPin, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { BB_COVER_CODES, getMethodologyById } from "@/lib/methodologies";
 import {
   createOccurrence,
@@ -112,6 +112,8 @@ interface OccurrenceFormProps {
   stationLocalKey?: string;   // set when station is pending (offline creation)
   forceOffline?: boolean;     // always save to Dexie regardless of online status (terreno mode)
   onRegistered?: (label: string, payload: OccurrencePayload, localId: number) => void; // terreno wizard callback
+  existingSpeciesIds?: Set<string>; // Flora dedup: species already registered this session
+  onRequestEdit?: (speciesId: string) => void; // called when user taps "Editar" on a duplicate
 }
 
 function buildTrapOptions(method: string, shermanCount: number, cameraCount: number): string[] {
@@ -136,6 +138,8 @@ export function OccurrenceForm({
   stationLocalKey,
   forceOffline,
   onRegistered,
+  existingSpeciesIds,
+  onRequestEdit,
 }: OccurrenceFormProps) {
   const router = useRouter();
   const isBB = methodology === "BRAUN_BLANQUET";
@@ -144,12 +148,20 @@ export function OccurrenceForm({
   const isGrilla = methodology === "GRILLA";
   const isTransectoFauna = methodology === "TRANSECTO_LINEAL_FAUNA";
 
+
   // Single-species search
   const [speciesQuery, setSpeciesQuery] = useState("");
   const [speciesList, setSpeciesList] = useState<SpeciesResult[]>([]);
   const [selectedSpecies, setSelectedSpecies] = useState<SpeciesResult | null>(null);
   const [searching, setSearching] = useState(false);
   const searchSeq = useRef(0);
+
+  // Flora dedup: true when the selected species is already registered this session (create mode only)
+  const isDuplicate =
+    surveyType === "FLORA" &&
+    !occurrenceId &&
+    !!existingSpeciesIds?.size &&
+    !!(selectedSpecies?.id && existingSpeciesIds.has(selectedSpecies.id));
 
   // Common
   const [date, setDate] = useState(defaultValues?.date ?? format(new Date(), "yyyy-MM-dd"));
@@ -416,6 +428,16 @@ export function OccurrenceForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
+    // Block duplicate Flora registration
+    if (isDuplicate) {
+      toast.error("Especie ya registrada", {
+        description: isForestal
+          ? "Edita el registro existente para agregar otro individuo."
+          : "Solo se permite un registro por especie en esta estación.",
+      });
+      return;
+    }
+
     // GRILLA batch create/update
     if (isGrilla) {
       const filled = grillaPoints.filter(p => p.type !== "empty");
@@ -671,6 +693,30 @@ export function OccurrenceForm({
               hasExisting={!!defaultValues?.speciesId && !selectedSpecies}
               existingLabel={defaultValues?.speciesLabel}
             />
+          )}
+
+          {/* Flora duplicate warning */}
+          {isDuplicate && (
+            <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+              <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-amber-800">Esta especie ya está registrada</p>
+                <p className="text-xs text-amber-600 mt-0.5">
+                  {isForestal
+                    ? "Edita el registro existente para agregar otro individuo."
+                    : "Solo se permite un registro por especie en esta estación."}
+                </p>
+              </div>
+              {onRequestEdit && selectedSpecies && (
+                <button
+                  type="button"
+                  onClick={() => onRequestEdit(selectedSpecies.id)}
+                  className="shrink-0 text-xs font-semibold text-amber-700 underline whitespace-nowrap"
+                >
+                  {isForestal ? "Editar y agregar" : "Editar registro"}
+                </button>
+              )}
+            </div>
           )}
 
           {/* Date — hidden for transecto fauna (handled inside custom section) */}
