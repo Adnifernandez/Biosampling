@@ -826,7 +826,7 @@ export default function OfflineRegistroPage() {
             cameraTrapCount={selectedCampaign.cameraTrapCount ?? undefined}
             forceOffline={true}
             defaultValues={editingOccurrence ? sessionOccurrenceToDefaultValues(editingOccurrence) : undefined}
-            existingSpeciesIds={selectedCampaign.surveyType === "FLORA" && !editingOccurrence ? sessionSpeciesIds : undefined}
+            existingSpeciesIds={!editingOccurrence ? sessionSpeciesIds : undefined}
             onRequestEdit={(speciesId) => {
               const existing = sessionOccurrences.find(
                 o => o.payload.kind === "single" && (o.payload.data as SingleOccurrenceData).speciesId === speciesId
