@@ -110,8 +110,8 @@ interface OccurrenceFormProps {
   shermanTrapCount?: number;
   cameraTrapCount?: number;
   stationLocalKey?: string;   // set when station is pending (offline creation)
-  onSuccess?: () => void;     // called after successful offline save (used by terreno wizard)
   forceOffline?: boolean;     // always save to Dexie regardless of online status (terreno mode)
+  onRegistered?: (label: string, payload: OccurrencePayload, localId: number) => void; // terreno wizard callback
 }
 
 function buildTrapOptions(method: string, shermanCount: number, cameraCount: number): string[] {
@@ -134,8 +134,8 @@ export function OccurrenceForm({
   shermanTrapCount,
   cameraTrapCount,
   stationLocalKey,
-  onSuccess,
   forceOffline,
+  onRegistered,
 }: OccurrenceFormProps) {
   const router = useRouter();
   const isBB = methodology === "BRAUN_BLANQUET";
@@ -396,18 +396,18 @@ export function OccurrenceForm({
     const { getDb } = await import("@/lib/db");
     const db = getDb();
     if (!db) return;
-    await db.pendingOccurrences.add({
+    const localId = await db.pendingOccurrences.add({
       stationId: stationId || "pending",
       stationLocalKey,
       projectId, campaignId, methodology, surveyType,
       payload, speciesLabel: label, createdAt: Date.now(), status: "pending",
-    });
-    toast.success("Sin conexión — registro guardado localmente", {
-      description: "Se subirá automáticamente cuando haya internet.",
+    }) as number;
+    toast.success("Registro guardado", {
+      description: navigator.onLine ? "Se sincronizará automáticamente." : "Se subirá al reconectarte.",
     });
     setSessionCount(n => n + 1);
     resetForm();
-    onSuccess?.();
+    onRegistered?.(label, payload, localId);
   }
 
   // Save offline when station is pending OR when in terreno wizard mode

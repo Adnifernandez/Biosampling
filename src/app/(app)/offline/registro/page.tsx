@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { getDb } from "@/lib/db";
-import type { CachedProject, CachedCampaign, CachedStation, PendingCampaign, PendingStation, PendingOccurrence, SingleOccurrenceData } from "@/lib/db";
+import type { CachedProject, CachedCampaign, CachedStation, PendingCampaign, PendingStation, OccurrencePayload, SingleOccurrenceData } from "@/lib/db";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -69,7 +69,13 @@ function parseCampaignName(name: string): { season: typeof SEASONS[number]; suff
   return { season, suffix };
 }
 
-function pendingOccurrenceToDefaultValues(occ: PendingOccurrence): Record<string, string> {
+interface SessionOccurrence {
+  localId: number;
+  speciesLabel: string;
+  payload: OccurrencePayload;
+}
+
+function sessionOccurrenceToDefaultValues(occ: SessionOccurrence): Record<string, string> {
   if (occ.payload.kind !== "single") return {};
   const d = occ.payload.data as SingleOccurrenceData;
   const result: Record<string, string> = {
@@ -450,9 +456,9 @@ export default function OfflineRegistroPage() {
   const [editingCampaign, setEditingCampaign] = useState<PendingCampaign | null>(null);
   const [editingStation, setEditingStation] = useState<PendingStation | null>(null);
 
-  // Pending occurrences for current station (step 4)
-  const [pendingOccurrences, setPendingOccurrences] = useState<PendingOccurrence[]>([]);
-  const [editingOccurrence, setEditingOccurrence] = useState<PendingOccurrence | null>(null);
+  // Session occurrences — in-memory list of occurrences registered in this station visit
+  const [sessionOccurrences, setSessionOccurrences] = useState<SessionOccurrence[]>([]);
+  const [editingOccurrence, setEditingOccurrence] = useState<SessionOccurrence | null>(null);
   const formTopRef = useRef<HTMLDivElement>(null);
 
   // Online status
@@ -512,25 +518,10 @@ export default function OfflineRegistroPage() {
     loadStations(selectedCampaign);
   }, [selectedCampaign, loadStations]);
 
-  // Load pending occurrences when station selected
-  const loadPendingOccurrences = useCallback(async (station: SelectedStationMeta) => {
-    const db = getDb();
-    if (!db) return;
-    let occs: PendingOccurrence[];
-    if (station.localKey) {
-      occs = await db.pendingOccurrences.where("stationLocalKey").equals(station.localKey).toArray();
-    } else if (station.id) {
-      occs = await db.pendingOccurrences.where("stationId").equals(station.id).toArray();
-    } else {
-      occs = [];
-    }
-    setPendingOccurrences(occs.sort((a, b) => b.createdAt - a.createdAt));
-  }, []);
-
+  // Clear session occurrences when station changes
   useEffect(() => {
-    if (!selectedStation) { setPendingOccurrences([]); setEditingOccurrence(null); return; }
-    loadPendingOccurrences(selectedStation);
-  }, [selectedStation, loadPendingOccurrences]);
+    if (!selectedStation) { setSessionOccurrences([]); setEditingOccurrence(null); }
+  }, [selectedStation]);
 
   function goTo(s: Step) {
     if (s === "project") { setSelectedProject(null); setSelectedCampaign(null); setSelectedStation(null); }
@@ -542,6 +533,7 @@ export default function OfflineRegistroPage() {
     setEditingCampaign(null);
     setEditingStation(null);
     setEditingOccurrence(null);
+    setSessionOccurrences([]);
   }
 
   // ── Render ──
@@ -799,16 +791,14 @@ export default function OfflineRegistroPage() {
             </p>
           </div>
 
-          {/* Edit mode banner — shown above the form when editing */}
+          {/* Edit mode banner */}
           {editingOccurrence && (
             <div ref={formTopRef} className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
               <div>
                 <p className="text-xs text-amber-600 font-medium">Editando registro</p>
                 <p className="text-sm text-gray-700 italic truncate">{editingOccurrence.speciesLabel}</p>
               </div>
-              <button
-                onClick={() => setEditingOccurrence(null)}
-                className="text-gray-400 hover:text-gray-600 ml-3 shrink-0">
+              <button onClick={() => setEditingOccurrence(null)} className="text-gray-400 hover:text-gray-600 ml-3 shrink-0">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -825,26 +815,31 @@ export default function OfflineRegistroPage() {
             shermanTrapCount={selectedCampaign.shermanTrapCount ?? undefined}
             cameraTrapCount={selectedCampaign.cameraTrapCount ?? undefined}
             forceOffline={true}
-            defaultValues={editingOccurrence ? pendingOccurrenceToDefaultValues(editingOccurrence) : undefined}
-            onSuccess={async () => {
+            defaultValues={editingOccurrence ? sessionOccurrenceToDefaultValues(editingOccurrence) : undefined}
+            onRegistered={async (label, payload, localId) => {
               if (editingOccurrence) {
+                // Edit flow: replace old item, delete old Dexie record
                 const db = getDb();
-                if (db && editingOccurrence.localId != null) {
-                  await db.pendingOccurrences.delete(editingOccurrence.localId);
-                }
+                try { await db?.pendingOccurrences.delete(editingOccurrence.localId); } catch {}
+                setSessionOccurrences(prev => [
+                  { localId, speciesLabel: label, payload },
+                  ...prev.filter(o => o.localId !== editingOccurrence.localId),
+                ]);
                 setEditingOccurrence(null);
+              } else {
+                // New registration: prepend to list
+                setSessionOccurrences(prev => [{ localId, speciesLabel: label, payload }, ...prev]);
               }
-              loadPendingOccurrences(selectedStation);
             }}
           />
 
-          {/* Pending occurrences list — shown BELOW the form so it's visible after registering */}
-          {pendingOccurrences.length > 0 && (
+          {/* Session occurrences list — in-memory, immune to sync race conditions */}
+          {sessionOccurrences.length > 0 && (
             <div className="space-y-1.5 pb-4">
               <p className="text-xs text-gray-500 font-medium pt-1">
-                Registros en esta réplica ({pendingOccurrences.length}) — toca el lápiz para editar
+                Registros en esta réplica ({sessionOccurrences.length})
               </p>
-              {pendingOccurrences.map((occ) => (
+              {sessionOccurrences.map((occ) => (
                 <div key={occ.localId}
                   className={cn(
                     "flex items-center gap-2 rounded-xl px-3 py-2.5 border",
@@ -859,16 +854,14 @@ export default function OfflineRegistroPage() {
                         ? occ.payload.data.date
                         : occ.payload.kind === "grilla"
                           ? `Grilla · ${occ.payload.data.date}`
-                          : `Sherman · ${occ.payload.data.captures.length} visita${occ.payload.data.captures.length !== 1 ? "s" : ""}`}
+                          : `Sherman · ${occ.payload.data.captures.length} cap.`}
                     </p>
                   </div>
                   <div className="flex gap-1 shrink-0">
                     {occ.payload.kind === "single" && (
                       <button
                         onClick={() => {
-                          setEditingOccurrence(
-                            editingOccurrence?.localId === occ.localId ? null : occ
-                          );
+                          setEditingOccurrence(editingOccurrence?.localId === occ.localId ? null : occ);
                           setTimeout(() => formTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
                         }}
                         className={cn(
@@ -885,10 +878,9 @@ export default function OfflineRegistroPage() {
                       onClick={async () => {
                         if (!confirm(`¿Eliminar el registro de "${occ.speciesLabel}"?`)) return;
                         const db = getDb();
-                        if (!db) return;
-                        await db.pendingOccurrences.delete(occ.localId!);
+                        try { await db?.pendingOccurrences.delete(occ.localId); } catch {}
                         if (editingOccurrence?.localId === occ.localId) setEditingOccurrence(null);
-                        loadPendingOccurrences(selectedStation);
+                        setSessionOccurrences(prev => prev.filter(o => o.localId !== occ.localId));
                       }}
                       className="p-1.5 text-gray-300 hover:text-red-500 rounded-lg transition-colors"
                       title="Eliminar">
