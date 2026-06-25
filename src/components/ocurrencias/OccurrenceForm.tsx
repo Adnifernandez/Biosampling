@@ -156,9 +156,9 @@ export function OccurrenceForm({
   const [searching, setSearching] = useState(false);
   const searchSeq = useRef(0);
 
-  // Dedup: true when the selected species is already registered this session (create mode only)
-  // The parent controls scope — only passes existingSpeciesIds for Flora in Terreno mode
+  // Dedup check — only Flora, only create mode
   const isDuplicate =
+    surveyType === "FLORA" &&
     !occurrenceId &&
     !!existingSpeciesIds?.size &&
     !!(selectedSpecies?.id && existingSpeciesIds.has(selectedSpecies.id));
