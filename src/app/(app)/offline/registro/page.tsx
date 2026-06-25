@@ -3,13 +3,13 @@
 import { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { getDb } from "@/lib/db";
-import type { CachedProject, CachedCampaign, CachedStation, PendingCampaign, PendingStation } from "@/lib/db";
+import type { CachedProject, CachedCampaign, CachedStation, PendingCampaign, PendingStation, PendingOccurrence, SingleOccurrenceData } from "@/lib/db";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { WifiOff, Wifi, ArrowLeft, Plus, ChevronRight, CheckCircle2, Clock, AlertCircle, X } from "lucide-react";
+import { WifiOff, Wifi, ArrowLeft, Plus, ChevronRight, CheckCircle2, Clock, AlertCircle, X, Pencil, Trash2 } from "lucide-react";
 import { METHODOLOGIES } from "@/lib/methodologies";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -58,6 +58,31 @@ function suggestNextStationName(
     if (match) max = Math.max(max, parseInt(match[1]));
   }
   return `${prefix}${max + 1}`;
+}
+
+// ── Helpers ──
+function parseCampaignName(name: string): { season: typeof SEASONS[number]; suffix: string } {
+  const dashIdx = name.indexOf(" — ");
+  const basePart = dashIdx !== -1 ? name.slice(0, dashIdx) : name;
+  const suffix = dashIdx !== -1 ? name.slice(dashIdx + 3) : "";
+  const season = SEASONS.find((s) => basePart.startsWith(s)) ?? "Verano";
+  return { season, suffix };
+}
+
+function pendingOccurrenceToDefaultValues(occ: PendingOccurrence): Record<string, string> {
+  if (occ.payload.kind !== "single") return {};
+  const d = occ.payload.data as SingleOccurrenceData;
+  const result: Record<string, string> = {
+    speciesId: d.speciesId,
+    speciesLabel: occ.speciesLabel,
+    date: d.date,
+  };
+  const optionals = ["notes", "abundance", "cover", "height", "stratum", "phenology", "distance", "bearing", "groupSize", "behavior", "detectionMethod", "methodologyData", "latitude", "longitude"] as const;
+  for (const k of optionals) {
+    const v = d[k as keyof SingleOccurrenceData];
+    if (v) result[k] = String(v);
+  }
+  return result;
 }
 
 // ── Step types ──
@@ -144,31 +169,38 @@ function PendingBadge({ status }: { status: "pending" | "synced" | "error" }) {
   );
 }
 
-// ── Campaign creation form ──
+// ── Campaign creation/edit form ──
 function NewCampaignForm({
   projectId,
   onCreated,
+  onUpdated,
   onCancel,
+  editData,
 }: {
   projectId: string;
   onCreated: (c: SelectedCampaignMeta) => void;
+  onUpdated?: (c: SelectedCampaignMeta) => void;
   onCancel: () => void;
+  editData?: PendingCampaign;
 }) {
-  const [surveyType, setSurveyType] = useState<"FLORA" | "FAUNA">("FLORA");
-  const [methodology, setMethodology] = useState("");
-  const [season, setSeason] = useState<typeof SEASONS[number]>("Verano");
-  const [suffix, setSuffix] = useState("");
-  const [startDate, setStartDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [responsible, setResponsible] = useState("");
+  const parsed = editData ? parseCampaignName(editData.name) : null;
+  const [surveyType, setSurveyType] = useState<"FLORA" | "FAUNA">(
+    editData ? (editData.surveyType as "FLORA" | "FAUNA") : "FLORA"
+  );
+  const [methodology, setMethodology] = useState(editData?.methodology ?? "");
+  const [season, setSeason] = useState<typeof SEASONS[number]>(parsed?.season ?? "Verano");
+  const [suffix, setSuffix] = useState(parsed?.suffix ?? "");
+  const [startDate, setStartDate] = useState(editData?.startDate ?? format(new Date(), "yyyy-MM-dd"));
+  const [endDate, setEndDate] = useState(editData?.endDate ?? format(new Date(), "yyyy-MM-dd"));
+  const [responsible, setResponsible] = useState(editData?.responsible ?? "");
   const [saving, setSaving] = useState(false);
 
   const methodologiesForType = METHODOLOGIES.filter(
     (m) => m.surveyType === surveyType && m.id !== "RESCATE_RELOC"
   );
 
-  // Reset methodology when survey type changes
-  useEffect(() => { setMethodology(""); }, [surveyType]);
+  // Reset methodology when survey type changes (only in create mode)
+  useEffect(() => { if (!editData) setMethodology(""); }, [surveyType]);
 
   async function handleSave() {
     if (!methodology || !startDate || !endDate) {
@@ -181,30 +213,35 @@ function NewCampaignForm({
 
     const year = new Date(startDate).getFullYear();
     const name = suffix.trim() ? `${season} ${year} — ${suffix.trim()}` : `${season} ${year}`;
-    const localKey = generateLocalKey();
 
-    await db.pendingCampaigns.add({
-      localKey,
-      projectId,
-      name,
-      surveyType,
-      methodology,
-      startDate,
-      endDate,
-      responsible: responsible || undefined,
-      createdAt: Date.now(),
-      status: "pending",
-    });
-
-    toast.success("Campaña guardada localmente");
-    onCreated({ localKey, name, surveyType, methodology });
+    if (editData) {
+      await db.pendingCampaigns.update(editData.localId!, {
+        name, surveyType, methodology, startDate, endDate,
+        responsible: responsible || undefined,
+      });
+      toast.success("Campaña actualizada");
+      onUpdated?.({
+        localKey: editData.localKey, name, surveyType, methodology,
+        shermanTrapCount: editData.shermanTrapCount,
+        cameraTrapCount: editData.cameraTrapCount,
+      });
+    } else {
+      const localKey = generateLocalKey();
+      await db.pendingCampaigns.add({
+        localKey, projectId, name, surveyType, methodology, startDate, endDate,
+        responsible: responsible || undefined,
+        createdAt: Date.now(), status: "pending",
+      });
+      toast.success("Campaña guardada localmente");
+      onCreated({ localKey, name, surveyType, methodology });
+    }
     setSaving(false);
   }
 
   return (
     <div className="border border-teal-200 rounded-xl bg-teal-50 p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-teal-800">Nueva campaña offline</p>
+        <p className="text-sm font-semibold text-teal-800">{editData ? "Editar campaña" : "Nueva campaña offline"}</p>
         <button onClick={onCancel} className="text-gray-400 hover:text-gray-600"><X className="h-4 w-4" /></button>
       </div>
 
@@ -276,13 +313,13 @@ function NewCampaignForm({
       </div>
 
       <Button onClick={handleSave} disabled={saving} className="w-full bg-teal-700 hover:bg-teal-800 text-white">
-        {saving ? "Guardando…" : "Guardar campaña"}
+        {saving ? "Guardando…" : editData ? "Actualizar campaña" : "Guardar campaña"}
       </Button>
     </div>
   );
 }
 
-// ── Station creation form ──
+// ── Station creation/edit form ──
 function NewStationForm({
   campaignId,
   campaignLocalKey,
@@ -290,7 +327,9 @@ function NewStationForm({
   realStations,
   pendingStations,
   onCreated,
+  onUpdated,
   onCancel,
+  editData,
 }: {
   campaignId?: string;
   campaignLocalKey?: string;
@@ -298,9 +337,11 @@ function NewStationForm({
   realStations: CachedStation[];
   pendingStations: PendingStation[];
   onCreated: (s: SelectedStationMeta) => void;
+  onUpdated?: (s: SelectedStationMeta) => void;
   onCancel: () => void;
+  editData?: PendingStation;
 }) {
-  const suggestedName = suggestNextStationName(realStations, pendingStations, methodology);
+  const suggestedName = editData ? editData.name : suggestNextStationName(realStations, pendingStations, methodology);
   const [name, setName] = useState(suggestedName);
   const [quantity, setQuantity] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -310,6 +351,14 @@ function NewStationForm({
     setSaving(true);
     const db = getDb();
     if (!db) { toast.error("Error al acceder al almacenamiento local"); setSaving(false); return; }
+
+    if (editData) {
+      await db.pendingStations.update(editData.localId!, { name: name.trim() });
+      toast.success("Réplica actualizada");
+      onUpdated?.({ localKey: editData.localKey, name: name.trim() });
+      setSaving(false);
+      return;
+    }
 
     const type = getStationType(methodology);
     const createdLocalKeys: string[] = [];
@@ -336,7 +385,6 @@ function NewStationForm({
     }
 
     toast.success(`${quantity} réplica${quantity > 1 ? "s" : ""} guardada${quantity > 1 ? "s" : ""} localmente`);
-    // Return the first station for navigation (user can pick others from list)
     const firstKey = createdLocalKeys[0];
     onCreated({ localKey: firstKey, name: name.trim() });
     setSaving(false);
@@ -345,29 +393,33 @@ function NewStationForm({
   return (
     <div className="border border-teal-200 rounded-xl bg-teal-50 p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-teal-800">Nueva réplica offline</p>
+        <p className="text-sm font-semibold text-teal-800">{editData ? "Editar réplica" : "Nueva réplica offline"}</p>
         <button onClick={onCancel} className="text-gray-400 hover:text-gray-600"><X className="h-4 w-4" /></button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className={cn("grid gap-2", editData ? "grid-cols-1" : "grid-cols-2")}>
         <div className="space-y-1">
           <Label className="text-xs">Nombre *</Label>
           <Input value={name} onChange={(e) => setName(e.target.value)} className="bg-white font-mono" />
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Cantidad</Label>
-          <Input type="number" min={1} max={20} value={quantity}
-            onChange={(e) => setQuantity(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
-            className="bg-white" />
-        </div>
+        {!editData && (
+          <div className="space-y-1">
+            <Label className="text-xs">Cantidad</Label>
+            <Input type="number" min={1} max={20} value={quantity}
+              onChange={(e) => setQuantity(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
+              className="bg-white" />
+          </div>
+        )}
       </div>
 
-      <p className="text-xs text-teal-700">
-        Tipo auto: <strong>{getStationType(methodology)}</strong> — prefijo <strong>{getStationPrefix(methodology)}</strong>
-      </p>
+      {!editData && (
+        <p className="text-xs text-teal-700">
+          Tipo auto: <strong>{getStationType(methodology)}</strong> — prefijo <strong>{getStationPrefix(methodology)}</strong>
+        </p>
+      )}
 
       <Button onClick={handleSave} disabled={saving} className="w-full bg-teal-700 hover:bg-teal-800 text-white">
-        {saving ? "Guardando…" : `Guardar réplica${quantity > 1 ? "s" : ""}`}
+        {saving ? "Guardando…" : editData ? "Actualizar réplica" : `Guardar réplica${quantity > 1 ? "s" : ""}`}
       </Button>
     </div>
   );
@@ -393,6 +445,14 @@ export default function OfflineRegistroPage() {
   const [pendingStations, setPendingStations] = useState<PendingStation[]>([]);
   const [selectedStation, setSelectedStation] = useState<SelectedStationMeta | null>(null);
   const [showNewStationForm, setShowNewStationForm] = useState(false);
+
+  // Edit mode for pending items
+  const [editingCampaign, setEditingCampaign] = useState<PendingCampaign | null>(null);
+  const [editingStation, setEditingStation] = useState<PendingStation | null>(null);
+
+  // Pending occurrences for current station (step 4)
+  const [pendingOccurrences, setPendingOccurrences] = useState<PendingOccurrence[]>([]);
+  const [editingOccurrence, setEditingOccurrence] = useState<PendingOccurrence | null>(null);
 
   // Online status
   useEffect(() => {
@@ -451,6 +511,26 @@ export default function OfflineRegistroPage() {
     loadStations(selectedCampaign);
   }, [selectedCampaign, loadStations]);
 
+  // Load pending occurrences when station selected
+  const loadPendingOccurrences = useCallback(async (station: SelectedStationMeta) => {
+    const db = getDb();
+    if (!db) return;
+    let occs: PendingOccurrence[];
+    if (station.localKey) {
+      occs = await db.pendingOccurrences.where("stationLocalKey").equals(station.localKey).toArray();
+    } else if (station.id) {
+      occs = await db.pendingOccurrences.where("stationId").equals(station.id).toArray();
+    } else {
+      occs = [];
+    }
+    setPendingOccurrences(occs.sort((a, b) => b.createdAt - a.createdAt));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedStation) { setPendingOccurrences([]); setEditingOccurrence(null); return; }
+    loadPendingOccurrences(selectedStation);
+  }, [selectedStation, loadPendingOccurrences]);
+
   function goTo(s: Step) {
     if (s === "project") { setSelectedProject(null); setSelectedCampaign(null); setSelectedStation(null); }
     if (s === "campaign") { setSelectedCampaign(null); setSelectedStation(null); }
@@ -458,6 +538,9 @@ export default function OfflineRegistroPage() {
     setStep(s);
     setShowNewCampaignForm(false);
     setShowNewStationForm(false);
+    setEditingCampaign(null);
+    setEditingStation(null);
+    setEditingOccurrence(null);
   }
 
   // ── Render ──
@@ -525,14 +608,23 @@ export default function OfflineRegistroPage() {
 
             {showNewCampaignForm && (
               <NewCampaignForm
+                key={editingCampaign?.localKey ?? "new"}
                 projectId={selectedProject.id}
+                editData={editingCampaign ?? undefined}
                 onCreated={(c) => {
                   setSelectedCampaign(c);
                   setShowNewCampaignForm(false);
+                  setEditingCampaign(null);
                   setStep("station");
                   loadCampaigns(selectedProject.id);
                 }}
-                onCancel={() => setShowNewCampaignForm(false)}
+                onUpdated={(c) => {
+                  if (selectedCampaign?.localKey === editingCampaign?.localKey) setSelectedCampaign(c);
+                  setShowNewCampaignForm(false);
+                  setEditingCampaign(null);
+                  loadCampaigns(selectedProject.id);
+                }}
+                onCancel={() => { setShowNewCampaignForm(false); setEditingCampaign(null); }}
               />
             )}
 
@@ -563,23 +655,31 @@ export default function OfflineRegistroPage() {
               <div className="space-y-2">
                 <p className="text-xs text-gray-400 font-medium">Creadas offline</p>
                 {pendingCampaigns.map((c) => (
-                  <button key={c.localKey}
-                    onClick={() => {
-                      setSelectedCampaign({
-                        localKey: c.localKey, name: c.name, surveyType: c.surveyType,
-                        methodology: c.methodology,
-                        shermanTrapCount: c.shermanTrapCount,
-                        cameraTrapCount: c.cameraTrapCount,
-                      });
-                      setStep("station");
-                    }}
-                    className="w-full text-left p-3 rounded-xl border border-orange-200 bg-orange-50 hover:border-orange-400 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium text-sm text-gray-900">{c.name}</p>
-                      <PendingBadge status={c.status} />
-                    </div>
-                    <p className="text-xs text-gray-400">{c.surveyType} — {c.methodology}</p>
-                  </button>
+                  <div key={c.localKey} className="relative">
+                    <button
+                      onClick={() => {
+                        setSelectedCampaign({
+                          localKey: c.localKey, name: c.name, surveyType: c.surveyType,
+                          methodology: c.methodology,
+                          shermanTrapCount: c.shermanTrapCount,
+                          cameraTrapCount: c.cameraTrapCount,
+                        });
+                        setStep("station");
+                      }}
+                      className="w-full text-left p-3 pr-10 rounded-xl border border-orange-200 bg-orange-50 hover:border-orange-400 transition-colors">
+                      <div className="flex items-center justify-between pr-6">
+                        <p className="font-medium text-sm text-gray-900">{c.name}</p>
+                        <PendingBadge status={c.status} />
+                      </div>
+                      <p className="text-xs text-gray-400">{c.surveyType} — {c.methodology}</p>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEditingCampaign(c); setShowNewCampaignForm(true); }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-teal-600 p-1.5 rounded"
+                      title="Editar campaña">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -612,18 +712,27 @@ export default function OfflineRegistroPage() {
 
             {showNewStationForm && (
               <NewStationForm
+                key={editingStation?.localKey ?? "new"}
                 campaignId={selectedCampaign.id}
                 campaignLocalKey={selectedCampaign.localKey}
                 methodology={selectedCampaign.methodology}
                 realStations={realStations}
                 pendingStations={pendingStations}
+                editData={editingStation ?? undefined}
                 onCreated={(s) => {
                   setSelectedStation(s);
                   setShowNewStationForm(false);
+                  setEditingStation(null);
                   setStep("occurrence");
                   loadStations(selectedCampaign);
                 }}
-                onCancel={() => setShowNewStationForm(false)}
+                onUpdated={(s) => {
+                  if (selectedStation?.localKey === editingStation?.localKey) setSelectedStation(s);
+                  setShowNewStationForm(false);
+                  setEditingStation(null);
+                  loadStations(selectedCampaign);
+                }}
+                onCancel={() => { setShowNewStationForm(false); setEditingStation(null); }}
               />
             )}
 
@@ -648,14 +757,22 @@ export default function OfflineRegistroPage() {
               <div className="space-y-2">
                 <p className="text-xs text-gray-400 font-medium">Creadas offline</p>
                 {pendingStations.map((s) => (
-                  <button key={s.localKey}
-                    onClick={() => { setSelectedStation({ localKey: s.localKey, name: s.name }); setStep("occurrence"); }}
-                    className="w-full text-left p-3 rounded-xl border border-orange-200 bg-orange-50 hover:border-orange-400 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium text-sm text-gray-900 font-mono">{s.name}</p>
-                      <PendingBadge status={s.status} />
-                    </div>
-                  </button>
+                  <div key={s.localKey} className="relative">
+                    <button
+                      onClick={() => { setSelectedStation({ localKey: s.localKey, name: s.name }); setStep("occurrence"); }}
+                      className="w-full text-left p-3 pr-10 rounded-xl border border-orange-200 bg-orange-50 hover:border-orange-400 transition-colors">
+                      <div className="flex items-center justify-between pr-6">
+                        <p className="font-medium text-sm text-gray-900 font-mono">{s.name}</p>
+                        <PendingBadge status={s.status} />
+                      </div>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEditingStation(s); setShowNewStationForm(true); }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-teal-600 p-1.5 rounded"
+                      title="Editar réplica">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -681,7 +798,82 @@ export default function OfflineRegistroPage() {
             </p>
           </div>
 
+          {/* Pending occurrences list */}
+          {pendingOccurrences.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-gray-400 font-medium">
+                Registros guardados en esta réplica ({pendingOccurrences.length})
+              </p>
+              {pendingOccurrences.map((occ) => (
+                <div key={occ.localId}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl px-3 py-2 border",
+                    editingOccurrence?.localId === occ.localId
+                      ? "bg-amber-50 border-amber-300"
+                      : "bg-orange-50 border-orange-200"
+                  )}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate italic">{occ.speciesLabel}</p>
+                    <p className="text-xs text-gray-400">
+                      {occ.payload.kind === "single"
+                        ? occ.payload.data.date
+                        : occ.payload.kind === "grilla"
+                          ? `Grilla · ${occ.payload.data.date}`
+                          : `Sherman · ${occ.payload.data.captures.length} visita${occ.payload.data.captures.length !== 1 ? "s" : ""}`}
+                    </p>
+                  </div>
+                  <div className="flex gap-0.5 shrink-0">
+                    {occ.payload.kind === "single" && (
+                      <button
+                        onClick={() => setEditingOccurrence(
+                          editingOccurrence?.localId === occ.localId ? null : occ
+                        )}
+                        className={cn(
+                          "p-1.5 rounded transition-colors",
+                          editingOccurrence?.localId === occ.localId
+                            ? "text-amber-600 hover:text-amber-700"
+                            : "text-gray-400 hover:text-teal-600"
+                        )}
+                        title="Editar registro">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`¿Eliminar el registro de "${occ.speciesLabel}"?`)) return;
+                        const db = getDb();
+                        if (!db) return;
+                        await db.pendingOccurrences.delete(occ.localId!);
+                        if (editingOccurrence?.localId === occ.localId) setEditingOccurrence(null);
+                        loadPendingOccurrences(selectedStation);
+                      }}
+                      className="text-gray-400 hover:text-red-500 p-1.5 rounded transition-colors"
+                      title="Eliminar registro">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Edit mode banner */}
+          {editingOccurrence && (
+            <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+              <div>
+                <p className="text-xs text-amber-600 font-medium">Modo edición</p>
+                <p className="text-sm text-gray-700 italic truncate">{editingOccurrence.speciesLabel}</p>
+              </div>
+              <button
+                onClick={() => setEditingOccurrence(null)}
+                className="text-gray-400 hover:text-gray-600 ml-3 shrink-0">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
           <OccurrenceForm
+            key={editingOccurrence?.localId ?? "new"}
             projectId={selectedProject.id}
             campaignId={selectedCampaign.id ?? selectedCampaign.localKey ?? "offline"}
             stationId={selectedStation.id ?? "pending"}
@@ -690,6 +882,17 @@ export default function OfflineRegistroPage() {
             methodology={selectedCampaign.methodology}
             shermanTrapCount={selectedCampaign.shermanTrapCount ?? undefined}
             cameraTrapCount={selectedCampaign.cameraTrapCount ?? undefined}
+            defaultValues={editingOccurrence ? pendingOccurrenceToDefaultValues(editingOccurrence) : undefined}
+            onSuccess={async () => {
+              if (editingOccurrence) {
+                const db = getDb();
+                if (db && editingOccurrence.localId != null) {
+                  await db.pendingOccurrences.delete(editingOccurrence.localId);
+                }
+                setEditingOccurrence(null);
+              }
+              loadPendingOccurrences(selectedStation);
+            }}
           />
         </div>
       )}

@@ -110,6 +110,7 @@ interface OccurrenceFormProps {
   shermanTrapCount?: number;
   cameraTrapCount?: number;
   stationLocalKey?: string;   // set when station is pending (offline creation)
+  onSuccess?: () => void;     // called after successful offline save (used by terreno wizard)
 }
 
 function buildTrapOptions(method: string, shermanCount: number, cameraCount: number): string[] {
@@ -132,6 +133,7 @@ export function OccurrenceForm({
   shermanTrapCount,
   cameraTrapCount,
   stationLocalKey,
+  onSuccess,
 }: OccurrenceFormProps) {
   const router = useRouter();
   const isBB = methodology === "BRAUN_BLANQUET";
@@ -403,6 +405,7 @@ export function OccurrenceForm({
     });
     setSessionCount(n => n + 1);
     resetForm();
+    onSuccess?.();
   }
 
   // When station is pending (offline creation), always save offline
