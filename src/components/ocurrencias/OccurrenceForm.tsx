@@ -654,8 +654,8 @@ export function OccurrenceForm({
             </div>
           )}
 
-          {/* Species search — hidden in GRILLA and when trap/camera selected in transecto */}
-          {!isGrilla && !(isTransectoFauna && (tfDetectionMethod === "Trampa Sherman" || tfDetectionMethod === "Cámara trampa")) && (
+          {/* Species search — hidden in GRILLA and when creating a trap/camera record (not when editing) */}
+          {!isGrilla && !(isTransectoFauna && !occurrenceId && (tfDetectionMethod === "Trampa Sherman" || tfDetectionMethod === "Cámara trampa")) && (
             <SpeciesSearch
               query={speciesQuery}
               setQuery={setSpeciesQuery}
