@@ -882,6 +882,7 @@ export default function OfflineRegistroPage() {
             methodology={selectedCampaign.methodology}
             shermanTrapCount={selectedCampaign.shermanTrapCount ?? undefined}
             cameraTrapCount={selectedCampaign.cameraTrapCount ?? undefined}
+            forceOffline={true}
             defaultValues={editingOccurrence ? pendingOccurrenceToDefaultValues(editingOccurrence) : undefined}
             onSuccess={async () => {
               if (editingOccurrence) {

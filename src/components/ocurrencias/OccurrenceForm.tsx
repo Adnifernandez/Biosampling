@@ -111,6 +111,7 @@ interface OccurrenceFormProps {
   cameraTrapCount?: number;
   stationLocalKey?: string;   // set when station is pending (offline creation)
   onSuccess?: () => void;     // called after successful offline save (used by terreno wizard)
+  forceOffline?: boolean;     // always save to Dexie regardless of online status (terreno mode)
 }
 
 function buildTrapOptions(method: string, shermanCount: number, cameraCount: number): string[] {
@@ -134,6 +135,7 @@ export function OccurrenceForm({
   cameraTrapCount,
   stationLocalKey,
   onSuccess,
+  forceOffline,
 }: OccurrenceFormProps) {
   const router = useRouter();
   const isBB = methodology === "BRAUN_BLANQUET";
@@ -408,8 +410,8 @@ export function OccurrenceForm({
     onSuccess?.();
   }
 
-  // When station is pending (offline creation), always save offline
-  const isOfflineStation = !!stationLocalKey;
+  // Save offline when station is pending OR when in terreno wizard mode
+  const isOfflineStation = !!stationLocalKey || !!forceOffline;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
