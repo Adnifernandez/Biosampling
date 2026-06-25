@@ -461,13 +461,14 @@ export default function OfflineRegistroPage() {
   const [editingOccurrence, setEditingOccurrence] = useState<SessionOccurrence | null>(null);
   const formTopRef = useRef<HTMLDivElement>(null);
 
-  // Set of speciesIds already registered this session — used for Flora dedup check
-  const sessionSpeciesIds = useMemo(() =>
-    new Set(
-      sessionOccurrences
-        .filter(o => o.payload.kind === "single")
-        .map(o => (o.payload.data as SingleOccurrenceData).speciesId)
-    ),
+  // Registrations for Transecto Fauna dedup (speciesId + current abundance + localId)
+  const existingRegistrations = useMemo(() =>
+    sessionOccurrences
+      .filter(o => o.payload.kind === "single")
+      .map(o => {
+        const d = o.payload.data as SingleOccurrenceData;
+        return { speciesId: d.speciesId, abundance: d.abundance, localId: o.localId };
+      }),
     [sessionOccurrences]
   );
 
@@ -826,15 +827,27 @@ export default function OfflineRegistroPage() {
             cameraTrapCount={selectedCampaign.cameraTrapCount ?? undefined}
             forceOffline={true}
             defaultValues={editingOccurrence ? sessionOccurrenceToDefaultValues(editingOccurrence) : undefined}
-            existingSpeciesIds={!editingOccurrence ? sessionSpeciesIds : undefined}
-            onRequestEdit={(speciesId) => {
-              const existing = sessionOccurrences.find(
-                o => o.payload.kind === "single" && (o.payload.data as SingleOccurrenceData).speciesId === speciesId
-              );
-              if (existing) {
-                setEditingOccurrence(existing);
-                window.scrollTo({ top: 0, behavior: "smooth" });
+            existingRegistrations={!editingOccurrence && selectedCampaign.methodology === "TRANSECTO_LINEAL_FAUNA" ? existingRegistrations : undefined}
+            onAdjustAbundance={async (localId, newAbundance) => {
+              // Update Dexie record
+              const db = getDb();
+              const existing = await db?.pendingOccurrences.get(localId);
+              if (existing && existing.payload.kind === "single") {
+                const updatedPayload: OccurrencePayload = {
+                  kind: "single",
+                  data: { ...(existing.payload.data as SingleOccurrenceData), abundance: newAbundance },
+                };
+                await db?.pendingOccurrences.update(localId, { payload: updatedPayload });
               }
+              // Update session state
+              setSessionOccurrences(prev => prev.map(o => {
+                if (o.localId !== localId || o.payload.kind !== "single") return o;
+                return {
+                  ...o,
+                  payload: { kind: "single", data: { ...(o.payload.data as SingleOccurrenceData), abundance: newAbundance } },
+                };
+              }));
+              toast.success("Cantidad actualizada");
             }}
             onRegistered={async (label, payload, localId) => {
               if (editingOccurrence) {

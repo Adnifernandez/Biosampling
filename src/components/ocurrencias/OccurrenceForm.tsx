@@ -112,8 +112,9 @@ interface OccurrenceFormProps {
   stationLocalKey?: string;   // set when station is pending (offline creation)
   forceOffline?: boolean;     // always save to Dexie regardless of online status (terreno mode)
   onRegistered?: (label: string, payload: OccurrencePayload, localId: number) => void; // terreno wizard callback
-  existingSpeciesIds?: Set<string>; // Flora dedup: species already registered this session
-  onRequestEdit?: (speciesId: string) => void; // called when user taps "Editar" on a duplicate
+  // Transecto Fauna dedup: list of already-registered species this session
+  existingRegistrations?: { speciesId: string; abundance?: string; localId: number }[];
+  onAdjustAbundance?: (localId: number, newAbundance: string) => Promise<void>;
 }
 
 function buildTrapOptions(method: string, shermanCount: number, cameraCount: number): string[] {
@@ -138,8 +139,8 @@ export function OccurrenceForm({
   stationLocalKey,
   forceOffline,
   onRegistered,
-  existingSpeciesIds,
-  onRequestEdit,
+  existingRegistrations,
+  onAdjustAbundance,
 }: OccurrenceFormProps) {
   const router = useRouter();
   const isBB = methodology === "BRAUN_BLANQUET";
@@ -156,12 +157,12 @@ export function OccurrenceForm({
   const [searching, setSearching] = useState(false);
   const searchSeq = useRef(0);
 
-  // Dedup check — only Flora, only create mode
-  const isDuplicate =
-    surveyType === "FLORA" &&
-    !occurrenceId &&
-    !!existingSpeciesIds?.size &&
-    !!(selectedSpecies?.id && existingSpeciesIds.has(selectedSpecies.id));
+  // Transecto Fauna dedup: find existing registration for the selected species
+  const duplicateEntry =
+    isTransectoFauna && !occurrenceId && selectedSpecies?.id
+      ? (existingRegistrations ?? []).find(r => r.speciesId === selectedSpecies.id)
+      : undefined;
+  const isDuplicate = !!duplicateEntry;
 
   // Common
   const [date, setDate] = useState(defaultValues?.date ?? format(new Date(), "yyyy-MM-dd"));
@@ -205,6 +206,8 @@ export function OccurrenceForm({
   const [tfLat, setTfLat] = useState<number | null>(null);
   const [tfLng, setTfLng] = useState<number | null>(null);
   const [tfAbundance, setTfAbundance] = useState("");
+  // Inline abundance adjuster shown when a duplicate species is detected
+  const [adjustAbundance, setAdjustAbundance] = useState("");
   const [shermanCaptures, setShermanCaptures] = useState<{ date: string; abundance: string }[]>([
     { date: format(new Date(), "yyyy-MM-dd"), abundance: "" },
   ]);
@@ -261,6 +264,11 @@ export function OccurrenceForm({
     }
     setFieldValues(loaded);
   }, []);
+
+  // Sync abundance adjuster when duplicate entry changes
+  useEffect(() => {
+    setAdjustAbundance(duplicateEntry?.abundance ?? "");
+  }, [duplicateEntry?.localId]);
 
   // Pre-populate UTM from transecto station coordinates (GRILLA)
   useEffect(() => {
@@ -428,12 +436,10 @@ export function OccurrenceForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    // Block duplicate Flora registration
+    // Block duplicate Transecto Fauna registration — user must use the abundance adjuster above
     if (isDuplicate) {
-      toast.error("Especie ya registrada", {
-        description: isForestal
-          ? "Edita el registro existente para agregar otro individuo."
-          : "Solo se permite un registro por especie en esta estación.",
+      toast.error("Especie ya registrada en este transecto", {
+        description: "Ajusta la cantidad en el aviso amarillo.",
       });
       return;
     }
@@ -695,27 +701,54 @@ export function OccurrenceForm({
             />
           )}
 
-          {/* Flora duplicate warning */}
-          {isDuplicate && (
-            <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
-              <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-amber-800">Esta especie ya está registrada</p>
-                <p className="text-xs text-amber-600 mt-0.5">
-                  {isForestal
-                    ? "Edita el registro existente para agregar otro individuo."
-                    : "Solo se permite un registro por especie en esta estación."}
-                </p>
+          {/* Transecto Fauna duplicate warning — shows abundance adjuster */}
+          {isDuplicate && duplicateEntry && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-3 space-y-2.5">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800">Esta especie ya está registrada</p>
+                  <p className="text-xs text-amber-600">
+                    Actualmente: <span className="font-semibold">{duplicateEntry.abundance ?? "—"} individuo{Number(duplicateEntry.abundance) !== 1 ? "s" : ""}</span>
+                  </p>
+                </div>
               </div>
-              {onRequestEdit && selectedSpecies && (
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-amber-700 font-medium shrink-0">Nueva cantidad:</label>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setAdjustAbundance(String(Math.max(1, Number(adjustAbundance || 0) - 1)))}
+                    className="w-7 h-7 rounded-lg border border-amber-300 bg-white text-amber-700 font-bold text-sm flex items-center justify-center"
+                  >−</button>
+                  <input
+                    type="number"
+                    min={1}
+                    value={adjustAbundance}
+                    onChange={e => setAdjustAbundance(e.target.value)}
+                    className="w-14 h-7 text-center text-sm border border-amber-300 rounded-lg bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setAdjustAbundance(String(Number(adjustAbundance || 0) + 1))}
+                    className="w-7 h-7 rounded-lg border border-amber-300 bg-white text-amber-700 font-bold text-sm flex items-center justify-center"
+                  >+</button>
+                </div>
                 <button
                   type="button"
-                  onClick={() => onRequestEdit(selectedSpecies.id)}
-                  className="shrink-0 text-xs font-semibold text-amber-700 underline whitespace-nowrap"
+                  disabled={!adjustAbundance || !onAdjustAbundance}
+                  onClick={async () => {
+                    if (!adjustAbundance || !onAdjustAbundance) return;
+                    await onAdjustAbundance(duplicateEntry.localId, adjustAbundance);
+                    setSelectedSpecies(null);
+                    setSpeciesQuery("");
+                    setSpeciesList([]);
+                  }}
+                  className="ml-auto px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold disabled:opacity-40"
                 >
-                  {isForestal ? "Editar y agregar" : "Editar registro"}
+                  Actualizar
                 </button>
-              )}
+              </div>
             </div>
           )}
 
