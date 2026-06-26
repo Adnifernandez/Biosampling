@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -24,8 +25,9 @@ export default async function NuevaOcurrenciaPage({
 
   const isGrilla = station.campaign.methodology === "GRILLA";
   const isBB = station.campaign.methodology === "BRAUN_BLANQUET";
+  const isTransectoFauna = station.campaign.methodology === "TRANSECTO_LINEAL_FAUNA";
 
-  const [transectoStation, bbOccurrences] = await Promise.all([
+  const [transectoStation, bbOccurrences, transectoOccurrences] = await Promise.all([
     isGrilla && station.parentId
       ? prisma.station.findUnique({
           where: { id: station.parentId },
@@ -35,9 +37,26 @@ export default async function NuevaOcurrenciaPage({
     isBB
       ? prisma.occurrence.findMany({ where: { stationId }, select: { speciesId: true } })
       : Promise.resolve([]),
+    isTransectoFauna
+      ? prisma.occurrence.findMany({ where: { stationId }, select: { id: true, speciesId: true, abundance: true } })
+      : Promise.resolve([]),
   ]);
 
   const existingBBSpeciesIds = bbOccurrences.map(o => o.speciesId);
+  const existingTransectoRegistrations = transectoOccurrences.map(o => ({
+    speciesId: o.speciesId,
+    abundance: o.abundance ?? undefined,
+    key: o.id,
+  }));
+
+  async function adjustTransectoAbundance(key: string, newAbundance: string) {
+    "use server";
+    await prisma.occurrence.update({
+      where: { id: key },
+      data: { abundance: newAbundance },
+    });
+    revalidatePath("/ocurrencias");
+  }
 
   return (
     <div className="max-w-xl space-y-5">
@@ -65,6 +84,8 @@ export default async function NuevaOcurrenciaPage({
         shermanTrapCount={station.campaign.shermanTrapCount ?? 0}
         cameraTrapCount={station.campaign.cameraTrapCount ?? 0}
         existingBBSpeciesIds={existingBBSpeciesIds.length > 0 ? existingBBSpeciesIds : undefined}
+        existingRegistrations={existingTransectoRegistrations.length > 0 ? existingTransectoRegistrations : undefined}
+        onAdjustAbundance={existingTransectoRegistrations.length > 0 ? adjustTransectoAbundance : undefined}
       />
     </div>
   );

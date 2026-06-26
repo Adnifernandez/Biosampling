@@ -468,7 +468,7 @@ export default function OfflineRegistroPage() {
       .filter(o => o.payload.kind === "single")
       .map(o => {
         const d = o.payload.data as SingleOccurrenceData;
-        return { speciesId: d.speciesId, abundance: d.abundance, localId: o.localId };
+        return { speciesId: d.speciesId, abundance: d.abundance, key: String(o.localId) };
       }),
     [sessionOccurrences]
   );
@@ -869,7 +869,8 @@ export default function OfflineRegistroPage() {
             defaultValues={editingOccurrence ? sessionOccurrenceToDefaultValues(editingOccurrence) : undefined}
             existingRegistrations={!editingOccurrence && selectedCampaign.methodology === "TRANSECTO_LINEAL_FAUNA" ? existingRegistrations : undefined}
             existingBBSpeciesIds={!editingOccurrence && allBBSpeciesIds.length > 0 ? allBBSpeciesIds : undefined}
-            onAdjustAbundance={async (localId, newAbundance) => {
+            onAdjustAbundance={async (key, newAbundance) => {
+              const localId = parseInt(key);
               // Update Dexie record
               const db = getDb();
               const existing = await db?.pendingOccurrences.get(localId);

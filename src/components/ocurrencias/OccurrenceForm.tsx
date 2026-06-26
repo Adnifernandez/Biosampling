@@ -112,9 +112,10 @@ interface OccurrenceFormProps {
   stationLocalKey?: string;   // set when station is pending (offline creation)
   forceOffline?: boolean;     // always save to Dexie regardless of online status (terreno mode)
   onRegistered?: (label: string, payload: OccurrencePayload, localId: number) => void; // terreno wizard callback
-  // Transecto Fauna dedup: list of already-registered species this session
-  existingRegistrations?: { speciesId: string; abundance?: string; localId: number }[];
-  onAdjustAbundance?: (localId: number, newAbundance: string) => Promise<void>;
+  // Transecto Fauna dedup: list of already-registered species this session/station
+  // key = String(localId) in Terreno mode, occurrenceId in regular tab
+  existingRegistrations?: { speciesId: string; abundance?: string; key: string }[];
+  onAdjustAbundance?: (key: string, newAbundance: string) => Promise<void>;
   // BB dedup: speciesIds already registered in this station (from server or session)
   existingBBSpeciesIds?: string[];
 }
@@ -160,10 +161,14 @@ export function OccurrenceForm({
   const [searching, setSearching] = useState(false);
   const searchSeq = useRef(0);
 
+  // Local copy of registrations so abundance updates reflect immediately in the banner
+  const [localRegistrations, setLocalRegistrations] = useState(existingRegistrations ?? []);
+  useEffect(() => { setLocalRegistrations(existingRegistrations ?? []); }, [existingRegistrations]);
+
   // Transecto Fauna dedup: find existing registration for the selected species
   const duplicateEntry =
     isTransectoFauna && !occurrenceId && selectedSpecies?.id
-      ? (existingRegistrations ?? []).find(r => r.speciesId === selectedSpecies.id)
+      ? localRegistrations.find(r => r.speciesId === selectedSpecies.id)
       : undefined;
   const isDuplicate = !!duplicateEntry;
 
@@ -754,7 +759,11 @@ export function OccurrenceForm({
                   disabled={!adjustAbundance || !onAdjustAbundance}
                   onClick={async () => {
                     if (!adjustAbundance || !onAdjustAbundance) return;
-                    await onAdjustAbundance(duplicateEntry.localId, adjustAbundance);
+                    await onAdjustAbundance(duplicateEntry.key, adjustAbundance);
+                    // Update local state so banner reflects new quantity immediately
+                    setLocalRegistrations(prev =>
+                      prev.map(r => r.key === duplicateEntry.key ? { ...r, abundance: adjustAbundance } : r)
+                    );
                     setSelectedSpecies(null);
                     setSpeciesQuery("");
                     setSpeciesList([]);
