@@ -472,6 +472,16 @@ export default function OfflineRegistroPage() {
     [sessionOccurrences]
   );
 
+  // Species already registered this session for BB dedup
+  const sessionBBSpeciesIds = useMemo(() =>
+    selectedCampaign?.methodology === "BRAUN_BLANQUET"
+      ? sessionOccurrences
+          .filter(o => o.payload.kind === "single")
+          .map(o => (o.payload.data as SingleOccurrenceData).speciesId)
+      : [],
+    [sessionOccurrences, selectedCampaign?.methodology]
+  );
+
   // Online status
   useEffect(() => {
     setIsOnline(navigator.onLine);
@@ -828,6 +838,7 @@ export default function OfflineRegistroPage() {
             forceOffline={true}
             defaultValues={editingOccurrence ? sessionOccurrenceToDefaultValues(editingOccurrence) : undefined}
             existingRegistrations={!editingOccurrence && selectedCampaign.methodology === "TRANSECTO_LINEAL_FAUNA" ? existingRegistrations : undefined}
+            existingBBSpeciesIds={!editingOccurrence && sessionBBSpeciesIds.length > 0 ? sessionBBSpeciesIds : undefined}
             onAdjustAbundance={async (localId, newAbundance) => {
               // Update Dexie record
               const db = getDb();

@@ -115,6 +115,8 @@ interface OccurrenceFormProps {
   // Transecto Fauna dedup: list of already-registered species this session
   existingRegistrations?: { speciesId: string; abundance?: string; localId: number }[];
   onAdjustAbundance?: (localId: number, newAbundance: string) => Promise<void>;
+  // BB dedup: speciesIds already registered in this station (from server or session)
+  existingBBSpeciesIds?: string[];
 }
 
 function buildTrapOptions(method: string, shermanCount: number, cameraCount: number): string[] {
@@ -141,6 +143,7 @@ export function OccurrenceForm({
   onRegistered,
   existingRegistrations,
   onAdjustAbundance,
+  existingBBSpeciesIds,
 }: OccurrenceFormProps) {
   const router = useRouter();
   const isBB = methodology === "BRAUN_BLANQUET";
@@ -163,6 +166,12 @@ export function OccurrenceForm({
       ? (existingRegistrations ?? []).find(r => r.speciesId === selectedSpecies.id)
       : undefined;
   const isDuplicate = !!duplicateEntry;
+
+  // BB dedup: species already registered in this station (blocks new registration)
+  const isBBDuplicate =
+    isBB && !occurrenceId &&
+    !!existingBBSpeciesIds?.length &&
+    !!(selectedSpecies?.id && existingBBSpeciesIds.includes(selectedSpecies.id));
 
   // Common
   const [date, setDate] = useState(defaultValues?.date ?? format(new Date(), "yyyy-MM-dd"));
@@ -441,6 +450,12 @@ export function OccurrenceForm({
       toast.error("Especie ya registrada en este transecto", {
         description: "Ajusta la cantidad en el aviso amarillo.",
       });
+      return;
+    }
+
+    // Block duplicate BB registration
+    if (isBBDuplicate) {
+      toast.error("Especie ya registrada en esta parcela");
       return;
     }
 
@@ -748,6 +763,17 @@ export function OccurrenceForm({
                 >
                   Actualizar
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* BB duplicate warning — blocks registration */}
+          {isBBDuplicate && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+              <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-red-800">Esta especie ya está registrada en la parcela</p>
+                <p className="text-xs text-red-600 mt-0.5">En Braun-Blanquet solo se puede registrar una vez por especie por parcela.</p>
               </div>
             </div>
           )}
