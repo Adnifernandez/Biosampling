@@ -256,6 +256,14 @@ export async function updateTransectoCoordinates(
   return { success: true };
 }
 
+export async function getStationBBSpeciesIds(stationId: string): Promise<string[]> {
+  const rows = await prisma.occurrence.findMany({
+    where: { stationId },
+    select: { speciesId: true },
+  });
+  return rows.map(r => r.speciesId);
+}
+
 export async function searchSpecies(query: string, surveyType: string) {
   const pattern = `%${query}%`;
   return prisma.$queryRaw<Array<{

@@ -13,6 +13,7 @@ import { WifiOff, Wifi, ArrowLeft, Plus, ChevronRight, CheckCircle2, Clock, Aler
 import { METHODOLOGIES } from "@/lib/methodologies";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { getStationBBSpeciesIds } from "@/app/(app)/proyectos/[id]/campanas/[cid]/estaciones/[sid]/ocurrencias/actions";
 import { cn } from "@/lib/utils";
 
 const OccurrenceForm = dynamic(
@@ -482,6 +483,24 @@ export default function OfflineRegistroPage() {
     [sessionOccurrences, selectedCampaign?.methodology]
   );
 
+  // Species already in server DB for this station (BB only, real stations only)
+  const [serverBBSpeciesIds, setServerBBSpeciesIds] = useState<string[]>([]);
+  useEffect(() => {
+    if (step !== "occurrence" || selectedCampaign?.methodology !== "BRAUN_BLANQUET" || !selectedStation?.id) {
+      setServerBBSpeciesIds([]);
+      return;
+    }
+    getStationBBSpeciesIds(selectedStation.id)
+      .then(ids => setServerBBSpeciesIds(ids))
+      .catch(() => {}); // silently fail if offline
+  }, [step, selectedCampaign?.methodology, selectedStation?.id]);
+
+  // Combined list: server + session (deduplicated)
+  const allBBSpeciesIds = useMemo(() =>
+    [...new Set([...serverBBSpeciesIds, ...sessionBBSpeciesIds])],
+    [serverBBSpeciesIds, sessionBBSpeciesIds]
+  );
+
   // Online status
   useEffect(() => {
     setIsOnline(navigator.onLine);
@@ -838,7 +857,7 @@ export default function OfflineRegistroPage() {
             forceOffline={true}
             defaultValues={editingOccurrence ? sessionOccurrenceToDefaultValues(editingOccurrence) : undefined}
             existingRegistrations={!editingOccurrence && selectedCampaign.methodology === "TRANSECTO_LINEAL_FAUNA" ? existingRegistrations : undefined}
-            existingBBSpeciesIds={!editingOccurrence && sessionBBSpeciesIds.length > 0 ? sessionBBSpeciesIds : undefined}
+            existingBBSpeciesIds={!editingOccurrence && allBBSpeciesIds.length > 0 ? allBBSpeciesIds : undefined}
             onAdjustAbundance={async (localId, newAbundance) => {
               // Update Dexie record
               const db = getDb();
