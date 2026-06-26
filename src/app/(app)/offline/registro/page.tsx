@@ -13,7 +13,7 @@ import { WifiOff, Wifi, ArrowLeft, Plus, ChevronRight, CheckCircle2, Clock, Aler
 import { METHODOLOGIES } from "@/lib/methodologies";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { getStationBBSpeciesIds } from "@/app/(app)/proyectos/[id]/campanas/[cid]/estaciones/[sid]/ocurrencias/actions";
+import { getStationBBSpeciesIds, getStationTransectoRegistrations, updateTransectoOccurrenceAbundance } from "@/app/(app)/proyectos/[id]/campanas/[cid]/estaciones/[sid]/ocurrencias/actions";
 import { cn } from "@/lib/utils";
 
 const OccurrenceForm = dynamic(
@@ -94,6 +94,8 @@ function sessionOccurrenceToDefaultValues(occ: SessionOccurrence): Record<string
 
 // ── Step types ──
 type Step = "project" | "campaign" | "station" | "occurrence";
+
+type TfReg = { speciesId: string; abundance?: string; key: string };
 
 interface SelectedCampaignMeta {
   id?: string;          // real server ID
@@ -512,6 +514,40 @@ export default function OfflineRegistroPage() {
     [serverBBSpeciesIds, sessionBBSpeciesIds]
   );
 
+  // Species already in server DB for this station (Transecto Fauna only, real stations only)
+  // Cached in localStorage so dedup works when going offline mid-session
+  // key = "srv-{occurrenceId}" for server entries; numeric string for session entries
+  const [serverTransectoRegistrations, setServerTransectoRegistrations] = useState<TfReg[]>([]);
+  useEffect(() => {
+    if (step !== "occurrence" || selectedCampaign?.methodology !== "TRANSECTO_LINEAL_FAUNA" || !selectedStation?.id) {
+      setServerTransectoRegistrations([]);
+      return;
+    }
+    const cacheKey = `tf-regs-${selectedStation.id}`;
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) setServerTransectoRegistrations(JSON.parse(cached));
+    } catch {}
+    getStationTransectoRegistrations(selectedStation.id)
+      .then(rows => {
+        const regs: TfReg[] = rows.map(r => ({
+          speciesId: r.speciesId,
+          abundance: r.abundance ?? undefined,
+          key: `srv-${r.id}`,
+        }));
+        setServerTransectoRegistrations(regs);
+        try { localStorage.setItem(cacheKey, JSON.stringify(regs)); } catch {}
+      })
+      .catch(() => {});
+  }, [step, selectedCampaign?.methodology, selectedStation?.id]);
+
+  // Combined: session first (they take precedence), then server ones not already in session
+  const allTransectoRegistrations = useMemo<TfReg[]>(() => {
+    const sessionSpeciesIds = new Set(existingRegistrations.map(r => r.speciesId));
+    const serverOnly = serverTransectoRegistrations.filter(r => !sessionSpeciesIds.has(r.speciesId));
+    return [...existingRegistrations, ...serverOnly];
+  }, [existingRegistrations, serverTransectoRegistrations]);
+
   // Online status
   useEffect(() => {
     setIsOnline(navigator.onLine);
@@ -867,11 +903,36 @@ export default function OfflineRegistroPage() {
             cameraTrapCount={selectedCampaign.cameraTrapCount ?? undefined}
             forceOffline={true}
             defaultValues={editingOccurrence ? sessionOccurrenceToDefaultValues(editingOccurrence) : undefined}
-            existingRegistrations={!editingOccurrence && selectedCampaign.methodology === "TRANSECTO_LINEAL_FAUNA" ? existingRegistrations : undefined}
+            existingRegistrations={!editingOccurrence && selectedCampaign.methodology === "TRANSECTO_LINEAL_FAUNA" ? allTransectoRegistrations : undefined}
             existingBBSpeciesIds={!editingOccurrence && allBBSpeciesIds.length > 0 ? allBBSpeciesIds : undefined}
             onAdjustAbundance={async (key, newAbundance) => {
+              // Server-registered occurrence (key = "srv-{occurrenceId}")
+              if (key.startsWith("srv-")) {
+                const occurrenceId = key.slice(4);
+                try {
+                  await updateTransectoOccurrenceAbundance(occurrenceId, newAbundance);
+                  // Update localStorage cache
+                  if (selectedStation?.id) {
+                    try {
+                      const cacheKey = `tf-regs-${selectedStation.id}`;
+                      const cached: TfReg[] = JSON.parse(localStorage.getItem(cacheKey) ?? "[]");
+                      localStorage.setItem(cacheKey, JSON.stringify(
+                        cached.map(r => r.key === key ? { ...r, abundance: newAbundance } : r)
+                      ));
+                    } catch {}
+                  }
+                  setServerTransectoRegistrations(prev =>
+                    prev.map(r => r.key === key ? { ...r, abundance: newAbundance } : r)
+                  );
+                  toast.success("Cantidad actualizada");
+                } catch {
+                  toast.error("Sin conexión — no se puede actualizar este registro");
+                  throw; // Prevents OccurrenceForm from updating its local state
+                }
+                return;
+              }
+              // Session/Dexie-registered occurrence (key = String(localId))
               const localId = parseInt(key);
-              // Update Dexie record
               const db = getDb();
               const existing = await db?.pendingOccurrences.get(localId);
               if (existing && existing.payload.kind === "single") {
@@ -881,7 +942,6 @@ export default function OfflineRegistroPage() {
                 };
                 await db?.pendingOccurrences.update(localId, { payload: updatedPayload });
               }
-              // Update session state
               setSessionOccurrences(prev => prev.map(o => {
                 if (o.localId !== localId || o.payload.kind !== "single") return o;
                 return {
@@ -913,6 +973,21 @@ export default function OfflineRegistroPage() {
                   const cached: string[] = JSON.parse(localStorage.getItem(cacheKey) ?? "[]");
                   if (!cached.includes(speciesId)) {
                     localStorage.setItem(cacheKey, JSON.stringify([...cached, speciesId]));
+                  }
+                } catch {}
+              }
+              // Keep Transecto Fauna localStorage cache fresh (same principle as BB)
+              if (selectedCampaign.methodology === "TRANSECTO_LINEAL_FAUNA" && selectedStation?.id && payload.kind === "single") {
+                const speciesId = (payload.data as SingleOccurrenceData).speciesId;
+                const abundance = (payload.data as SingleOccurrenceData).abundance;
+                try {
+                  const cacheKey = `tf-regs-${selectedStation.id}`;
+                  const cached: TfReg[] = JSON.parse(localStorage.getItem(cacheKey) ?? "[]");
+                  if (!cached.some(r => r.speciesId === speciesId)) {
+                    localStorage.setItem(cacheKey, JSON.stringify([
+                      ...cached,
+                      { speciesId, abundance, key: String(localId) },
+                    ]));
                   }
                 } catch {}
               }

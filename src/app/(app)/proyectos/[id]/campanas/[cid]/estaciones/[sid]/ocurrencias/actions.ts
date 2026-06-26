@@ -264,6 +264,31 @@ export async function getStationBBSpeciesIds(stationId: string): Promise<string[
   return rows.map(r => r.speciesId);
 }
 
+export async function getStationTransectoRegistrations(
+  stationId: string
+): Promise<{ id: string; speciesId: string; abundance: string | null }[]> {
+  const rows = await prisma.occurrence.findMany({
+    where: { stationId },
+    select: { id: true, speciesId: true, abundance: true },
+  });
+  return rows.map(r => ({
+    id: r.id,
+    speciesId: r.speciesId,
+    abundance: r.abundance != null ? String(r.abundance) : null,
+  }));
+}
+
+export async function updateTransectoOccurrenceAbundance(
+  id: string,
+  newAbundance: string
+): Promise<void> {
+  await prisma.occurrence.update({
+    where: { id },
+    data: { abundance: newAbundance ? parseInt(newAbundance) : null },
+  });
+  revalidatePath("/ocurrencias");
+}
+
 export async function searchSpecies(query: string, surveyType: string) {
   const pattern = `%${query}%`;
   return prisma.$queryRaw<Array<{
