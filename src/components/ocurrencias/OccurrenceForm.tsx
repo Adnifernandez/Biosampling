@@ -282,7 +282,7 @@ export function OccurrenceForm({
   // Sync abundance adjuster when duplicate entry changes
   useEffect(() => {
     setAdjustAbundance(duplicateEntry?.abundance ?? "");
-  }, [duplicateEntry?.localId]);
+  }, [duplicateEntry?.key]);
 
   // Pre-populate UTM from transecto station coordinates (GRILLA)
   useEffect(() => {
