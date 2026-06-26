@@ -484,15 +484,26 @@ export default function OfflineRegistroPage() {
   );
 
   // Species already in server DB for this station (BB only, real stations only)
+  // Cached in localStorage so it survives going offline mid-session
   const [serverBBSpeciesIds, setServerBBSpeciesIds] = useState<string[]>([]);
   useEffect(() => {
     if (step !== "occurrence" || selectedCampaign?.methodology !== "BRAUN_BLANQUET" || !selectedStation?.id) {
       setServerBBSpeciesIds([]);
       return;
     }
+    const cacheKey = `bb-species-${selectedStation.id}`;
+    // Apply cached value immediately so it's available before the network call
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) setServerBBSpeciesIds(JSON.parse(cached));
+    } catch {}
+    // Try to refresh from server; if offline, the cached value above stays
     getStationBBSpeciesIds(selectedStation.id)
-      .then(ids => setServerBBSpeciesIds(ids))
-      .catch(() => {}); // silently fail if offline
+      .then(ids => {
+        setServerBBSpeciesIds(ids);
+        try { localStorage.setItem(cacheKey, JSON.stringify(ids)); } catch {}
+      })
+      .catch(() => {});
   }, [step, selectedCampaign?.methodology, selectedStation?.id]);
 
   // Combined list: server + session (deduplicated)
@@ -892,6 +903,17 @@ export default function OfflineRegistroPage() {
               } else {
                 // New registration: prepend to list
                 setSessionOccurrences(prev => [{ localId, speciesLabel: label, payload }, ...prev]);
+              }
+              // Keep BB localStorage cache fresh so the dedup works after going offline
+              if (selectedCampaign.methodology === "BRAUN_BLANQUET" && selectedStation?.id && payload.kind === "single") {
+                const speciesId = (payload.data as SingleOccurrenceData).speciesId;
+                try {
+                  const cacheKey = `bb-species-${selectedStation.id}`;
+                  const cached: string[] = JSON.parse(localStorage.getItem(cacheKey) ?? "[]");
+                  if (!cached.includes(speciesId)) {
+                    localStorage.setItem(cacheKey, JSON.stringify([...cached, speciesId]));
+                  }
+                } catch {}
               }
             }}
           />
