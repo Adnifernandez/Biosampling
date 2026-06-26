@@ -45,7 +45,7 @@ export default async function NuevaOcurrenciaPage({
   const existingBBSpeciesIds = bbOccurrences.map(o => o.speciesId);
   const existingTransectoRegistrations = transectoOccurrences.map(o => ({
     speciesId: o.speciesId,
-    abundance: o.abundance ?? undefined,
+    abundance: o.abundance != null ? String(o.abundance) : undefined,
     key: o.id,
   }));
 
@@ -53,7 +53,7 @@ export default async function NuevaOcurrenciaPage({
     "use server";
     await prisma.occurrence.update({
       where: { id: key },
-      data: { abundance: newAbundance },
+      data: { abundance: newAbundance ? parseInt(newAbundance) : null },
     });
     revalidatePath("/ocurrencias");
   }
