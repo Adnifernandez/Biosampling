@@ -201,7 +201,11 @@ function NewCampaignForm({
   const [suffix, setSuffix] = useState(parsed?.suffix ?? "");
   const [startDate, setStartDate] = useState(editData?.startDate ?? format(new Date(), "yyyy-MM-dd"));
   const [endDate, setEndDate] = useState(editData?.endDate ?? format(new Date(), "yyyy-MM-dd"));
-  const [responsible, setResponsible] = useState(editData?.responsible ?? "");
+  const [responsibles, setResponsibles] = useState<string[]>(
+    editData?.responsible ? editData.responsible.split(", ").filter(Boolean) : []
+  );
+  const [personQuery, setPersonQuery] = useState("");
+  const [personOpen, setPersonOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const methodologiesForType = METHODOLOGIES.filter(
@@ -226,7 +230,7 @@ function NewCampaignForm({
     if (editData) {
       await db.pendingCampaigns.update(editData.localId!, {
         name, surveyType, methodology, startDate, endDate,
-        responsible: responsible || undefined,
+        responsible: responsibles.length > 0 ? responsibles.join(", ") : undefined,
       });
       toast.success("Campaña actualizada");
       onUpdated?.({
@@ -238,7 +242,7 @@ function NewCampaignForm({
       const localKey = generateLocalKey();
       await db.pendingCampaigns.add({
         localKey, projectId, name, surveyType, methodology, startDate, endDate,
-        responsible: responsible || undefined,
+        responsible: responsibles.length > 0 ? responsibles.join(", ") : undefined,
         createdAt: Date.now(), status: "pending",
       });
       toast.success("Campaña guardada localmente");
@@ -310,15 +314,44 @@ function NewCampaignForm({
         </div>
       </div>
 
-      {/* Responsible */}
+      {/* Responsible — multi-select */}
       <div className="space-y-1">
-        <Label className="text-xs">Responsable</Label>
-        <Select value={responsible} onValueChange={(v) => v && setResponsible(v)}>
-          <SelectTrigger className="bg-white"><SelectValue placeholder="Opcional…" /></SelectTrigger>
-          <SelectContent>
-            {RESPONSIBLE_PERSONS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <Label className="text-xs">Responsables</Label>
+        {responsibles.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {responsibles.map(p => (
+              <span key={p} className="inline-flex items-center gap-1 bg-teal-50 border border-teal-200 text-teal-900 text-xs font-medium px-2 py-0.5 rounded-full">
+                {p}
+                <button type="button" onClick={() => setResponsibles(prev => prev.filter(r => r !== p))}
+                  className="text-teal-500 hover:text-red-500 leading-none">×</button>
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="relative">
+          <Input
+            className="bg-white text-xs h-8"
+            placeholder="Agregar responsable…"
+            value={personQuery}
+            onChange={(e) => setPersonQuery(e.target.value)}
+            onFocus={() => setPersonOpen(true)}
+            onBlur={() => setTimeout(() => setPersonOpen(false), 150)}
+          />
+        </div>
+        {personOpen && (
+          <div className="border rounded-lg max-h-44 overflow-y-auto divide-y bg-white shadow-sm">
+            {RESPONSIBLE_PERSONS
+              .filter(p => !responsibles.includes(p) && (!personQuery || p.toLowerCase().includes(personQuery.toLowerCase())))
+              .map(p => (
+                <button key={p} type="button"
+                  className="w-full text-left px-3 py-2 hover:bg-teal-50 text-xs"
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => { setResponsibles(prev => [...prev, p]); setPersonQuery(""); setPersonOpen(false); }}>
+                  {p}
+                </button>
+              ))}
+          </div>
+        )}
       </div>
 
       <Button onClick={handleSave} disabled={saving} className="w-full bg-teal-700 hover:bg-teal-800 text-white">

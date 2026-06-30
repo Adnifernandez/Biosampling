@@ -68,7 +68,9 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
   const [suffix, setSuffix] = useState(parsed.suffix);
   const [surveyType, setSurveyType] = useState<"FLORA" | "FAUNA">(defaultValues?.surveyType ?? "FLORA");
   const [methodology, setMethodology] = useState(defaultValues?.methodology ?? "");
-  const [responsible, setResponsible] = useState(defaultValues?.responsible ?? "");
+  const [responsibles, setResponsibles] = useState<string[]>(
+    defaultValues?.responsible ? defaultValues.responsible.split(", ").filter(Boolean) : []
+  );
   const [personQuery, setPersonQuery] = useState("");
   const [personOpen, setPersonOpen] = useState(false);
   const [shermanTrapCount, setShermanTrapCount] = useState(defaultValues?.shermanTrapCount ?? "");
@@ -102,7 +104,7 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
     fd.set("season", season);
     fd.set("surveyType", surveyType);
     fd.set("methodology", methodology);
-    fd.set("responsible", responsible);
+    fd.set("responsible", responsibles.join(", "));
     fd.set("shermanTrapCount", shermanTrapCount || "0");
     fd.set("cameraTrapCount", cameraTrapCount || "0");
 
@@ -290,39 +292,45 @@ export function NuevaCampanaForm({ projects, preselectedProject, campaignId, def
             </div>
           )}
 
-          {/* Persona responsable */}
+          {/* Personas responsables — multi-select */}
           <div className="space-y-1.5">
-            <Label>Persona responsable <span className="text-gray-400 text-xs font-normal">(opcional)</span></Label>
-            {responsible ? (
-              <div className="flex items-center justify-between bg-teal-50 rounded-lg px-3 py-2 border border-teal-200">
-                <span className="text-sm font-medium text-teal-900">{responsible}</span>
-                <button type="button" className="text-xs text-red-500 hover:text-red-700 ml-3"
-                  onClick={() => { setResponsible(""); setPersonQuery(""); }}>
-                  Cambiar
-                </button>
+            <Label>Personas responsables <span className="text-gray-400 text-xs font-normal">(opcional)</span></Label>
+            {/* Selected chips */}
+            {responsibles.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {responsibles.map(p => (
+                  <span key={p} className="inline-flex items-center gap-1 bg-teal-50 border border-teal-200 text-teal-900 text-xs font-medium px-2.5 py-1 rounded-full">
+                    {p}
+                    <button type="button" onClick={() => setResponsibles(prev => prev.filter(r => r !== p))}
+                      className="text-teal-500 hover:text-red-500 ml-0.5 leading-none">×</button>
+                  </span>
+                ))}
               </div>
-            ) : (
-              <>
-                <div className="relative">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                  <Input className="pl-9" placeholder="Buscar persona..." value={personQuery}
-                    onChange={(e) => setPersonQuery(e.target.value)}
-                    onFocus={() => setPersonOpen(true)}
-                    onBlur={() => setTimeout(() => setPersonOpen(false), 150)} />
-                </div>
-                {personOpen && (
-                  <div className="border rounded-lg max-h-52 overflow-y-auto divide-y bg-white shadow-sm">
-                    {(personQuery ? RESPONSIBLE_PERSONS.filter(p => p.toLowerCase().includes(personQuery.toLowerCase())) : RESPONSIBLE_PERSONS)
-                      .map(p => (
-                        <button key={p} type="button" className="w-full text-left px-3 py-2.5 hover:bg-teal-50 text-sm"
-                          onMouseDown={e => e.preventDefault()}
-                          onClick={() => { setResponsible(p); setPersonQuery(""); setPersonOpen(false); }}>
-                          {p}
-                        </button>
-                      ))}
-                  </div>
+            )}
+            {/* Search to add more */}
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+              <Input className="pl-9" placeholder="Agregar responsable..." value={personQuery}
+                onChange={(e) => setPersonQuery(e.target.value)}
+                onFocus={() => setPersonOpen(true)}
+                onBlur={() => setTimeout(() => setPersonOpen(false), 150)} />
+            </div>
+            {personOpen && (
+              <div className="border rounded-lg max-h-52 overflow-y-auto divide-y bg-white shadow-sm">
+                {(personQuery
+                  ? RESPONSIBLE_PERSONS.filter(p => p.toLowerCase().includes(personQuery.toLowerCase()) && !responsibles.includes(p))
+                  : RESPONSIBLE_PERSONS.filter(p => !responsibles.includes(p))
+                ).map(p => (
+                  <button key={p} type="button" className="w-full text-left px-3 py-2.5 hover:bg-teal-50 text-sm"
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => { setResponsibles(prev => [...prev, p]); setPersonQuery(""); setPersonOpen(false); }}>
+                    {p}
+                  </button>
+                ))}
+                {RESPONSIBLE_PERSONS.filter(p => !responsibles.includes(p) && (!personQuery || p.toLowerCase().includes(personQuery.toLowerCase()))).length === 0 && (
+                  <p className="px-3 py-2.5 text-sm text-gray-400">Todos los responsables ya están seleccionados</p>
                 )}
-              </>
+              </div>
             )}
           </div>
 
