@@ -118,6 +118,8 @@ interface OccurrenceFormProps {
   onAdjustAbundance?: (key: string, newAbundance: string) => Promise<void>;
   // BB dedup: speciesIds already registered in this station (from server or session)
   existingBBSpeciesIds?: string[];
+  // Campaign-wide species suggestions (sorted by frequency across all stations in campaign)
+  campaignSpecies?: SpeciesResult[];
 }
 
 function buildTrapOptions(method: string, shermanCount: number, cameraCount: number): string[] {
@@ -145,6 +147,7 @@ export function OccurrenceForm({
   existingRegistrations,
   onAdjustAbundance,
   existingBBSpeciesIds,
+  campaignSpecies,
 }: OccurrenceFormProps) {
   const router = useRouter();
   const isBB = methodology === "BRAUN_BLANQUET";
@@ -718,6 +721,7 @@ export function OccurrenceForm({
               searching={searching}
               hasExisting={!!defaultValues?.speciesId && !selectedSpecies}
               existingLabel={defaultValues?.speciesLabel}
+              campaignSuggestions={campaignSpecies}
             />
           )}
 
@@ -1225,7 +1229,7 @@ export function OccurrenceForm({
 
 // ── Species search sub-component ──
 function SpeciesSearch({
-  query, setQuery, list, selected, setSelected, searching, hasExisting, existingLabel,
+  query, setQuery, list, selected, setSelected, searching, hasExisting, existingLabel, campaignSuggestions,
 }: {
   query: string;
   setQuery: (v: string) => void;
@@ -1235,7 +1239,11 @@ function SpeciesSearch({
   searching: boolean;
   hasExisting: boolean;
   existingLabel?: string;
+  campaignSuggestions?: SpeciesResult[];
 }) {
+  const showSuggestions = !selected && !query && !!campaignSuggestions?.length;
+  const showResults = !selected && list.length > 0;
+
   return (
     <div className="space-y-2">
       <Label>Especie <span className="text-red-500">*</span></Label>
@@ -1269,8 +1277,32 @@ function SpeciesSearch({
           />
         </div>
       )}
+      {/* Campaign suggestions — shown when search is empty */}
+      {showSuggestions && (
+        <div className="space-y-1">
+          <p className="text-xs text-gray-400 px-1">Especies de esta campaña</p>
+          <div className="border rounded-lg max-h-44 overflow-y-auto divide-y">
+            {campaignSuggestions!.map((sp) => (
+              <button
+                key={sp.id}
+                type="button"
+                className="w-full text-left px-3 py-2 hover:bg-teal-50 text-sm"
+                onClick={() => { setSelected(sp); setQuery(`${sp.genus} ${sp.species}`); }}
+              >
+                <span className="italic font-medium">{sp.genus} {sp.species}</span>
+                {sp.commonName && <span className="text-gray-500 ml-2">· {sp.commonName}</span>}
+                {sp.conservationStatus && sp.conservationStatus !== "LC" && (
+                  <span className="ml-2 text-xs bg-orange-100 text-orange-700 px-1 rounded">
+                    {sp.conservationStatus}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {searching && <p className="text-xs text-gray-400">Buscando...</p>}
-      {list.length > 0 && !selected && (
+      {showResults && (
         <div className="border rounded-lg max-h-44 overflow-y-auto divide-y">
           {list.map((sp) => (
             <button

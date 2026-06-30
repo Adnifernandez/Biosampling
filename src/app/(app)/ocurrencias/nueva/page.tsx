@@ -27,7 +27,7 @@ export default async function NuevaOcurrenciaPage({
   const isBB = station.campaign.methodology === "BRAUN_BLANQUET";
   const isTransectoFauna = station.campaign.methodology === "TRANSECTO_LINEAL_FAUNA";
 
-  const [transectoStation, bbOccurrences, transectoOccurrences] = await Promise.all([
+  const [transectoStation, bbOccurrences, transectoOccurrences, rawCampaignSpecies] = await Promise.all([
     isGrilla && station.parentId
       ? prisma.station.findUnique({
           where: { id: station.parentId },
@@ -40,7 +40,25 @@ export default async function NuevaOcurrenciaPage({
     isTransectoFauna
       ? prisma.occurrence.findMany({ where: { stationId }, select: { id: true, speciesId: true, abundance: true } })
       : Promise.resolve([]),
+    prisma.occurrence.findMany({
+      where: { station: { campaignId: station.campaignId } },
+      select: {
+        speciesId: true,
+        species: { select: { id: true, genus: true, species: true, commonName: true, family: true, conservationStatus: true } },
+      },
+    }),
   ]);
+
+  // Deduplicate and sort by frequency across the campaign
+  const speciesCountMap = new Map<string, { sp: typeof rawCampaignSpecies[0]["species"]; count: number }>();
+  for (const r of rawCampaignSpecies) {
+    const existing = speciesCountMap.get(r.speciesId);
+    if (existing) existing.count++;
+    else speciesCountMap.set(r.speciesId, { sp: r.species, count: 1 });
+  }
+  const campaignSpecies = [...speciesCountMap.values()]
+    .sort((a, b) => b.count - a.count)
+    .map((v) => v.sp);
 
   const existingBBSpeciesIds = bbOccurrences.map(o => o.speciesId);
   const existingTransectoRegistrations = transectoOccurrences.map(o => ({
@@ -86,6 +104,7 @@ export default async function NuevaOcurrenciaPage({
         existingBBSpeciesIds={existingBBSpeciesIds.length > 0 ? existingBBSpeciesIds : undefined}
         existingRegistrations={existingTransectoRegistrations.length > 0 ? existingTransectoRegistrations : undefined}
         onAdjustAbundance={existingTransectoRegistrations.length > 0 ? adjustTransectoAbundance : undefined}
+        campaignSpecies={campaignSpecies.length > 0 ? campaignSpecies : undefined}
       />
     </div>
   );

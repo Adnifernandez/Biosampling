@@ -13,7 +13,7 @@ import { WifiOff, Wifi, ArrowLeft, Plus, ChevronRight, CheckCircle2, Clock, Aler
 import { METHODOLOGIES } from "@/lib/methodologies";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { getStationBBSpeciesIds, getStationTransectoRegistrations, updateTransectoOccurrenceAbundance } from "@/app/(app)/proyectos/[id]/campanas/[cid]/estaciones/[sid]/ocurrencias/actions";
+import { getStationBBSpeciesIds, getStationTransectoRegistrations, updateTransectoOccurrenceAbundance, getCampaignSpecies } from "@/app/(app)/proyectos/[id]/campanas/[cid]/estaciones/[sid]/ocurrencias/actions";
 import { cn } from "@/lib/utils";
 
 const OccurrenceForm = dynamic(
@@ -581,6 +581,27 @@ export default function OfflineRegistroPage() {
     return [...existingRegistrations, ...serverOnly];
   }, [existingRegistrations, serverTransectoRegistrations]);
 
+  // Campaign-wide species suggestions (sorted by frequency) — fetched once per campaign, cached in localStorage
+  type CampaignSp = { id: string; genus: string; species: string; commonName: string | null; family: string; conservationStatus: string | null };
+  const [campaignSpeciesSuggestions, setCampaignSpeciesSuggestions] = useState<CampaignSp[]>([]);
+  useEffect(() => {
+    if (step !== "occurrence" || !selectedCampaign?.id) {
+      setCampaignSpeciesSuggestions([]);
+      return;
+    }
+    const cacheKey = `campaign-species-${selectedCampaign.id}`;
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) setCampaignSpeciesSuggestions(JSON.parse(cached));
+    } catch {}
+    getCampaignSpecies(selectedCampaign.id)
+      .then(rows => {
+        setCampaignSpeciesSuggestions(rows);
+        try { localStorage.setItem(cacheKey, JSON.stringify(rows)); } catch {}
+      })
+      .catch(() => {});
+  }, [step, selectedCampaign?.id]);
+
   // Online status
   useEffect(() => {
     setIsOnline(navigator.onLine);
@@ -938,6 +959,7 @@ export default function OfflineRegistroPage() {
             defaultValues={editingOccurrence ? sessionOccurrenceToDefaultValues(editingOccurrence) : undefined}
             existingRegistrations={!editingOccurrence && selectedCampaign.methodology === "TRANSECTO_LINEAL_FAUNA" ? allTransectoRegistrations : undefined}
             existingBBSpeciesIds={!editingOccurrence && allBBSpeciesIds.length > 0 ? allBBSpeciesIds : undefined}
+            campaignSpecies={campaignSpeciesSuggestions.length > 0 ? campaignSpeciesSuggestions : undefined}
             onAdjustAbundance={async (key, newAbundance) => {
               // Server-registered occurrence (key = "srv-{occurrenceId}")
               if (key.startsWith("srv-")) {
