@@ -72,22 +72,6 @@ export default async function EstacionesPage({
         selectedCampaignId={campaignId ?? ""}
       />
 
-      {selectedCampaign && (
-        <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg w-fit ${
-          selectedCampaign.surveyType === "FLORA"
-            ? "bg-teal-50 text-teal-700"
-            : "bg-blue-50 text-blue-700"
-        }`}>
-          {selectedCampaign.surveyType === "FLORA"
-            ? <Leaf className="h-4 w-4 shrink-0" />
-            : <Bird className="h-4 w-4 shrink-0" />}
-          <span>
-            Campaña de {selectedCampaign.surveyType === "FLORA" ? "Flora" : "Fauna"} ·{" "}
-            {selectedCampaign.surveyType === "FLORA" ? "Parcelas" : "Transectos"}
-          </span>
-        </div>
-      )}
-
       {!campaignId ? (
         <Card>
           <CardContent className="py-12 text-center text-gray-400">
@@ -115,17 +99,18 @@ export default async function EstacionesPage({
         <div className="space-y-2">
           {stations.map((s) => (
             <Card key={s.id}>
-              <CardContent className="py-3 px-4 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className={`text-xs font-bold px-2 py-1 rounded font-mono shrink-0 ${
+              <CardContent className="py-3 px-4">
+                {/* Nombre + tipo + info */}
+                <div className="flex items-start gap-3 mb-2">
+                  <span className={`text-sm font-bold px-2 py-1 rounded font-mono shrink-0 ${
                     s.type === "PARCELA"
                       ? "bg-teal-100 text-teal-800"
                       : "bg-blue-100 text-blue-800"
                   }`}>
                     {s.name}
                   </span>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-medium text-gray-900">
                         {s.campaign.methodology === "GRILLA" ? "Transecto"
                           : s.campaign.methodology === "MICRORUTEO" ? "Ruta"
@@ -137,7 +122,7 @@ export default async function EstacionesPage({
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 truncate">
+                    <p className="text-xs text-gray-500">
                       {s.area
                         ? `${s.area} m²`
                         : s.length && s.width
@@ -145,11 +130,12 @@ export default async function EstacionesPage({
                         : "Sin dimensiones"}
                     </p>
                     {s.notes && (
-                      <p className="text-xs text-gray-400 truncate mt-0.5">{s.notes}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{s.notes}</p>
                     )}
                   </div>
                 </div>
-                <div className="flex gap-1 shrink-0">
+                {/* Acciones */}
+                <div className="flex items-center gap-1.5">
                   <ButtonLink
                     href={
                       s.campaign.methodology === "GRILLA"
@@ -157,7 +143,7 @@ export default async function EstacionesPage({
                         : `/ocurrencias?projectId=${projectId}&campaignId=${campaignId}&stationId=${s.id}`
                     }
                     size="sm"
-                    className="bg-teal-700 hover:bg-teal-800 text-white gap-1.5"
+                    className="flex-1 justify-center bg-teal-700 hover:bg-teal-800 text-white gap-1.5"
                   >
                     <ClipboardList className="h-3.5 w-3.5" />
                     Ocurrencias

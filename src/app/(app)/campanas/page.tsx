@@ -57,35 +57,36 @@ export default async function CampanasPage({
         <div className="space-y-2">
           {campaigns.map((c) => (
             <Card key={c.id}>
-              <CardContent className="py-3 px-4 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
+              <CardContent className="py-3 px-4">
+                {/* Nombre + estado */}
+                <div className="flex items-start gap-3 mb-2">
                   <div className={`p-2 rounded-lg shrink-0 ${c.surveyType === "FLORA" ? "bg-teal-100" : "bg-blue-100"}`}>
                     {c.surveyType === "FLORA"
                       ? <Leaf className="h-4 w-4 text-teal-700" />
                       : <Bird className="h-4 w-4 text-blue-700" />}
                   </div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm text-gray-900 truncate">{c.name}</p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {c.project.name}
-                      <span className={`ml-1.5 px-1.5 py-0.5 rounded font-medium ${c.surveyType === "FLORA" ? "bg-teal-50 text-teal-700" : "bg-blue-50 text-blue-700"}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm text-gray-900 leading-snug">{c.name}</p>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${c.surveyType === "FLORA" ? "bg-teal-50 text-teal-700" : "bg-blue-50 text-blue-700"}`}>
                         {c.surveyType === "FLORA" ? "Flora" : "Fauna"}
                       </span>
-                      {c.methodology && <span className="text-gray-400"> · {getMethodologyById(c.methodology)?.name ?? c.methodology}</span>}
-                    </p>
+                      {c.methodology && <span className="text-xs text-gray-400">{getMethodologyById(c.methodology)?.name ?? c.methodology}</span>}
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        c.status === "ACTIVE" ? "bg-yellow-100 text-yellow-700" :
+                        c.status === "COMPLETED" ? "bg-gray-100 text-gray-600" : "bg-red-100 text-red-700"
+                      }`}>
+                        {CAMPAIGN_STATUS_LABELS[c.status as CampaignStatus]}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    c.status === "ACTIVE" ? "bg-yellow-100 text-yellow-700" :
-                    c.status === "COMPLETED" ? "bg-gray-100 text-gray-600" : "bg-red-100 text-red-700"
-                  }`}>
-                    {CAMPAIGN_STATUS_LABELS[c.status as CampaignStatus]}
-                  </span>
+                {/* Acciones */}
+                <div className="flex items-center gap-1.5">
                   <ButtonLink
                     href={`/estaciones?projectId=${c.project.id}&campaignId=${c.id}`}
                     size="sm"
-                    className="bg-teal-700 hover:bg-teal-800 text-white gap-1.5"
+                    className="flex-1 justify-center bg-teal-700 hover:bg-teal-800 text-white gap-1.5"
                   >
                     <LayoutList className="h-3.5 w-3.5" />
                     Réplicas
