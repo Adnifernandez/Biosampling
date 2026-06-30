@@ -36,7 +36,7 @@ export default async function CampanasPage({
           <h1 className="text-2xl font-bold text-gray-900">Campañas</h1>
           <p className="text-gray-500 text-sm mt-0.5">{campaigns.length} campaña{campaigns.length !== 1 ? "s" : ""}</p>
         </div>
-        <ButtonLink href="/campanas/nueva" className="bg-teal-700 hover:bg-teal-800 text-white gap-2">
+        <ButtonLink href={projectId ? `/campanas/nueva?projectId=${projectId}` : "/campanas/nueva"} className="bg-teal-700 hover:bg-teal-800 text-white gap-2">
           <Plus className="h-4 w-4" /> Nueva
         </ButtonLink>
       </div>

@@ -1,7 +1,7 @@
 ﻿import { prisma } from "@/lib/prisma";
 import { Card, CardContent } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button-link";
-import { Plus, FolderOpen, MapPin, User2, Pencil } from "lucide-react";
+import { Plus, FolderOpen, MapPin, User2, Pencil, Layers } from "lucide-react";
 import { PROJECT_STATUS_LABELS, type ProjectStatus } from "@/lib/types";
 import { DeleteProjectButton } from "@/components/proyectos/DeleteProjectButton";
 import { CloseProjectButton } from "@/components/proyectos/CloseProjectButton";
@@ -65,6 +65,10 @@ export default async function ProyectosPage() {
                   </div>
                 </div>
                 <div className="flex gap-1 shrink-0">
+                  <ButtonLink href={`/campanas?projectId=${p.id}`} size="sm" className="bg-teal-700 hover:bg-teal-800 text-white gap-1.5">
+                    <Layers className="h-3.5 w-3.5" />
+                    Campañas
+                  </ButtonLink>
                   <CloseProjectButton id={p.id} status={p.status} />
                   {p.status !== "COMPLETED" && (
                     <ButtonLink href={`/proyectos/${p.id}/editar`} variant="outline" size="sm">
