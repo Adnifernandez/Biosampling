@@ -799,29 +799,35 @@ export function OccurrenceForm({
           {isBB && (
             <div className="space-y-2">
               <Label>Código de cobertura (Braun-Blanquet) <span className="text-red-500">*</span></Label>
-              <div className="grid grid-cols-1 gap-1.5">
-                {BB_COVER_CODES.map(({ code, desc }) => (
+              <div className="grid grid-cols-5 gap-1.5">
+                {BB_COVER_CODES.map(({ code }) => (
                   <button
                     key={code}
                     type="button"
                     onClick={() => setBbCover(code)}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-colors",
+                      "flex items-center justify-center py-3 rounded-lg border transition-colors",
                       bbCover === code
                         ? "border-teal-600 bg-teal-50"
                         : "border-gray-200 hover:border-gray-300"
                     )}
                   >
                     <span className={cn(
-                      "font-mono font-bold text-sm w-6 shrink-0 text-center",
+                      "font-mono font-bold text-base",
                       bbCover === code ? "text-teal-700" : "text-gray-600"
                     )}>
                       {code}
                     </span>
-                    <span className="text-xs text-gray-600">{desc}</span>
                   </button>
                 ))}
               </div>
+              {bbCover && (
+                <p className="text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
+                  <span className="font-mono font-bold text-teal-700">{bbCover}</span>
+                  {" — "}
+                  {BB_COVER_CODES.find((c) => c.code === bbCover)?.desc}
+                </p>
+              )}
             </div>
           )}
 
