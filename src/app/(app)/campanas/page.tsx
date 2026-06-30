@@ -1,7 +1,7 @@
 ﻿import { prisma } from "@/lib/prisma";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Card, CardContent } from "@/components/ui/card";
-import { Layers, Plus, Leaf, Bird, Pencil } from "lucide-react";
+import { Layers, Plus, Leaf, Bird, Pencil, LayoutList } from "lucide-react";
 import { CAMPAIGN_STATUS_LABELS, type CampaignStatus } from "@/lib/types";
 import { getMethodologyById } from "@/lib/methodologies";
 import { CampanasFilter } from "@/components/campanas/CampanasFilter";
@@ -76,15 +76,20 @@ export default async function CampanasPage({
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-xs text-gray-400 hidden sm:block">
-                    {c.stations.length} estación{c.stations.length !== 1 ? "es" : ""}
-                  </span>
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                     c.status === "ACTIVE" ? "bg-yellow-100 text-yellow-700" :
                     c.status === "COMPLETED" ? "bg-gray-100 text-gray-600" : "bg-red-100 text-red-700"
                   }`}>
                     {CAMPAIGN_STATUS_LABELS[c.status as CampaignStatus]}
                   </span>
+                  <ButtonLink
+                    href={`/estaciones?projectId=${c.project.id}&campaignId=${c.id}`}
+                    size="sm"
+                    className="bg-teal-700 hover:bg-teal-800 text-white gap-1.5"
+                  >
+                    <LayoutList className="h-3.5 w-3.5" />
+                    Réplicas
+                  </ButtonLink>
                   <ButtonLink href={`/campanas/${c.id}/editar`} variant="outline" size="sm">
                     <Pencil className="h-4 w-4" />
                   </ButtonLink>

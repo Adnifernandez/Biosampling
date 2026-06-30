@@ -1,7 +1,7 @@
 ﻿import { prisma } from "@/lib/prisma";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Card, CardContent } from "@/components/ui/card";
-import { LayoutList, Plus, MapPin, Leaf, Bird, Pencil } from "lucide-react";
+import { LayoutList, Plus, MapPin, Leaf, Bird, Pencil, ClipboardList } from "lucide-react";
 import { EstacionesFiltro } from "@/components/estaciones/EstacionesFiltro";
 import { STATION_TYPE_LABELS, type StationType } from "@/lib/types";
 import { DeleteStationButton } from "@/components/estaciones/DeleteStationButton";
@@ -150,6 +150,18 @@ export default async function EstacionesPage({
                   </div>
                 </div>
                 <div className="flex gap-1 shrink-0">
+                  <ButtonLink
+                    href={
+                      s.campaign.methodology === "GRILLA"
+                        ? `/ocurrencias?projectId=${projectId}&campaignId=${campaignId}&transectoId=${s.id}`
+                        : `/ocurrencias?projectId=${projectId}&campaignId=${campaignId}&stationId=${s.id}`
+                    }
+                    size="sm"
+                    className="bg-teal-700 hover:bg-teal-800 text-white gap-1.5"
+                  >
+                    <ClipboardList className="h-3.5 w-3.5" />
+                    Ocurrencias
+                  </ButtonLink>
                   <ButtonLink href={`/estaciones/${s.id}/editar`} variant="outline" size="sm">
                     <Pencil className="h-4 w-4" />
                   </ButtonLink>

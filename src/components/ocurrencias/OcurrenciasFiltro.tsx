@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FolderOpen } from "lucide-react";
+import { FolderOpen, Layers, LayoutList } from "lucide-react";
 import { navigate } from "@/lib/offline-nav";
 import { saveLastProject, getLastProject } from "@/lib/project-persistence";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -53,15 +53,10 @@ export function OcurrenciasFiltro({
     : null;
   const isGrilla = selectedCampaign?.methodology === "GRILLA";
 
-  const stationName = isGrilla
-    ? stations.find((s) => s.id === selectedTransectoId)?.name
-    : stations.find((s) => s.id === selectedStationId)?.name;
-  const grillaName = grillaStations?.find((s) => s.id === selectedStationId)?.name;
-
-  function onCampaignChange(val: string | null) {
-    const v = val ?? "";
-    navigate(router, v ? `/ocurrencias?projectId=${selectedProjectId}&campaignId=${v}` : `/ocurrencias?projectId=${selectedProjectId}`);
-  }
+  const selectedStation = isGrilla
+    ? stations.find((s) => s.id === selectedTransectoId)
+    : stations.find((s) => s.id === selectedStationId);
+  const selectedGrilla = grillaStations?.find((s) => s.id === selectedStationId);
 
   function onStationChange(val: string | null) {
     const v = val ?? "";
@@ -93,7 +88,7 @@ export function OcurrenciasFiltro({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {/* Project badge */}
       {selectedProjectId ? (
         <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-lg px-4 py-2.5">
@@ -107,83 +102,92 @@ export function OcurrenciasFiltro({
         <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
           <FolderOpen className="h-4 w-4 shrink-0" />
           <span>Selecciona un proyecto desde</span>
-          <Link href="/proyectos" className="text-teal-700 font-medium hover:underline">
-            Proyectos
-          </Link>
+          <Link href="/proyectos" className="text-teal-700 font-medium hover:underline">Proyectos</Link>
         </div>
       )}
 
-      {/* Campaign + station selectors */}
-      {selectedProjectId && (
-        <div className={`grid gap-3 ${isGrilla ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2"}`}>
-          <div className="space-y-1.5">
-            <Label className="text-xs text-gray-500">Campaña</Label>
-            <Select value={selectedCampaignId} onValueChange={onCampaignChange} disabled={!selectedProjectId}>
-              <SelectTrigger className="w-full">
-                <SelectValue>
-                  {campaignName
-                    ? <>{campaignName}{campaignMethodology && <span className="text-gray-400 ml-1">· {campaignMethodology}</span>}</>
-                    : <span className="text-muted-foreground">Seleccionar campaña...</span>}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent className="min-w-max">
-                {campaigns.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                    <span className="text-gray-400 ml-1">· {c.surveyType === "FLORA" ? "Flora" : "Fauna"}</span>
-                    {c.methodology && <span className="text-gray-400 ml-1">· {getMethodologyById(c.methodology)?.name ?? c.methodology}</span>}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      {/* Campaign badge */}
+      {selectedProjectId && (campaignName ? (
+        <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5">
+          <Layers className="h-4 w-4 text-blue-600 shrink-0" />
+          <span className="font-medium text-blue-900 text-sm">
+            {campaignName}
+            {campaignMethodology && <span className="text-blue-500 font-normal ml-1.5">· {campaignMethodology}</span>}
+          </span>
+          <Link
+            href={`/campanas?projectId=${selectedProjectId}`}
+            className="ml-auto text-xs text-blue-600 hover:text-blue-800 hover:underline shrink-0"
+          >
+            cambiar campaña
+          </Link>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+          <Layers className="h-4 w-4 shrink-0" />
+          <span>Elige una campaña desde</span>
+          <Link href={`/campanas?projectId=${selectedProjectId}`} className="text-teal-700 font-medium hover:underline">
+            Campañas
+          </Link>
+        </div>
+      ))}
 
-          <div className="space-y-1.5">
-            <Label className="text-xs text-gray-500">{isGrilla ? "Transecto" : "Estación"}</Label>
-            <Select
-              value={isGrilla ? (selectedTransectoId ?? "") : selectedStationId}
-              onValueChange={onStationChange}
-              disabled={!selectedCampaignId}
+      {/* Station badge (if already selected via guided nav) or selector */}
+      {selectedCampaignId && (
+        selectedStation && !isGrilla ? (
+          <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-lg px-4 py-2.5">
+            <LayoutList className="h-4 w-4 text-purple-600 shrink-0" />
+            <span className="font-medium text-purple-900 text-sm">{selectedStation.name}</span>
+            <Link
+              href={`/estaciones?projectId=${selectedProjectId}&campaignId=${selectedCampaignId}`}
+              className="ml-auto text-xs text-purple-600 hover:text-purple-800 hover:underline shrink-0"
             >
-              <SelectTrigger className="w-full">
-                <SelectValue>
-                  {stationName
-                    ? stationName
-                    : <span className="text-muted-foreground">{selectedCampaignId ? `Seleccionar ${isGrilla ? "transecto" : "estación"}...` : "Primero elige campaña"}</span>}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {stations.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              cambiar estación
+            </Link>
           </div>
-
-          {isGrilla && (
+        ) : (
+          <div className={`grid gap-3 ${isGrilla ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
             <div className="space-y-1.5">
-              <Label className="text-xs text-gray-500">Grilla</Label>
+              <Label className="text-xs text-gray-500">{isGrilla ? "Transecto" : "Estación"}</Label>
               <Select
-                value={selectedStationId}
-                onValueChange={onGrillaChange}
-                disabled={!selectedTransectoId}
+                value={isGrilla ? (selectedTransectoId ?? "") : selectedStationId}
+                onValueChange={onStationChange}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full sm:max-w-xs">
                   <SelectValue>
-                    {grillaName
-                      ? grillaName
-                      : <span className="text-muted-foreground">{selectedTransectoId ? "Seleccionar grilla..." : "Primero elige transecto"}</span>}
+                    <span className="text-muted-foreground">
+                      {`Seleccionar ${isGrilla ? "transecto" : "estación"}...`}
+                    </span>
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {(grillaStations ?? []).map((s) => (
+                  {stations.map((s) => (
                     <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          )}
-        </div>
+
+            {isGrilla && selectedTransectoId && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-gray-500">Grilla</Label>
+                <Select value={selectedStationId} onValueChange={onGrillaChange}>
+                  <SelectTrigger className="w-full sm:max-w-xs">
+                    <SelectValue>
+                      {selectedGrilla
+                        ? selectedGrilla.name
+                        : <span className="text-muted-foreground">Seleccionar grilla...</span>}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(grillaStations ?? []).map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+        )
       )}
     </div>
   );
