@@ -958,9 +958,9 @@ export default function OfflineRegistroPage() {
                     prev.map(r => r.key === key ? { ...r, abundance: newAbundance } : r)
                   );
                   toast.success("Cantidad actualizada");
-                } catch {
+                } catch (e) {
                   toast.error("Sin conexión — no se puede actualizar este registro");
-                  throw; // Prevents OccurrenceForm from updating its local state
+                  throw e;
                 }
                 return;
               }
