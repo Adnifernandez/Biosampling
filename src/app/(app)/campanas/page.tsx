@@ -1,4 +1,4 @@
-﻿import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Layers, Plus, Leaf, Bird, Pencil, LayoutList } from "lucide-react";
@@ -6,6 +6,7 @@ import { CAMPAIGN_STATUS_LABELS, type CampaignStatus } from "@/lib/types";
 import { getMethodologyById } from "@/lib/methodologies";
 import { CampanasFilter } from "@/components/campanas/CampanasFilter";
 import { DeleteCampaignButton } from "@/components/campanas/DeleteCampaignButton";
+import { CloseCampaignButton } from "@/components/campanas/CloseCampaignButton";
 
 export default async function CampanasPage({
   searchParams,
@@ -19,14 +20,20 @@ export default async function CampanasPage({
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
-    prisma.campaign.findMany({
-      where: projectId ? { projectId } : undefined,
-      orderBy: { createdAt: "desc" },
-      include: {
-        project: { select: { id: true, name: true } },
-        stations: { select: { id: true } },
-      },
-    }),
+    projectId
+      ? prisma.campaign.findMany({
+          where: { projectId },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            surveyType: true,
+            methodology: true,
+            status: true,
+            projectId: true,
+          },
+        })
+      : Promise.resolve([]),
   ]);
 
   return (
@@ -34,72 +41,90 @@ export default async function CampanasPage({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Campañas</h1>
-          <p className="text-gray-500 text-sm mt-0.5">{campaigns.length} campaña{campaigns.length !== 1 ? "s" : ""}</p>
+          {projectId && (
+            <p className="text-gray-500 text-sm mt-0.5">
+              {campaigns.length} campaña{campaigns.length !== 1 ? "s" : ""}
+            </p>
+          )}
         </div>
-        <ButtonLink href={projectId ? `/campanas/nueva?projectId=${projectId}` : "/campanas/nueva"} className="bg-teal-700 hover:bg-teal-800 text-white gap-2">
-          <Plus className="h-4 w-4" /> Nueva
-        </ButtonLink>
+        {projectId && (
+          <ButtonLink
+            href={`/campanas/nueva?projectId=${projectId}`}
+            className="bg-teal-700 hover:bg-teal-800 text-white gap-2"
+          >
+            <Plus className="h-4 w-4" /> Nueva
+          </ButtonLink>
+        )}
       </div>
 
       <CampanasFilter projects={projects} selectedProjectId={projectId ?? ""} />
 
-      {campaigns.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-gray-400">
-            <Layers className="h-10 w-10 mx-auto mb-2 opacity-30" />
-            <p>{projectId ? "No hay campañas en este proyecto." : "No hay campañas todavía."}</p>
-            <ButtonLink href="/campanas/nueva" size="sm" className="mt-3 inline-flex bg-teal-700 hover:bg-teal-800 text-white">
-              <Plus className="h-4 w-4 mr-1" /> Crear campaña
-            </ButtonLink>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-2">
-          {campaigns.map((c) => (
-            <Card key={c.id}>
-              <CardContent className="py-3 px-4">
-                {/* Nombre + estado */}
-                <div className="flex items-start gap-3 mb-2">
-                  <div className={`p-2 rounded-lg shrink-0 ${c.surveyType === "FLORA" ? "bg-teal-100" : "bg-blue-100"}`}>
-                    {c.surveyType === "FLORA"
-                      ? <Leaf className="h-4 w-4 text-teal-700" />
-                      : <Bird className="h-4 w-4 text-blue-700" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-gray-900 leading-snug">{c.name}</p>
-                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${c.surveyType === "FLORA" ? "bg-teal-50 text-teal-700" : "bg-blue-50 text-blue-700"}`}>
-                        {c.surveyType === "FLORA" ? "Flora" : "Fauna"}
-                      </span>
-                      {c.methodology && <span className="text-xs text-gray-400">{getMethodologyById(c.methodology)?.name ?? c.methodology}</span>}
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        c.status === "ACTIVE" ? "bg-yellow-100 text-yellow-700" :
-                        c.status === "COMPLETED" ? "bg-gray-100 text-gray-600" : "bg-red-100 text-red-700"
-                      }`}>
-                        {CAMPAIGN_STATUS_LABELS[c.status as CampaignStatus]}
-                      </span>
+      {projectId && (
+        campaigns.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center text-gray-400">
+              <Layers className="h-10 w-10 mx-auto mb-2 opacity-30" />
+              <p>No hay campañas en este proyecto.</p>
+              <ButtonLink
+                href={`/campanas/nueva?projectId=${projectId}`}
+                size="sm"
+                className="mt-3 inline-flex bg-teal-700 hover:bg-teal-800 text-white"
+              >
+                <Plus className="h-4 w-4 mr-1" /> Crear campaña
+              </ButtonLink>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-2">
+            {campaigns.map((c) => (
+              <Card key={c.id}>
+                <CardContent className="py-3 px-4">
+                  <div className="flex items-start gap-3 mb-2">
+                    <div className={`p-2 rounded-lg shrink-0 ${c.surveyType === "FLORA" ? "bg-teal-100" : "bg-blue-100"}`}>
+                      {c.surveyType === "FLORA"
+                        ? <Leaf className="h-4 w-4 text-teal-700" />
+                        : <Bird className="h-4 w-4 text-blue-700" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-gray-900 leading-snug">{c.name}</p>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${c.surveyType === "FLORA" ? "bg-teal-50 text-teal-700" : "bg-blue-50 text-blue-700"}`}>
+                          {c.surveyType === "FLORA" ? "Flora" : "Fauna"}
+                        </span>
+                        {c.methodology && (
+                          <span className="text-xs text-gray-400">
+                            {getMethodologyById(c.methodology)?.name ?? c.methodology}
+                          </span>
+                        )}
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          c.status === "ACTIVE"    ? "bg-yellow-100 text-yellow-700" :
+                          c.status === "COMPLETED" ? "bg-gray-100 text-gray-600"    : "bg-red-100 text-red-700"
+                        }`}>
+                          {CAMPAIGN_STATUS_LABELS[c.status as CampaignStatus]}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-                {/* Acciones */}
-                <div className="flex items-center gap-1.5">
-                  <ButtonLink
-                    href={`/estaciones?projectId=${c.project.id}&campaignId=${c.id}`}
-                    size="sm"
-                    className="flex-1 justify-center bg-teal-700 hover:bg-teal-800 text-white gap-1.5"
-                  >
-                    <LayoutList className="h-3.5 w-3.5" />
-                    Réplicas
-                  </ButtonLink>
-                  <ButtonLink href={`/campanas/${c.id}/editar`} variant="outline" size="sm">
-                    <Pencil className="h-4 w-4" />
-                  </ButtonLink>
-                  <DeleteCampaignButton projectId={c.project.id} campaignId={c.id} />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <div className="flex items-center gap-1.5">
+                    <ButtonLink
+                      href={`/estaciones?projectId=${projectId}&campaignId=${c.id}`}
+                      size="sm"
+                      className="flex-1 justify-center bg-teal-700 hover:bg-teal-800 text-white gap-1.5"
+                    >
+                      <LayoutList className="h-3.5 w-3.5" />
+                      Réplicas
+                    </ButtonLink>
+                    <CloseCampaignButton id={c.id} status={c.status} />
+                    <ButtonLink href={`/campanas/${c.id}/editar`} variant="outline" size="sm">
+                      <Pencil className="h-4 w-4" />
+                    </ButtonLink>
+                    <DeleteCampaignButton projectId={projectId} campaignId={c.id} />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
       )}
     </div>
   );

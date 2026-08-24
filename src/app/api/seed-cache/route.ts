@@ -20,7 +20,7 @@ export async function GET() {
       orderBy: { createdAt: "asc" },
     }),
     prisma.species.findMany({
-      select: { id: true, family: true, genus: true, species: true, commonName: true, type: true, conservationStatus: true },
+      select: { id: true, family: true, genus: true, species: true, commonName: true, type: true, conservationStatus: true, orden: true, clase: true, division: true, habito: true, origen: true, macrofitasHabito: true, category: true },
       orderBy: { genus: "asc" },
     }),
   ]);

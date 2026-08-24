@@ -2,27 +2,18 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { FolderOpen } from "lucide-react";
-import { navigate } from "@/lib/offline-nav";
-import { saveLastProject, getLastProject } from "@/lib/project-persistence";
+import { saveLastProject } from "@/lib/project-persistence";
 
 type Project = { id: string; name: string };
 
 export function CampanasFilter({ projects, selectedProjectId }: { projects: Project[]; selectedProjectId: string }) {
-  const router = useRouter();
-
   useEffect(() => {
     if (selectedProjectId) {
       saveLastProject(selectedProjectId);
-    } else {
-      const last = getLastProject();
-      if (last && projects.some((p) => p.id === last)) {
-        navigate(router, `/campanas?projectId=${last}`);
-      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedProjectId]);
 
   if (!selectedProjectId) {
     return (

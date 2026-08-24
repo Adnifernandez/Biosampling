@@ -5,7 +5,6 @@ import { ButtonLink } from "@/components/ui/button-link";
 import { ArrowLeft, MapPin, User, Pencil } from "lucide-react";
 import { PROJECT_STATUS_LABELS, type ProjectStatus } from "@/lib/types";
 import { REGIONS } from "@/lib/chile-data";
-import { DeleteProjectButton } from "@/components/proyectos/DeleteProjectButton";
 
 export default async function ProyectoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -44,7 +43,6 @@ export default async function ProyectoDetailPage({ params }: { params: Promise<{
           <ButtonLink href={`/proyectos/${project.id}/editar`} variant="outline" size="sm">
             <Pencil className="h-4 w-4" />
           </ButtonLink>
-          <DeleteProjectButton id={project.id} />
         </div>
       </div>
 

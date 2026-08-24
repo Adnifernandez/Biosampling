@@ -15,25 +15,34 @@ import {
   Layers,
   LayoutList,
   ClipboardList,
+  FlaskConical,
+  MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const PROJECT_TABS = new Set(["/campanas", "/estaciones", "/ocurrencias"]);
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/proyectos", label: "Proyectos", icon: FolderOpen },
-  { href: "/campanas", label: "Campañas", icon: Layers },
-  { href: "/estaciones", label: "Estaciones/Réplicas", icon: LayoutList },
-  { href: "/ocurrencias", label: "Ocurrencias", icon: ClipboardList },
-  { href: "/reportes", label: "Reportes", icon: FileBarChart2 },
-  { href: "/admin/usuarios", label: "Usuarios", icon: Users },
+const baseNavItems = [
+  { href: "/dashboard",       label: "Dashboard",          icon: LayoutDashboard },
+  { href: "/proyectos",       label: "Proyectos",          icon: FolderOpen      },
+  { href: "/campanas",        label: "Campañas",           icon: Layers          },
+  { href: "/estaciones",      label: "Estaciones/Réplicas", icon: LayoutList     },
+  { href: "/ocurrencias",     label: "Ocurrencias",        icon: ClipboardList   },
+  { href: "/reportes",        label: "Reportes",           icon: FileBarChart2   },
+  { href: "/admin/especies",  label: "Especies",           icon: FlaskConical    },
 ];
 
-function SidebarInner() {
+const adminNavItems = [
+  { href: "/terreno",         label: "Modo Terreno",       icon: MapPin          },
+  { href: "/admin/usuarios",  label: "Usuarios",           icon: Users           },
+];
+
+function SidebarInner({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const projectId = searchParams.get("projectId") ?? "";
+
+  const navItems = isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems;
 
   return (
     <aside className="hidden lg:flex flex-col w-60 shrink-0 bg-teal-900 text-white h-full">
@@ -78,7 +87,7 @@ function SidebarInner() {
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
   return (
     <Suspense fallback={
       <aside className="hidden lg:flex flex-col w-60 shrink-0 bg-teal-900 text-white h-full">
@@ -87,7 +96,7 @@ export function Sidebar() {
           <span className="font-bold text-lg">BioSampling</span>
         </div>
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-          {navItems.map(({ href, label, icon: Icon }) => (
+          {baseNavItems.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-teal-200">
               <Icon className="h-4 w-4 shrink-0" />
@@ -97,7 +106,7 @@ export function Sidebar() {
         </nav>
       </aside>
     }>
-      <SidebarInner />
+      <SidebarInner isAdmin={isAdmin} />
     </Suspense>
   );
 }

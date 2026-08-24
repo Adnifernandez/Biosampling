@@ -44,7 +44,15 @@ async function searchSpeciesFallback(query: string, surveyType: string): Promise
       normalize(s.genus).includes(q) ||
       normalize(s.species).includes(q) ||
       normalize(s.commonName ?? "").includes(q) ||
-      normalize(s.family ?? "").includes(q)
+      normalize(s.family ?? "").includes(q) ||
+      normalize(s.orden ?? "").includes(q) ||
+      normalize(s.clase ?? "").includes(q) ||
+      normalize(s.division ?? "").includes(q) ||
+      normalize(s.habito ?? "").includes(q) ||
+      normalize(s.origen ?? "").includes(q) ||
+      normalize(s.conservationStatus ?? "").includes(q) ||
+      normalize(s.macrofitasHabito ?? "").includes(q) ||
+      normalize(s.category ?? "").includes(q)
     )
     .slice(0, 15)
     .map((s) => ({
@@ -328,7 +336,7 @@ export function OccurrenceForm({
         setSpeciesList(results);
         setSearching(false);
         if (results.length > 0 && navigator.onLine)
-          import("@/lib/db").then(({ getDb }) => getDb()?.species.bulkPut(results.map(s => ({ ...s, type: surveyType })))).catch(() => {});
+          import("@/lib/db").then(({ getDb }) => getDb()?.species.bulkPut(results.map(s => ({ ...s, type: surveyType, orden: null, clase: null, division: null, habito: null, origen: null, macrofitasHabito: null, category: null })))).catch(() => {});
       }
     }, 250);
     return () => clearTimeout(timer);

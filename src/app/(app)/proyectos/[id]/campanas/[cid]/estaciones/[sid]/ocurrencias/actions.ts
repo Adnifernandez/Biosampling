@@ -326,7 +326,15 @@ export async function searchSpecies(query: string, surveyType: string) {
         unaccent(genus)        ILIKE unaccent(${pattern}) OR
         unaccent(species)      ILIKE unaccent(${pattern}) OR
         unaccent("commonName") ILIKE unaccent(${pattern}) OR
-        unaccent(family)       ILIKE unaccent(${pattern})
+        unaccent(family)       ILIKE unaccent(${pattern}) OR
+        unaccent(COALESCE(orden, ''))     ILIKE unaccent(${pattern}) OR
+        unaccent(COALESCE(clase, ''))     ILIKE unaccent(${pattern}) OR
+        unaccent(COALESCE(division, ''))  ILIKE unaccent(${pattern}) OR
+        unaccent(COALESCE(habito, ''))              ILIKE unaccent(${pattern}) OR
+        unaccent(COALESCE(origen, ''))              ILIKE unaccent(${pattern}) OR
+        unaccent(COALESCE("conservationStatus", '')) ILIKE unaccent(${pattern}) OR
+        unaccent(COALESCE("macrofitasHabito", ''))   ILIKE unaccent(${pattern}) OR
+        unaccent(COALESCE(category, ''))             ILIKE unaccent(${pattern})
       )
     ORDER BY genus
     LIMIT 50

@@ -17,7 +17,7 @@ async function runSeedCache() {
 
 async function precachePages() {
   if (!("caches" in window)) return;
-  const KEY_PAGES = ["/proyectos", "/campanas", "/estaciones", "/ocurrencias", "/offline/registro"];
+  const KEY_PAGES = ["/proyectos", "/campanas", "/estaciones", "/ocurrencias", "/offline/registro", "/terreno"];
   try {
     const cache = await caches.open("bio-pages-v4");
     for (const url of KEY_PAGES) {
@@ -69,6 +69,12 @@ export function useOnlineSync() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    // Register service worker for offline support
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+
     setIsOnline(navigator.onLine);
 
     const handleOnline = () => { setIsOnline(true); sync(); runSeedCache(); };

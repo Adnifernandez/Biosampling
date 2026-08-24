@@ -1,13 +1,19 @@
 ﻿import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Users } from "lucide-react";
 import { NuevoUsuarioDialog } from "@/components/admin/NuevoUsuarioDialog";
 import { ToggleUserButton } from "@/components/admin/ToggleUserButton";
+import { ChangeRoleButton } from "@/components/admin/ChangeRoleButton";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
 export default async function UsuariosPage() {
+  const session = await auth();
+  if (session?.user.role !== "ADMIN") redirect("/proyectos");
+
   const users = await prisma.user.findMany({
     orderBy: { createdAt: "asc" },
     include: { _count: { select: { occurrences: true } } },
@@ -43,6 +49,11 @@ export default async function UsuariosPage() {
                     }`}>
                       {u.active ? "Activo" : "Inactivo"}
                     </span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                      u.role === "ADMIN" ? "bg-purple-100 text-purple-700" : "bg-gray-100 text-gray-500"
+                    }`}>
+                      {u.role === "ADMIN" ? "Admin" : "Usuario"}
+                    </span>
                   </div>
                   <p className="text-xs text-gray-500">{u.email}</p>
                   <p className="text-xs text-gray-400">
@@ -50,7 +61,10 @@ export default async function UsuariosPage() {
                     {format(new Date(u.createdAt), "d MMM yyyy", { locale: es })}
                   </p>
                 </div>
-                <ToggleUserButton id={u.id} active={u.active} />
+                <div className="flex gap-2">
+                  <ChangeRoleButton id={u.id} role={u.role} isSelf={u.id === session!.user.id} />
+                  <ToggleUserButton id={u.id} active={u.active} />
+                </div>
               </CardContent>
             </Card>
           ))}

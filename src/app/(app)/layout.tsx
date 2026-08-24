@@ -9,18 +9,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const session = await auth();
   if (!session) redirect("/login");
 
+  const isAdmin = session.user.role === "ADMIN";
+
   return (
     <ClientProviders session={session}>
       <div className="flex h-full">
-        <Sidebar />
+        <Sidebar isAdmin={isAdmin} />
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <TopBar />
-          <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-20 lg:pb-6">
+          <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-24 lg:pb-6">
             {children}
           </main>
         </div>
       </div>
-      <BottomNav />
+      <BottomNav isAdmin={isAdmin} />
     </ClientProviders>
   );
 }

@@ -90,8 +90,8 @@ export function ProjectForm({ projectId, defaultValues }: ProjectFormProps) {
       <CardContent className="pt-5">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="name">Nombre del proyecto *</Label>
-            <Input id="name" {...register("name")} placeholder="Ej: Monitoreo Laguna Verde 2025" />
+            <Label htmlFor="name">Código del proyecto *</Label>
+            <Input id="name" {...register("name")} placeholder="Ej: CICLOS-DIA-SUSPIROS-01-26" />
             {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
           </div>
 

@@ -1,10 +1,11 @@
 ﻿import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Plus, FolderOpen, MapPin, User2, Pencil, Layers } from "lucide-react";
 import { PROJECT_STATUS_LABELS, type ProjectStatus } from "@/lib/types";
-import { DeleteProjectButton } from "@/components/proyectos/DeleteProjectButton";
 import { CloseProjectButton } from "@/components/proyectos/CloseProjectButton";
+import { DeleteProjectButton } from "@/components/proyectos/DeleteProjectButton";
 
 const STATUS_COLORS: Record<ProjectStatus, string> = {
   ACTIVE: "bg-teal-100 text-teal-800",
@@ -13,6 +14,9 @@ const STATUS_COLORS: Record<ProjectStatus, string> = {
 };
 
 export default async function ProyectosPage() {
+  const session = await auth();
+  const isAdmin = session?.user.role === "ADMIN";
+
   const projects = await prisma.project.findMany({
     orderBy: { createdAt: "desc" },
   });
@@ -76,7 +80,7 @@ export default async function ProyectosPage() {
                       <Pencil className="h-4 w-4" />
                     </ButtonLink>
                   )}
-                  <DeleteProjectButton id={p.id} />
+                  {isAdmin && <DeleteProjectButton id={p.id} />}
                 </div>
               </CardContent>
             </Card>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FolderOpen, Layers, LayoutList } from "lucide-react";
 import { navigate } from "@/lib/offline-nav";
-import { saveLastProject, getLastProject } from "@/lib/project-persistence";
+import { saveLastProject } from "@/lib/project-persistence";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { getMethodologyById } from "@/lib/methodologies";
@@ -34,16 +34,9 @@ export function OcurrenciasFiltro({
   const router = useRouter();
 
   useEffect(() => {
-    if (selectedProjectId) {
-      saveLastProject(selectedProjectId);
-    } else {
-      const last = getLastProject();
-      if (last && projects.some((p) => p.id === last)) {
-        navigate(router, `/ocurrencias?projectId=${last}`);
-      }
-    }
+    if (selectedProjectId) saveLastProject(selectedProjectId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedProjectId]);
 
   const projectName = projects.find((p) => p.id === selectedProjectId)?.name;
   const selectedCampaign = campaigns.find((c) => c.id === selectedCampaignId);

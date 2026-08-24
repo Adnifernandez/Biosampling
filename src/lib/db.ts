@@ -101,6 +101,9 @@ export interface CachedStation {
 export interface CachedSpecies {
   id: string; family: string; genus: string; species: string;
   commonName: string | null; type: string; conservationStatus: string | null;
+  orden: string | null; clase: string | null; division: string | null;
+  habito: string | null; origen: string | null;
+  macrofitasHabito: string | null; category: string | null;
 }
 
 export class BioSamplingDB extends Dexie {

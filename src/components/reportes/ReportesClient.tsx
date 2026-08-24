@@ -33,6 +33,7 @@ type OccurrenceRow = {
   cover: number | null;
   groupSize: number | null;
   methodologyData: string | null;
+  individualCode: string | null;
   species: SpeciesRow;
   user: { name: string };
 };
@@ -49,6 +50,10 @@ type CampaignRow = {
   name: string;
   surveyType: string;
   methodology: string;
+  startDate: Date | string;
+  endDate: Date | string;
+  responsible: string | null;
+  notes: string | null;
   stations: StationRow[];
 };
 
@@ -56,6 +61,7 @@ type ProjectRow = {
   id: string;
   name: string;
   region: string;
+  commune: string;
   campaigns: CampaignRow[];
 };
 
@@ -71,26 +77,48 @@ function spSort(a: SpeciesRow, b: SpeciesRow): number {
 }
 
 function primaryStatus(raw: string | null): string {
-  if (!raw) return "LC";
+  if (!raw) return "";
   const m = raw.match(/^(CR|EN|VU|NT|LC|DD|EW|EX|NE|NA)/i);
   return m ? m[1].toUpperCase() : raw;
 }
 
-function statusBadge(raw: string | null) {
-  const code = primaryStatus(raw);
-  const cls =
+// "VU (XV-XIV), NT (X-XII)" → each comma-separated entry kept intact, joined with " ; "
+function allStatusesText(raw: string | null): string {
+  if (!raw) return "";
+  return raw.split(",").map((s) => s.trim()).filter(Boolean).join(" ; ");
+}
+
+function statusColor(code: string): string {
+  return (
     code === "CR" ? "bg-red-100 text-red-700" :
     code === "EN" ? "bg-orange-100 text-orange-700" :
     code === "VU" ? "bg-yellow-100 text-yellow-700" :
     code === "NT" ? "bg-blue-50 text-blue-600" :
     code === "LC" ? "bg-gray-100 text-gray-500" :
-    "bg-gray-100 text-gray-600";
+    "bg-gray-100 text-gray-600"
+  );
+}
+
+// Parse "VU (XV-XIV), NT (X-XII)" → one badge per comma-separated entry
+function statusBadge(raw: string | null) {
+  if (!raw) {
+    return <span className="text-gray-300 text-xs">—</span>;
+  }
+  const entries = raw.split(",").map((s) => s.trim()).filter(Boolean).map((part) => {
+    const m = part.match(/^(CR|EN|VU|NT|LC|DD|EW|EX|NE|NA)\b/i);
+    return { code: m ? m[1].toUpperCase() : part, label: part };
+  });
   return (
-    <span
-      className={`text-xs px-1.5 py-0.5 rounded font-medium whitespace-nowrap ${cls}`}
-      title={raw ?? undefined}
-    >
-      {code}
+    <span className="inline-flex flex-wrap gap-0.5">
+      {entries.map(({ code, label }, i) => (
+        <span
+          key={i}
+          className={`text-xs px-1.5 py-0.5 rounded font-medium whitespace-nowrap ${statusColor(code)}`}
+          title={raw}
+        >
+          {label}
+        </span>
+      ))}
     </span>
   );
 }
@@ -107,6 +135,8 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
   const isPF = selectedCampaign?.methodology === "PARCELAS_FORESTALES";
   const isGrilla = selectedCampaign?.methodology === "GRILLA";
   const isTransectoFauna = selectedCampaign?.methodology === "TRANSECTO_LINEAL_FAUNA";
+  const isRescate = selectedCampaign?.methodology === "RESCATE_RELOC";
+  const isFauna = selectedCampaign?.surveyType === "FAUNA";
 
   // ── Summary stats (all methodologies) ──
   const stats = (() => {
@@ -384,13 +414,66 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
 
     // ── Generate sheets ──
 
+    // Sheet 0: project + campaign metadata
+    {
+      const ws = wb.addWorksheet("Información");
+      ws.properties.defaultColWidth = 30;
+
+      const fmt = (d: Date | string | null | undefined) => {
+        if (!d) return "";
+        const date = d instanceof Date ? d : new Date(d);
+        return date.toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" });
+      };
+
+      const rows: [string, string][] = [
+        ["PROYECTO", ""],
+        ["Código", selectedProject.name],
+        ["Región", selectedProject.region],
+        ["Comuna", selectedProject.commune],
+        ["", ""],
+        ["CAMPAÑA", ""],
+        ["Nombre", selectedCampaign.name],
+        ["Tipo", selectedCampaign.surveyType === "FLORA" ? "Flora" : "Fauna"],
+        ["Metodología", getMethodologyById(selectedCampaign.methodology)?.name ?? selectedCampaign.methodology],
+        ["Fecha inicio", fmt(selectedCampaign.startDate)],
+        ["Fecha término", fmt(selectedCampaign.endDate)],
+        ["Responsable", selectedCampaign.responsible ?? ""],
+        ["Notas", selectedCampaign.notes ?? ""],
+        ["", ""],
+        ["ESTADÍSTICAS", ""],
+        ["Especies únicas", String(stats.totalSpecies)],
+        ["Ocurrencias", String(stats.totalOccurrences)],
+        ["Individuos", String(stats.totalIndividuals)],
+        [isGrilla ? "Grillas" : "Estaciones", String(stats.totalStations)],
+      ];
+
+      rows.forEach(([label, value], i) => {
+        const row = ws.addRow([label, value]);
+        const isSection = label === "PROYECTO" || label === "CAMPAÑA" || label === "ESTADÍSTICAS";
+        row.getCell(1).font = { name: "Tahoma", size: 10, bold: true, color: isSection ? { argb: HDR_FG } : { argb: "FF000000" } };
+        row.getCell(2).font = { name: "Tahoma", size: 10 };
+        if (isSection) {
+          row.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: HDR_BG } };
+          row.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: HDR_BG } };
+        }
+        if (i > 0 && !isSection && label !== "") {
+          const border = { style: "thin" as const, color: { argb: "FFE5E7EB" } };
+          row.getCell(1).border = { bottom: border };
+          row.getCell(2).border = { bottom: border };
+        }
+      });
+
+      ws.getColumn(1).width = 22;
+      ws.getColumn(2).width = 45;
+    }
+
     if (isBB && bbData) {
       const { sortedStations, rows, habitoRows, origenRows } = bbData;
       addSheet("Parcelas BB", [
         ["División","Clase","Familia","Especie","Nombre Común","Hábito","Origen","Estado Conservación",...sortedStations.map((s)=>s.name)],
         ...rows.map(({sp,stMap})=>[
           sp.division??"",sp.clase??"",sp.family,`${sp.genus} ${sp.species}`,
-          sp.commonName??"",sp.habito??"",sp.origen??"",primaryStatus(sp.conservationStatus),
+          sp.commonName??"",sp.habito??"",sp.origen??"",allStatusesText(sp.conservationStatus),
           ...sortedStations.map((s)=>stMap.get(s.id)??""),
         ]),
       ]);
@@ -404,7 +487,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
         ["División","Clase","Familia","Especie","Nombre Común","Hábito","Origen","Estado Conservación","Individuo","Este (m E)","Norte (m S)"],
         ...rows.map(({sp,individuo,utmEast,utmNorth})=>[
           sp.division??"",sp.clase??"",sp.family,`${sp.genus} ${sp.species}`,
-          sp.commonName??"",sp.habito??"",sp.origen??"",primaryStatus(sp.conservationStatus),
+          sp.commonName??"",sp.habito??"",sp.origen??"",allStatusesText(sp.conservationStatus),
           individuo,
           utmEast!=null?Math.round(utmEast):"",
           utmNorth!=null?Math.round(utmNorth):"",
@@ -420,7 +503,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
         ["División","Clase","Familia","Especie","Nombre Común","Hábito","Origen","Estado Conservación"],
         ...speciesRows.map((sp)=>[
           sp.division??"",sp.clase??"",sp.family,`${sp.genus} ${sp.species}`,
-          sp.commonName??"",sp.habito??"",sp.origen??"",primaryStatus(sp.conservationStatus),
+          sp.commonName??"",sp.habito??"",sp.origen??"",allStatusesText(sp.conservationStatus),
         ]),
       ]);
       addSheet("Individuos", [
@@ -439,7 +522,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
         ...rows.map(({sp,perGrilla})=>[
           sp.division??"",sp.clase??"",sp.family,`${sp.genus} ${sp.species}`,
           sp.commonName??"",sp.habito??"",sp.macrofitasHabito??"",sp.origen??"",
-          primaryStatus(sp.conservationStatus),
+          allStatusesText(sp.conservationStatus),
           ...grillaStations.map((g)=>perGrilla.get(g.id)??""),
         ]),
         ["","","","","","","","","Sin vegetación",...grillaStations.map((g)=>grillaHasData.has(g.id)?(sinVegPerGrilla.get(g.id)??0):"")],
@@ -464,22 +547,25 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     }
 
     if (isTransectoFauna && transectoFaunaData) {
-      const { rows, totalAbundance } = transectoFaunaData;
+      const { rows, totalAbundance, sortedStations } = transectoFaunaData;
+      const stationNames = sortedStations.map((s) => s.name);
       addSheet("Consolidado", [
-        ["Clase","Orden","Familia","Especie","Nombre Común","Origen","E.C.","Abundancia Total"],
-        ...rows.map(({sp,abundance})=>[
+        ["Clase","Orden","Familia","Especie","Nombre Común","Origen","E.C.",...stationNames,"Total"],
+        ...rows.map(({sp,abundance,perStation})=>[
           sp.clase??"",sp.orden??"",sp.family,
           `${sp.genus} ${sp.species}`,sp.commonName??"",
-          sp.origen??"",primaryStatus(sp.conservationStatus),abundance,
+          sp.origen??"",allStatusesText(sp.conservationStatus),
+          ...sortedStations.map((s) => perStation.get(s.id) ?? 0),
+          abundance,
         ]),
-        ["","","","","","","Total",totalAbundance],
+        ["","","","","","","Total",...sortedStations.map((s) => rows.reduce((sum, r) => sum + (r.perStation.get(s.id) ?? 0), 0)),totalAbundance],
       ], true); // last row bold
     }
 
     if (isTransectoFauna && communityParamsData && communityParamsData.length > 0) {
       addSheet("Parámetros", [
         ["Transecto","Riqueza (S)","Abundancia (N)","Shannon (H')","Equidad (J')"],
-        ...communityParamsData.map((r)=>[r.name,r.S,r.N,r.H,r.J]),
+        ...communityParamsData.map((r)=>[r.name,r.S,r.N,r.H,r.J ?? ""]),
       ]);
     }
 
@@ -495,7 +581,28 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
         ["Familia","Género","Especie","Nombre Común","Tipo","Estado Conservación","Nº Registros","Abundancia Total"],
         ...stats.speciesList.map(({sp,count,abundance})=>[
           sp.family,sp.genus,sp.species,sp.commonName??"",sp.type,
-          primaryStatus(sp.conservationStatus),count,abundance,
+          allStatusesText(sp.conservationStatus),count,abundance,
+        ]),
+      ]);
+    }
+
+    // ── Por Clase (FAUNA only) ──
+    if (isFauna && claseData && claseData.rows.length > 0) {
+      addSheet("Por Clase", [
+        ["Clase","N° Especies","% Especies","N° Individuos","% Individuos"],
+        ...claseData.rows.map((r) => [r.clase, r.nEspecies, r.pctEspecies / 100, r.abundance, r.pctAbundancia / 100]),
+        ["Total", claseData.totalSpecies, 1, claseData.totalAbundance, 1],
+      ], true); // last row bold
+    }
+
+    // ── RESCATE: captures table ──
+    if (isRescate && rescateData && rescateData.rows.length > 0) {
+      addSheet("Capturas", [
+        ["Clase","Orden","Familia","Especie","Nombre Común","Código","Estación","Estado Conservación"],
+        ...rescateData.rows.map((r) => [
+          r.sp.clase ?? "", r.sp.orden ?? "", r.sp.family,
+          `${r.sp.genus} ${r.sp.species}`, r.sp.commonName ?? "",
+          r.individualCode, r.stationName, allStatusesText(r.sp.conservationStatus),
         ]),
       ]);
     }
@@ -504,7 +611,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
       addSheet("Conservación", [
         ["Familia","Especie","Nombre Común","Estado Conservación"],
         ...stats.endangered.map(({sp})=>[
-          sp.family,`${sp.genus} ${sp.species}`,sp.commonName??"",primaryStatus(sp.conservationStatus),
+          sp.family,`${sp.genus} ${sp.species}`,sp.commonName??"",allStatusesText(sp.conservationStatus),
         ]),
       ]);
     }
@@ -564,14 +671,17 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
   // ── Transecto Fauna: consolidated species table ──
   const transectoFaunaData = (() => {
     if (!selectedCampaign || !isTransectoFauna) return null;
-    const allOcc = selectedCampaign.stations.flatMap((s) => s.occurrences);
-    const speciesMap = new Map<string, { sp: SpeciesRow; abundance: number }>();
-    for (const occ of allOcc) {
-      const key = occ.species.id;
-      const n = occ.abundance ?? 1;
-      const ex = speciesMap.get(key);
-      if (ex) { ex.abundance += n; }
-      else speciesMap.set(key, { sp: occ.species, abundance: n });
+    const sortedStations = [...selectedCampaign.stations]
+      .sort((a, b) => a.name.localeCompare(b.name, "es", { numeric: true }));
+    const speciesMap = new Map<string, { sp: SpeciesRow; perStation: Map<string, number> }>();
+    for (const station of sortedStations) {
+      for (const occ of station.occurrences) {
+        const key = occ.species.id;
+        const n = occ.abundance ?? 1;
+        if (!speciesMap.has(key)) speciesMap.set(key, { sp: occ.species, perStation: new Map() });
+        const entry = speciesMap.get(key)!;
+        entry.perStation.set(station.id, (entry.perStation.get(station.id) ?? 0) + n);
+      }
     }
     const rows = Array.from(speciesMap.values()).sort((a, b) => {
       const c = (a.sp.clase ?? "").localeCompare(b.sp.clase ?? "");
@@ -581,7 +691,11 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
       const f = (a.sp.family || "").localeCompare(b.sp.family || "");
       if (f !== 0) return f;
       return `${a.sp.genus} ${a.sp.species}`.localeCompare(`${b.sp.genus} ${b.sp.species}`);
-    });
+    }).map(({ sp, perStation }) => ({
+      sp,
+      perStation,
+      abundance: Array.from(perStation.values()).reduce((s, n) => s + n, 0),
+    }));
     const totalAbundance = rows.reduce((sum, r) => sum + r.abundance, 0);
     const origenCounts = new Map<string, number>();
     for (const { sp } of rows) {
@@ -591,15 +705,14 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
       }
     }
     const origenRows = Array.from(origenCounts.entries()).sort((a, b) => a[0].localeCompare(b[0], "es"));
-    return { rows, totalAbundance, origenRows };
+    return { rows, totalAbundance, origenRows, sortedStations };
   })();
 
   // ── Parámetros comunitarios por transecto ──
   const communityParamsData = (() => {
     if (!selectedCampaign || !isTransectoFauna) return null;
-    const sortedStations = [...selectedCampaign.stations].sort((a, b) =>
-      a.name.localeCompare(b.name, "es", { numeric: true })
-    );
+    const sortedStations = [...selectedCampaign.stations]
+      .sort((a, b) => a.name.localeCompare(b.name, "es", { numeric: true }));
     return sortedStations
       .map((station) => {
         const speciesAbundance = new Map<string, number>();
@@ -616,10 +729,77 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
             if (pi > 0) H -= pi * Math.log(pi);
           }
         }
-        const J = S > 1 ? H / Math.log(S) : S === 1 ? 1 : 0;
-        return { name: station.name, S, N, H: Math.round(H * 1000) / 1000, J: Math.round(J * 1000) / 1000 };
-      })
-      .filter((s) => s.N > 0);
+        const J: number | null = S > 1 ? H / Math.log(S) : S === 1 ? 0 : null;
+        return {
+          name: station.name, S, N,
+          H: Math.round(H * 1000) / 1000,
+          J: J !== null ? Math.round(J * 1000) / 1000 : null,
+        };
+      });
+  })();
+
+  // ── Clase taxonómica — aplica a campañas de fauna (transecto, rescate, etc.) ──
+  const claseData = (() => {
+    if (!selectedCampaign || (!isTransectoFauna && !isRescate)) return null;
+    const allOcc = isGrilla
+      ? selectedCampaign.stations.flatMap((s) => (s.children ?? []).flatMap((c) => c.occurrences))
+      : selectedCampaign.stations.flatMap((s) => s.occurrences);
+
+    // Unique species and total abundance
+    const speciesMap = new Map<string, { sp: SpeciesRow; abundance: number }>();
+    for (const occ of allOcc) {
+      const key = occ.species.id;
+      const n = occ.abundance ?? occ.groupSize ?? 1;
+      const ex = speciesMap.get(key);
+      if (ex) { ex.abundance += n; }
+      else speciesMap.set(key, { sp: occ.species, abundance: n });
+    }
+
+    // Group by clase
+    const claseMap = new Map<string, { speciesIds: Set<string>; abundance: number }>();
+    for (const { sp, abundance } of speciesMap.values()) {
+      const clase = sp.clase || "Sin clasificar";
+      if (!claseMap.has(clase)) claseMap.set(clase, { speciesIds: new Set(), abundance: 0 });
+      const entry = claseMap.get(clase)!;
+      entry.speciesIds.add(sp.id);
+      entry.abundance += abundance;
+    }
+
+    const totalSpecies = speciesMap.size;
+    const totalAbundance = Array.from(speciesMap.values()).reduce((s, v) => s + v.abundance, 0);
+
+    const rows = Array.from(claseMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0], "es"))
+      .map(([clase, { speciesIds, abundance }]) => ({
+        clase,
+        nEspecies: speciesIds.size,
+        abundance,
+        pctEspecies: totalSpecies > 0 ? Math.round((speciesIds.size / totalSpecies) * 100) : 0,
+        pctAbundancia: totalAbundance > 0 ? Math.round((abundance / totalAbundance) * 100) : 0,
+      }));
+
+    return { rows, totalSpecies, totalAbundance };
+  })();
+
+  // ── RESCATE: capturas individuales agrupadas por clase ──
+  const rescateData = (() => {
+    if (!selectedCampaign || !isRescate) return null;
+    const rows: { individualCode: string; sp: SpeciesRow; stationName: string }[] = [];
+    for (const station of selectedCampaign.stations) {
+      for (const occ of station.occurrences) {
+        if (occ.individualCode) {
+          rows.push({ individualCode: occ.individualCode, sp: occ.species, stationName: station.name });
+        }
+      }
+    }
+    rows.sort((a, b) => {
+      const c = (a.sp.clase ?? "").localeCompare(b.sp.clase ?? "", "es");
+      if (c !== 0) return c;
+      const s = `${a.sp.genus} ${a.sp.species}`.localeCompare(`${b.sp.genus} ${b.sp.species}`, "es");
+      if (s !== 0) return s;
+      return a.individualCode.localeCompare(b.individualCode);
+    });
+    return { rows };
   })();
 
   const fmt3 = (n: number) => n.toFixed(3).replace(".", ",");
@@ -1229,8 +1409,9 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
             </Card>
           )}
 
-          {/* ── TRANSECTO FAUNA: consolidated table ── */}
+          {/* ── TRANSECTO FAUNA: consolidated table + por clase ── */}
           {isTransectoFauna && transectoFaunaData && (
+            <>
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Consolidado de Fauna — Transecto</CardTitle>
@@ -1247,11 +1428,14 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
                         <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Nombre Común</th>
                         <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Origen</th>
                         <th className="text-center px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">E.C.</th>
-                        <th className="text-right px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Abundancia Total</th>
+                        {transectoFaunaData.sortedStations.map((st) => (
+                          <th key={st.id} className="text-right px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">{st.name}</th>
+                        ))}
+                        <th className="text-right px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Total</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {transectoFaunaData.rows.map(({ sp, abundance }) => (
+                      {transectoFaunaData.rows.map(({ sp, abundance, perStation }) => (
                         <tr key={sp.id} className="hover:bg-gray-50">
                           <td className="px-3 py-2">{sp.clase ?? "—"}</td>
                           <td className="px-3 py-2 text-gray-600">{sp.orden ?? "—"}</td>
@@ -1260,6 +1444,12 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
                           <td className="px-3 py-2 text-gray-600">{sp.commonName ?? "—"}</td>
                           <td className="px-3 py-2 text-gray-600">{sp.origen ?? "—"}</td>
                           <td className="px-3 py-2 text-center">{statusBadge(sp.conservationStatus)}</td>
+                          {transectoFaunaData.sortedStations.map((st) => {
+                            const n = perStation.get(st.id) ?? 0;
+                            return (
+                              <td key={st.id} className={`px-3 py-2 text-right ${n === 0 ? "text-gray-300" : ""}`}>{n}</td>
+                            );
+                          })}
                           <td className="px-3 py-2 text-right font-semibold">{abundance}</td>
                         </tr>
                       ))}
@@ -1267,6 +1457,11 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
                     <tfoot>
                       <tr className="border-t-2 border-gray-300 bg-gray-100">
                         <td colSpan={7} className="px-3 py-2.5 text-right font-bold text-gray-800">Total</td>
+                        {transectoFaunaData.sortedStations.map((st) => (
+                          <td key={st.id} className="px-3 py-2.5 text-right font-bold text-gray-900">
+                            {transectoFaunaData.rows.reduce((sum, r) => sum + (r.perStation.get(st.id) ?? 0), 0)}
+                          </td>
+                        ))}
                         <td className="px-3 py-2.5 text-right font-bold text-gray-900">{transectoFaunaData.totalAbundance}</td>
                       </tr>
                     </tfoot>
@@ -1277,7 +1472,64 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
                 </div>
               </CardContent>
             </Card>
+
+            {/* ── Por Clase (inside the same transectoFaunaData guard) ── */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Riqueza y Abundancia por Clase Taxonómica</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left px-4 py-2.5 font-semibold text-gray-600">Clase</th>
+                        <th className="text-right px-4 py-2.5 font-semibold text-gray-600">N° Especies</th>
+                        <th className="text-right px-4 py-2.5 font-semibold text-gray-600">% Esp.</th>
+                        <th className="text-right px-4 py-2.5 font-semibold text-gray-600">N° Individuos</th>
+                        <th className="text-right px-4 py-2.5 font-semibold text-gray-600">% Ind.</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {(() => {
+                        const clMap = new Map<string, {n: number; ab: number}>();
+                        for (const {sp, abundance} of transectoFaunaData.rows) {
+                          const cl = sp.clase ?? "Sin clasificar";
+                          const e = clMap.get(cl) ?? {n: 0, ab: 0};
+                          e.n++; e.ab += abundance;
+                          clMap.set(cl, e);
+                        }
+                        const totN = transectoFaunaData.rows.length;
+                        const totAb = transectoFaunaData.totalAbundance;
+                        return Array.from(clMap.entries())
+                          .sort((a, b) => a[0].localeCompare(b[0], "es"))
+                          .map(([cl, {n, ab}]) => (
+                            <tr key={cl} className="hover:bg-gray-50">
+                              <td className="px-4 py-2 font-medium">{cl}</td>
+                              <td className="px-4 py-2 text-right">{n}</td>
+                              <td className="px-4 py-2 text-right text-gray-500">{totN > 0 ? Math.round(n/totN*100) : 0}%</td>
+                              <td className="px-4 py-2 text-right">{ab}</td>
+                              <td className="px-4 py-2 text-right text-gray-500">{totAb > 0 ? Math.round(ab/totAb*100) : 0}%</td>
+                            </tr>
+                          ));
+                      })()}
+                    </tbody>
+                    <tfoot>
+                      <tr className="font-bold border-t-2 border-gray-300 bg-gray-50">
+                        <td className="px-4 py-2">Total</td>
+                        <td className="px-4 py-2 text-right">{transectoFaunaData.rows.length}</td>
+                        <td className="px-4 py-2 text-right">100%</td>
+                        <td className="px-4 py-2 text-right">{transectoFaunaData.totalAbundance}</td>
+                        <td className="px-4 py-2 text-right">100%</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+            </>
           )}
+
 
           {/* ── TRANSECTO FAUNA: parámetros comunitarios ── */}
           {isTransectoFauna && communityParamsData && communityParamsData.length > 0 && (
@@ -1304,7 +1556,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
                           <td className="px-3 py-2 text-right font-mono">{row.S}</td>
                           <td className="px-3 py-2 text-right font-mono">{row.N}</td>
                           <td className="px-3 py-2 text-right font-mono">{fmt3(row.H)}</td>
-                          <td className="px-3 py-2 text-right font-mono">{fmt3(row.J)}</td>
+                          <td className="px-3 py-2 text-right font-mono">{row.J !== null ? fmt3(row.J) : <span className="text-gray-300 font-mono">—</span>}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1323,31 +1575,93 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-gray-50">
-                      <th className="text-left px-4 py-2 font-semibold text-gray-600">Origen</th>
-                      <th className="text-right px-4 py-2 font-semibold text-gray-600">Cantidad de especies</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {transectoFaunaData.origenRows.map(([origen, count]) => (
-                      <tr key={origen} className="hover:bg-gray-50">
-                        <td className="px-4 py-2">{origen}</td>
-                        <td className="px-4 py-2 text-right font-medium">{count}</td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left px-4 py-2 font-semibold text-gray-600">Origen</th>
+                        <th className="text-right px-4 py-2 font-semibold text-gray-600">Cantidad de especies</th>
                       </tr>
-                    ))}
-                    {transectoFaunaData.origenRows.length === 0 && (
-                      <tr><td colSpan={2} className="px-4 py-4 text-center text-gray-400 text-xs">Sin datos de origen</td></tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y">
+                      {transectoFaunaData.origenRows.map(([origen, count]) => (
+                        <tr key={origen} className="hover:bg-gray-50">
+                          <td className="px-4 py-2">{origen}</td>
+                          <td className="px-4 py-2 text-right font-medium">{count}</td>
+                        </tr>
+                      ))}
+                      {transectoFaunaData.origenRows.length === 0 && (
+                        <tr><td colSpan={2} className="px-4 py-4 text-center text-gray-400 text-xs">Sin datos de origen</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ── RESCATE: capturas agrupadas por clase ── */}
+          {isRescate && rescateData && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Registros de Captura por Clase Taxonómica</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Clase</th>
+                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Orden</th>
+                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Familia</th>
+                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap italic">Especie</th>
+                        <th className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Nombre Común</th>
+                        <th className="text-center px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Código</th>
+                        <th className="text-center px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">Estación</th>
+                        <th className="text-center px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">E.C.</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {(() => {
+                        let lastClase = "";
+                        return rescateData.rows.map((row, i) => {
+                          const showClaseHeader = row.sp.clase !== lastClase;
+                          lastClase = row.sp.clase ?? "";
+                          return (
+                            <>
+                              {showClaseHeader && (
+                                <tr key={`clase-${i}`} className="bg-blue-50 border-t border-blue-200">
+                                  <td colSpan={8} className="px-3 py-1.5 font-semibold text-blue-800 text-xs uppercase tracking-wide">
+                                    {row.sp.clase || "Sin clasificar"}
+                                  </td>
+                                </tr>
+                              )}
+                              <tr key={row.individualCode} className="hover:bg-gray-50">
+                                <td className="px-3 py-2 text-gray-500">{row.sp.clase ?? "—"}</td>
+                                <td className="px-3 py-2 text-gray-500">{row.sp.orden ?? "—"}</td>
+                                <td className="px-3 py-2">{row.sp.family}</td>
+                                <td className="px-3 py-2 italic font-medium whitespace-nowrap">{row.sp.genus} {row.sp.species}</td>
+                                <td className="px-3 py-2 text-gray-500">{row.sp.commonName ?? "—"}</td>
+                                <td className="px-3 py-2 text-center font-mono font-semibold text-orange-700">{row.individualCode}</td>
+                                <td className="px-3 py-2 text-center text-gray-500">{row.stationName}</td>
+                                <td className="px-3 py-2 text-center">{statusBadge(row.sp.conservationStatus)}</td>
+                              </tr>
+                            </>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                  {rescateData.rows.length === 0 && (
+                    <p className="text-sm text-gray-400 text-center py-8">Sin capturas registradas</p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           )}
 
           {/* ── Generic species table (non-BB methodologies) ── */}
-          {!isBB && !isMicroruteo && !isPF && !isGrilla && !isTransectoFauna && (
+          {!isBB && !isMicroruteo && !isPF && !isGrilla && !isTransectoFauna && !isRescate && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Lista de Especies</CardTitle>

@@ -14,14 +14,17 @@ datasource db {
 // CampaignStatus: "ACTIVE" | "COMPLETED" | "CANCELLED"
 
 model User {
-  id          String       @id @default(cuid())
-  email       String       @unique
-  name        String
-  password    String
-  active      Boolean      @default(true)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  occurrences Occurrence[]
+  id               String       @id @default(cuid())
+  email            String       @unique
+  name             String
+  password         String
+  active           Boolean      @default(true)
+  role             String       @default("USER")
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  occurrences      Occurrence[]
+  speciesCreated   Species[]    @relation("SpeciesCreatedBy")
+  speciesUpdated   Species[]    @relation("SpeciesUpdatedBy")
 }
 
 model Project {
@@ -98,6 +101,12 @@ model Species {
   division           String?
   clase              String?
   orden              String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @default(now()) @updatedAt
+  createdById        String?
+  updatedById        String?
+  createdBy          User?        @relation("SpeciesCreatedBy", fields: [createdById], references: [id])
+  updatedBy          User?        @relation("SpeciesUpdatedBy", fields: [updatedById], references: [id])
   occurrences        Occurrence[]
 
   @@index([type])

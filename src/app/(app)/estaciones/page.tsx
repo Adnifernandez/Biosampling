@@ -1,7 +1,7 @@
-﻿import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Card, CardContent } from "@/components/ui/card";
-import { LayoutList, Plus, MapPin, Leaf, Bird, Pencil, ClipboardList } from "lucide-react";
+import { LayoutList, Plus, MapPin, Pencil, ClipboardList } from "lucide-react";
 import { EstacionesFiltro } from "@/components/estaciones/EstacionesFiltro";
 import { STATION_TYPE_LABELS, type StationType } from "@/lib/types";
 import { DeleteStationButton } from "@/components/estaciones/DeleteStationButton";
@@ -13,37 +13,39 @@ export default async function EstacionesPage({
 }) {
   const { projectId, campaignId } = await searchParams;
 
-  const projects = await prisma.project.findMany({
-    orderBy: { name: "asc" },
-    select: {
-      id: true,
-      name: true,
-      campaigns: {
-        orderBy: { createdAt: "desc" },
-        select: { id: true, name: true, surveyType: true, methodology: true },
-      },
-    },
-  });
-
-  const stations = campaignId
-    ? await prisma.station.findMany({
-        where: { campaignId, parentId: null },
-        orderBy: { createdAt: "asc" },
-        include: {
-          campaign: {
-            select: { id: true, name: true, surveyType: true, methodology: true, projectId: true },
+  const [projects, campaigns, stations] = await Promise.all([
+    prisma.project.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    projectId
+      ? prisma.campaign.findMany({
+          where: { projectId },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, name: true, surveyType: true, methodology: true },
+        })
+      : Promise.resolve([]),
+    campaignId
+      ? prisma.station.findMany({
+          where: { campaignId, parentId: null },
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            campaignId: true,
+            area: true,
+            length: true,
+            width: true,
+            notes: true,
+            children: { select: { id: true, name: true }, orderBy: { createdAt: "asc" } },
           },
-          children: { select: { id: true, name: true }, orderBy: { createdAt: "asc" } },
-        },
-      })
-    : [];
+        })
+      : Promise.resolve([]),
+  ]);
 
-  // Find the selected campaign for context
-  const selectedCampaign = campaignId
-    ? projects
-        .flatMap((p) => p.campaigns)
-        .find((c) => c.id === campaignId)
-    : null;
+  const selectedCampaign = campaigns.find((c) => c.id === campaignId) ?? null;
+  const methodology = selectedCampaign?.methodology ?? null;
 
   return (
     <div className="space-y-5">
@@ -68,6 +70,7 @@ export default async function EstacionesPage({
 
       <EstacionesFiltro
         projects={projects}
+        campaigns={campaigns}
         selectedProjectId={projectId ?? ""}
         selectedCampaignId={campaignId ?? ""}
       />
@@ -100,20 +103,17 @@ export default async function EstacionesPage({
           {stations.map((s) => (
             <Card key={s.id}>
               <CardContent className="py-3 px-4">
-                {/* Nombre + tipo + info */}
                 <div className="flex items-start gap-3 mb-2">
                   <span className={`text-sm font-bold px-2 py-1 rounded font-mono shrink-0 ${
-                    s.type === "PARCELA"
-                      ? "bg-teal-100 text-teal-800"
-                      : "bg-blue-100 text-blue-800"
+                    s.type === "PARCELA" ? "bg-teal-100 text-teal-800" : "bg-blue-100 text-blue-800"
                   }`}>
                     {s.name}
                   </span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-medium text-gray-900">
-                        {s.campaign.methodology === "GRILLA" ? "Transecto"
-                          : s.campaign.methodology === "MICRORUTEO" ? "Ruta"
+                        {methodology === "GRILLA" ? "Transecto"
+                          : methodology === "MICRORUTEO" ? "Ruta"
                           : STATION_TYPE_LABELS[s.type as StationType]}
                       </p>
                       {s.children.length > 0 && (
@@ -134,11 +134,10 @@ export default async function EstacionesPage({
                     )}
                   </div>
                 </div>
-                {/* Acciones */}
                 <div className="flex items-center gap-1.5">
                   <ButtonLink
                     href={
-                      s.campaign.methodology === "GRILLA"
+                      methodology === "GRILLA"
                         ? `/ocurrencias?projectId=${projectId}&campaignId=${campaignId}&transectoId=${s.id}`
                         : `/ocurrencias?projectId=${projectId}&campaignId=${campaignId}&stationId=${s.id}`
                     }
@@ -152,7 +151,7 @@ export default async function EstacionesPage({
                     <Pencil className="h-4 w-4" />
                   </ButtonLink>
                   <DeleteStationButton
-                    projectId={s.campaign.projectId}
+                    projectId={projectId ?? ""}
                     campaignId={s.campaignId}
                     stationId={s.id}
                   />

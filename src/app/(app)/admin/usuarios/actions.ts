@@ -43,3 +43,14 @@ export async function toggleUserActive(id: string, active: boolean) {
   revalidatePath("/admin/usuarios");
   return { success: true };
 }
+
+export async function changeUserRole(id: string, currentRole: string) {
+  const session = await auth();
+  if (session?.user.role !== "ADMIN") throw new Error("No autorizado");
+  if (session.user.id === id) return { error: "No puedes cambiar tu propio rol" };
+
+  const newRole = currentRole === "ADMIN" ? "USER" : "ADMIN";
+  await prisma.user.update({ where: { id }, data: { role: newRole } });
+  revalidatePath("/admin/usuarios");
+  return { success: true };
+}

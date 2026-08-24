@@ -447,8 +447,8 @@ function NewStationForm({
         {!editData && (
           <div className="space-y-1">
             <Label className="text-xs">Cantidad</Label>
-            <Input type="number" min={1} max={20} value={quantity}
-              onChange={(e) => setQuantity(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
+            <Input type="number" min={1} max={100} value={quantity}
+              onChange={(e) => setQuantity(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
               className="bg-white" />
           </div>
         )}

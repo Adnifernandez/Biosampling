@@ -124,3 +124,9 @@ export async function updateCampana(campaignId: string, formData: FormData) {
   revalidatePath(`/proyectos/${campaign.projectId}/campanas/${campaignId}`);
   return { success: true, id: campaign.id, projectId: campaign.projectId };
 }
+
+export async function changeCampaignStatus(id: string, status: string) {
+  await prisma.campaign.update({ where: { id }, data: { status } });
+  revalidatePath("/campanas");
+  return { success: true };
+}

@@ -24,8 +24,8 @@ export async function createEstaciones(formData: FormData) {
   }
 
   const quantity = parseInt(quantityVal, 10);
-  if (isNaN(quantity) || quantity < 1 || quantity > 20) {
-    return { error: "La cantidad debe ser entre 1 y 20" };
+  if (isNaN(quantity) || quantity < 1 || quantity > 100) {
+    return { error: "La cantidad debe ser entre 1 y 100" };
   }
 
   const methodology = formData.get("methodology") as string | null;

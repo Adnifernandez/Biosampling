@@ -2,41 +2,32 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { FolderOpen, Layers } from "lucide-react";
-import { navigate } from "@/lib/offline-nav";
-import { saveLastProject, getLastProject } from "@/lib/project-persistence";
+import { saveLastProject } from "@/lib/project-persistence";
 
-type Campaign = { id: string; name: string; surveyType: string; methodology: string | null };
-type Project = { id: string; name: string; campaigns: Campaign[] };
+type Campaign = { id: string; name: string };
+type Project  = { id: string; name: string };
 
 interface EstacionesFiltroProps {
   projects: Project[];
+  campaigns: Campaign[];
   selectedProjectId: string;
   selectedCampaignId: string;
 }
 
 export function EstacionesFiltro({
   projects,
+  campaigns,
   selectedProjectId,
   selectedCampaignId,
 }: EstacionesFiltroProps) {
-  const router = useRouter();
-
-  const selectedProject = projects.find((p) => p.id === selectedProjectId);
-  const selectedCampaign = selectedProject?.campaigns.find((c) => c.id === selectedCampaignId);
+  const selectedProject  = projects.find((p) => p.id === selectedProjectId);
+  const selectedCampaign = campaigns.find((c) => c.id === selectedCampaignId);
 
   useEffect(() => {
-    if (selectedProjectId) {
-      saveLastProject(selectedProjectId);
-    } else {
-      const last = getLastProject();
-      if (last && projects.some((p) => p.id === last)) {
-        navigate(router, `/estaciones?projectId=${last}`);
-      }
-    }
+    if (selectedProjectId) saveLastProject(selectedProjectId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedProjectId]);
 
   return (
     <div className="space-y-2">

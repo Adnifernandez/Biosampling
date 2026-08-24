@@ -12,6 +12,7 @@ import { DeleteGrillaButton } from "@/components/ocurrencias/DeleteGrillaButton"
 type OccurrenceRow = {
   id: string;
   date: Date;
+  createdAt: Date;
   abundance: number | null;
   cover: number | null;
   methodologyData: string | null;
@@ -54,6 +55,7 @@ export default async function OcurrenciasPage({
           select: {
             id: true,
             date: true,
+            createdAt: true,
             abundance: true,
             cover: true,
             methodologyData: true,
@@ -206,7 +208,9 @@ export default async function OcurrenciasPage({
                     {o.species.commonName && (
                       <p className="text-xs text-gray-500">{o.species.commonName}</p>
                     )}
-                    <p className="text-xs text-gray-400 mt-0.5">{o.user.name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {o.user.name} · {format(new Date(o.createdAt), "d MMM yyyy, HH:mm", { locale: es })}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <div className="text-right">
