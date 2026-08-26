@@ -220,6 +220,24 @@ export function OccurrenceForm({
   const [grillaSearchList, setGrillaSearchList] = useState<SpeciesResult[]>([]);
   const [searchingGrilla, setSearchingGrilla] = useState(false);
   const grillaSearchSeq = useRef(0);
+  // Species already picked for another point in this grilla, or elsewhere in the campaign — quick-pick suggestions
+  const grillaSuggestions = (() => {
+    const seen = new Set<string>();
+    const suggestions: { speciesId: string; label: string }[] = [];
+    for (const p of grillaPoints) {
+      if (p.type === "species" && !seen.has(p.speciesId)) {
+        seen.add(p.speciesId);
+        suggestions.push({ speciesId: p.speciesId, label: p.label });
+      }
+    }
+    for (const sp of campaignSpecies ?? []) {
+      if (!seen.has(sp.id)) {
+        seen.add(sp.id);
+        suggestions.push({ speciesId: sp.id, label: `${sp.genus} ${sp.species}${sp.commonName ? ` · ${sp.commonName}` : ""}` });
+      }
+    }
+    return suggestions;
+  })();
   // Grilla extras: individual counts per species + GPS + photo
   const [grillaIndividuos, setGrillaIndividuos] = useState<Record<string, string>>({});
   const [grillaPhoto, setGrillaPhoto] = useState<string | null>(null);
@@ -979,27 +997,29 @@ export function OccurrenceForm({
                         onChange={(e) => setGrillaQuery(e.target.value)}
                       />
                     </div>
-                    {/* Campaign suggestions — shown when search is empty */}
-                    {!grillaQuery && !!campaignSpecies?.length && (
+                    {/* Suggestions — species already used in this grilla or campaign, shown when search is empty */}
+                    {!grillaQuery && grillaSuggestions.length > 0 && (
                       <div className="space-y-1">
-                        <p className="text-xs text-gray-400 px-1">Especies de esta campaña</p>
+                        <p className="text-xs text-gray-400 px-1">Especies ya ingresadas</p>
                         <div className="border rounded-lg max-h-44 overflow-y-auto divide-y bg-white">
-                          {campaignSpecies.map((sp) => (
-                            <button
-                              key={sp.id}
-                              type="button"
-                              className="w-full text-left px-3 py-2 hover:bg-teal-50 text-sm"
-                              onClick={() => {
-                                const label = `${sp.genus} ${sp.species}${sp.commonName ? ` · ${sp.commonName}` : ""}`;
-                                setGrillaPoints(prev => prev.map((p, i) => i === activePoint ? { type: "species", speciesId: sp.id, label } : p));
-                                setActivePoint(activePoint < 15 ? activePoint + 1 : null);
-                                setGrillaQuery(""); setGrillaSearchList([]);
-                              }}
-                            >
-                              <span className="italic font-medium">{sp.genus} {sp.species}</span>
-                              {sp.commonName && <span className="text-gray-500 ml-2">· {sp.commonName}</span>}
-                            </button>
-                          ))}
+                          {grillaSuggestions.map((sg) => {
+                            const [sciName, commonName] = sg.label.split(" · ");
+                            return (
+                              <button
+                                key={sg.speciesId}
+                                type="button"
+                                className="w-full text-left px-3 py-2 hover:bg-teal-50 text-sm"
+                                onClick={() => {
+                                  setGrillaPoints(prev => prev.map((p, i) => i === activePoint ? { type: "species", speciesId: sg.speciesId, label: sg.label } : p));
+                                  setActivePoint(activePoint < 15 ? activePoint + 1 : null);
+                                  setGrillaQuery(""); setGrillaSearchList([]);
+                                }}
+                              >
+                                <span className="italic font-medium">{sciName}</span>
+                                {commonName && <span className="text-gray-500 ml-2">· {commonName}</span>}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
