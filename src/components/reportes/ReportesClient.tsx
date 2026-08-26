@@ -1,15 +1,16 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Download, BarChart2, ListTree, Leaf, Bird } from "lucide-react";
+import { Download, BarChart2, ListTree, Leaf, Bird, Loader2 } from "lucide-react";
 // ExcelJS loaded dynamically inside exportXLSX to avoid SSR issues
 import { SURVEY_TYPE_LABELS } from "@/lib/types";
 import { getMethodologyById } from "@/lib/methodologies";
+import { getCampaignStations } from "@/app/(app)/reportes/actions";
 
 type SpeciesRow = {
   id: string;
@@ -54,7 +55,6 @@ type CampaignRow = {
   endDate: Date | string;
   responsible: string | null;
   notes: string | null;
-  stations: StationRow[];
 };
 
 type ProjectRow = {
@@ -126,6 +126,26 @@ function statusBadge(raw: string | null) {
 export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
   const [projectId, setProjectId] = useState<string>("");
   const [campaignId, setCampaignId] = useState<string>("");
+  const [stations, setStations] = useState<StationRow[]>([]);
+  const [loadingStations, setLoadingStations] = useState(false);
+
+  useEffect(() => {
+    if (!campaignId) {
+      setStations([]);
+      setLoadingStations(false);
+      return;
+    }
+    let cancelled = false;
+    setStations([]);
+    setLoadingStations(true);
+    getCampaignStations(campaignId).then((data) => {
+      if (!cancelled) {
+        setStations(data);
+        setLoadingStations(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [campaignId]);
 
   const selectedProject = projects.find((p) => p.id === projectId);
   const campaigns = selectedProject?.campaigns ?? [];
@@ -142,8 +162,8 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
   const stats = (() => {
     if (!selectedCampaign) return null;
     const allOcc = isGrilla
-      ? selectedCampaign.stations.flatMap((s) => (s.children ?? []).flatMap((c) => c.occurrences))
-      : selectedCampaign.stations.flatMap((s) => s.occurrences);
+      ? stations.flatMap((s) => (s.children ?? []).flatMap((c) => c.occurrences))
+      : stations.flatMap((s) => s.occurrences);
     const speciesMap = new Map<string, { sp: SpeciesRow; count: number; abundance: number }>();
     for (const occ of allOcc) {
       const key = occ.species.id;
@@ -154,14 +174,14 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     }
     const speciesList = Array.from(speciesMap.values()).sort((a, b) => spSort(a.sp, b.sp));
     const stationData = isGrilla
-      ? selectedCampaign.stations
+      ? stations
           .flatMap((s) => s.children ?? [])
           .sort((a, b) => a.name.localeCompare(b.name, "es", { numeric: true }))
           .map((g) => ({
             name: g.name,
             ocurrencias: g.occurrences.reduce((sum, o) => sum + (o.abundance ?? 0), 0),
           }))
-      : selectedCampaign.stations.map((s) => ({
+      : stations.map((s) => ({
           name: s.name.length > 8 ? s.name.slice(0, 8) + "…" : s.name,
           ocurrencias: s.occurrences.length,
         }));
@@ -173,8 +193,8 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
       totalOccurrences: allOcc.length,
       totalIndividuals: allOcc.reduce((s, o) => s + (o.abundance ?? o.groupSize ?? 1), 0),
       totalStations: isGrilla
-        ? selectedCampaign.stations.reduce((sum, s) => sum + (s.children?.length ?? 0), 0)
-        : selectedCampaign.stations.length,
+        ? stations.reduce((sum, s) => sum + (s.children?.length ?? 0), 0)
+        : stations.length,
       speciesList,
       stationData,
       endangered,
@@ -184,7 +204,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
   // ── Parcelas (Braun-Blanquet) matrix ──
   const bbData = (() => {
     if (!selectedCampaign || !isBB) return null;
-    const sortedStations = [...selectedCampaign.stations].sort((a, b) =>
+    const sortedStations = [...stations].sort((a, b) =>
       a.name.localeCompare(b.name, "es", { numeric: true })
     );
     const speciesMap = new Map<string, { sp: SpeciesRow; stMap: Map<string, string> }>();
@@ -225,7 +245,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     type MRow = { sp: SpeciesRow; individuo: number; utmEast: number | null; utmNorth: number | null };
 
     const raw: Omit<MRow, "individuo">[] = [];
-    for (const station of selectedCampaign.stations) {
+    for (const station of stations) {
       for (const o of station.occurrences) {
         let utmEast: number | null = null;
         let utmNorth: number | null = null;
@@ -272,7 +292,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
   const grillaData = (() => {
     if (!selectedCampaign || !isGrilla) return null;
 
-    const transectos = [...selectedCampaign.stations].sort((a, b) =>
+    const transectos = [...stations].sort((a, b) =>
       a.name.localeCompare(b.name, "es", { numeric: true })
     );
 
@@ -634,7 +654,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     type PFRow = { parcela: string; sp: SpeciesRow; individuo: number; dap: string; dat: string; altura: string };
 
     const individualRows: PFRow[] = [];
-    const sortedStations = [...selectedCampaign.stations].sort((a, b) =>
+    const sortedStations = [...stations].sort((a, b) =>
       a.name.localeCompare(b.name, "es", { numeric: true })
     );
 
@@ -671,7 +691,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
   // ── Transecto Fauna: consolidated species table ──
   const transectoFaunaData = (() => {
     if (!selectedCampaign || !isTransectoFauna) return null;
-    const sortedStations = [...selectedCampaign.stations]
+    const sortedStations = [...stations]
       .sort((a, b) => a.name.localeCompare(b.name, "es", { numeric: true }));
     const speciesMap = new Map<string, { sp: SpeciesRow; perStation: Map<string, number> }>();
     for (const station of sortedStations) {
@@ -711,7 +731,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
   // ── Parámetros comunitarios por transecto ──
   const communityParamsData = (() => {
     if (!selectedCampaign || !isTransectoFauna) return null;
-    const sortedStations = [...selectedCampaign.stations]
+    const sortedStations = [...stations]
       .sort((a, b) => a.name.localeCompare(b.name, "es", { numeric: true }));
     return sortedStations
       .map((station) => {
@@ -742,8 +762,8 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
   const claseData = (() => {
     if (!selectedCampaign || (!isTransectoFauna && !isRescate)) return null;
     const allOcc = isGrilla
-      ? selectedCampaign.stations.flatMap((s) => (s.children ?? []).flatMap((c) => c.occurrences))
-      : selectedCampaign.stations.flatMap((s) => s.occurrences);
+      ? stations.flatMap((s) => (s.children ?? []).flatMap((c) => c.occurrences))
+      : stations.flatMap((s) => s.occurrences);
 
     // Unique species and total abundance
     const speciesMap = new Map<string, { sp: SpeciesRow; abundance: number }>();
@@ -785,7 +805,7 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
   const rescateData = (() => {
     if (!selectedCampaign || !isRescate) return null;
     const rows: { individualCode: string; sp: SpeciesRow; stationName: string }[] = [];
-    for (const station of selectedCampaign.stations) {
+    for (const station of stations) {
       for (const occ of station.occurrences) {
         if (occ.individualCode) {
           rows.push({ individualCode: occ.individualCode, sp: occ.species, stationName: station.name });
@@ -851,7 +871,16 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
         </CardContent>
       </Card>
 
-      {stats && selectedCampaign && (
+      {selectedCampaign && loadingStations && (
+        <Card>
+          <CardContent className="py-10 text-center text-gray-400">
+            <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin" />
+            <p>Cargando datos de la campaña…</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {stats && selectedCampaign && !loadingStations && (
         <div className="space-y-4">
 
           {/* Export button */}

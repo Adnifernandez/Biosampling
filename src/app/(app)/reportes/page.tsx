@@ -5,30 +5,21 @@ import { ReportesClient } from "@/components/reportes/ReportesClient";
 export default async function ReportesPage() {
   const projects = await prisma.project.findMany({
     orderBy: { name: "asc" },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      region: true,
+      commune: true,
       campaigns: {
-        include: {
-          stations: {
-            include: {
-              occurrences: {
-                include: {
-                  species: true,
-                  user: { select: { name: true } },
-                },
-              },
-              children: {
-                orderBy: { name: "asc" },
-                include: {
-                  occurrences: {
-                    include: {
-                      species: true,
-                      user: { select: { name: true } },
-                    },
-                  },
-                },
-              },
-            },
-          },
+        select: {
+          id: true,
+          name: true,
+          surveyType: true,
+          methodology: true,
+          startDate: true,
+          endDate: true,
+          responsible: true,
+          notes: true,
         },
       },
     },
