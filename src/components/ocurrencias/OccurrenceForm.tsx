@@ -977,7 +977,6 @@ export function OccurrenceForm({
                         placeholder="Buscar especie..."
                         value={grillaQuery}
                         onChange={(e) => setGrillaQuery(e.target.value)}
-                        autoFocus
                       />
                     </div>
                     {/* Campaign suggestions — shown when search is empty */}
