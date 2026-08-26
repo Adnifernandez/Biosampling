@@ -980,6 +980,30 @@ export function OccurrenceForm({
                         autoFocus
                       />
                     </div>
+                    {/* Campaign suggestions — shown when search is empty */}
+                    {!grillaQuery && !!campaignSpecies?.length && (
+                      <div className="space-y-1">
+                        <p className="text-xs text-gray-400 px-1">Especies de esta campaña</p>
+                        <div className="border rounded-lg max-h-44 overflow-y-auto divide-y bg-white">
+                          {campaignSpecies.map((sp) => (
+                            <button
+                              key={sp.id}
+                              type="button"
+                              className="w-full text-left px-3 py-2 hover:bg-teal-50 text-sm"
+                              onClick={() => {
+                                const label = `${sp.genus} ${sp.species}${sp.commonName ? ` · ${sp.commonName}` : ""}`;
+                                setGrillaPoints(prev => prev.map((p, i) => i === activePoint ? { type: "species", speciesId: sp.id, label } : p));
+                                setActivePoint(activePoint < 15 ? activePoint + 1 : null);
+                                setGrillaQuery(""); setGrillaSearchList([]);
+                              }}
+                            >
+                              <span className="italic font-medium">{sp.genus} {sp.species}</span>
+                              {sp.commonName && <span className="text-gray-500 ml-2">· {sp.commonName}</span>}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {searchingGrilla && <p className="text-xs text-gray-400">Buscando...</p>}
                     {grillaSearchList.length > 0 && (
                       <div className="border rounded-lg max-h-44 overflow-y-auto divide-y bg-white">
