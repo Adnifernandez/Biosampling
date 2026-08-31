@@ -5,6 +5,5 @@ import { TerrenoClient } from "./TerrenoClient";
 export default async function TerrenoPage() {
   const session = await auth();
   if (!session) redirect("/login");
-  if (session.user.role !== "ADMIN") redirect("/dashboard");
   return <TerrenoClient />;
 }

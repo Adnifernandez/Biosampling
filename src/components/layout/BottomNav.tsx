@@ -21,10 +21,10 @@ const mainItems = [
 const moreItemsBase = [
   { href: "/admin/especies",  label: "Especies",  icon: FlaskConical  },
   { href: "/reportes",        label: "Reportes",  icon: FileBarChart2 },
+  { href: "/terreno",         label: "Terreno",   icon: MapPin        },
 ];
 
 const moreItemsAdmin = [
-  { href: "/terreno",         label: "Terreno",   icon: MapPin        },
   { href: "/admin/usuarios",  label: "Usuarios",  icon: Users         },
 ];
 

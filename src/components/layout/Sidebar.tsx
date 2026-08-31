@@ -30,10 +30,10 @@ const baseNavItems = [
   { href: "/ocurrencias",     label: "Ocurrencias",        icon: ClipboardList   },
   { href: "/reportes",        label: "Reportes",           icon: FileBarChart2   },
   { href: "/admin/especies",  label: "Especies",           icon: FlaskConical    },
+  { href: "/terreno",         label: "Modo Terreno",       icon: MapPin          },
 ];
 
 const adminNavItems = [
-  { href: "/terreno",         label: "Modo Terreno",       icon: MapPin          },
   { href: "/admin/usuarios",  label: "Usuarios",           icon: Users           },
 ];
 
