@@ -1,17 +1,8 @@
 ﻿import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
-import { Card, CardContent } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button-link";
-import { Plus, FolderOpen, MapPin, User2, Pencil, Layers } from "lucide-react";
-import { PROJECT_STATUS_LABELS, type ProjectStatus } from "@/lib/types";
-import { CloseProjectButton } from "@/components/proyectos/CloseProjectButton";
-import { DeleteProjectButton } from "@/components/proyectos/DeleteProjectButton";
-
-const STATUS_COLORS: Record<ProjectStatus, string> = {
-  ACTIVE: "bg-teal-100 text-teal-800",
-  INACTIVE: "bg-gray-100 text-gray-600",
-  COMPLETED: "bg-blue-100 text-blue-800",
-};
+import { Plus } from "lucide-react";
+import { ProjectsListClient } from "@/components/proyectos/ProjectsListClient";
 
 export default async function ProyectosPage() {
   const session = await auth();
@@ -34,59 +25,7 @@ export default async function ProyectosPage() {
         </ButtonLink>
       </div>
 
-      {projects.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <FolderOpen className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-            <p className="text-gray-500 font-medium">No hay proyectos</p>
-            <p className="text-sm text-gray-400 mt-1">Crea tu primer proyecto para comenzar</p>
-            <ButtonLink href="/proyectos/nuevo" className="mt-4 inline-flex bg-teal-700 hover:bg-teal-800 text-white" size="sm">
-              <Plus className="h-4 w-4 mr-1" /> Crear proyecto
-            </ButtonLink>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {projects.map((p) => (
-            <Card key={p.id}>
-              <CardContent className="py-4 px-4">
-                {/* Nombre + estado */}
-                <div className="flex items-start gap-2 mb-1.5">
-                  <h2 className="font-semibold text-gray-900 flex-1 leading-snug">{p.name}</h2>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 mt-0.5 ${STATUS_COLORS[p.status as ProjectStatus]}`}>
-                    {PROJECT_STATUS_LABELS[p.status as ProjectStatus]}
-                  </span>
-                </div>
-                {/* Meta */}
-                <div className="flex flex-wrap gap-x-3 gap-y-0.5 mb-3 text-xs text-gray-500">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3 w-3 shrink-0" /> {p.region} · {p.commune}
-                  </span>
-                  {p.createdBy && (
-                    <span className="flex items-center gap-1">
-                      <User2 className="h-3 w-3 shrink-0" /> {p.createdBy}
-                    </span>
-                  )}
-                </div>
-                {/* Acciones */}
-                <div className="flex items-center gap-1.5">
-                  <ButtonLink href={`/campanas?projectId=${p.id}`} size="sm" className="flex-1 justify-center bg-teal-700 hover:bg-teal-800 text-white gap-1.5">
-                    <Layers className="h-3.5 w-3.5" />
-                    Campañas
-                  </ButtonLink>
-                  <CloseProjectButton id={p.id} status={p.status} />
-                  {p.status !== "COMPLETED" && (
-                    <ButtonLink href={`/proyectos/${p.id}/editar`} variant="outline" size="sm">
-                      <Pencil className="h-4 w-4" />
-                    </ButtonLink>
-                  )}
-                  {isAdmin && <DeleteProjectButton id={p.id} />}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      <ProjectsListClient projects={projects} isAdmin={isAdmin} />
     </div>
   );
 }
