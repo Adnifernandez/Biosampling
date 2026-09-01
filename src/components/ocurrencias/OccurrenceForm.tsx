@@ -728,7 +728,7 @@ export function OccurrenceForm({
                   <SelectValue placeholder="Seleccionar..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {["POA", "Trampa Sherman", "Cámara trampa", "Observación directa", "Captura manual", "Otro"].map((m) => (
+                  {["POA", "Recorrido pedestre", "Trampa Sherman", "Cámara trampa", "Observación directa", "Captura manual", "Otro"].map((m) => (
                     <SelectItem key={m} value={m}>{m}</SelectItem>
                   ))}
                 </SelectContent>
