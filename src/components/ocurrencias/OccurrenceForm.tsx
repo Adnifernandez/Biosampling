@@ -128,6 +128,9 @@ interface OccurrenceFormProps {
   existingBBSpeciesIds?: string[];
   // Campaign-wide species suggestions (sorted by frequency across all stations in campaign)
   campaignSpecies?: SpeciesResult[];
+  // Station-wide species suggestions — for Sherman/camera traps: species already seen in
+  // other traps or on previous days at this same station (sorted by frequency)
+  stationSpecies?: SpeciesResult[];
 }
 
 function buildTrapOptions(method: string, shermanCount: number, cameraCount: number): string[] {
@@ -156,6 +159,7 @@ export function OccurrenceForm({
   onAdjustAbundance,
   existingBBSpeciesIds,
   campaignSpecies,
+  stationSpecies,
 }: OccurrenceFormProps) {
   const router = useRouter();
   const isBB = methodology === "BRAUN_BLANQUET";
@@ -1190,6 +1194,7 @@ export function OccurrenceForm({
                   entries={trapEntries}
                   onChange={setTrapEntries}
                   surveyType={surveyType}
+                  stationSpecies={stationSpecies}
                 />
               ) : (
                 /* All other methods or edit mode: single date + time + abundance */
@@ -1382,10 +1387,12 @@ function TrapMultiEntry({
   entries,
   onChange,
   surveyType,
+  stationSpecies,
 }: {
   entries: TrapEntry[];
   onChange: (entries: TrapEntry[]) => void;
   surveyType: "FLORA" | "FAUNA";
+  stationSpecies?: SpeciesResult[];
 }) {
   function addEntry() {
     onChange([...entries, {
@@ -1418,6 +1425,7 @@ function TrapMultiEntry({
             entry={entry}
             canRemove={entries.length > 1}
             surveyType={surveyType}
+            stationSpecies={stationSpecies}
             onUpdate={(patch) => updateEntry(i, patch)}
             onRemove={() => removeEntry(i)}
           />
@@ -1433,6 +1441,7 @@ function TrapEntryRow({
   entry,
   canRemove,
   surveyType,
+  stationSpecies,
   onUpdate,
   onRemove,
 }: {
@@ -1440,6 +1449,7 @@ function TrapEntryRow({
   entry: TrapEntry;
   canRemove: boolean;
   surveyType: "FLORA" | "FAUNA";
+  stationSpecies?: SpeciesResult[];
   onUpdate: (patch: Partial<TrapEntry>) => void;
   onRemove: () => void;
 }) {
@@ -1499,6 +1509,26 @@ function TrapEntryRow({
             <Input className="pl-9" placeholder="Buscar especie..." value={query}
               onChange={(e) => { setQuery(e.target.value); }} />
           </div>
+          {/* Suggestions — species already seen in other traps or previous days at this station */}
+          {!query && !!stationSpecies?.length && (
+            <div className="mt-1 space-y-1">
+              <p className="text-xs text-gray-400 px-1">Especies de esta estación</p>
+              <div className="border rounded-lg max-h-40 overflow-y-auto divide-y bg-white">
+                {stationSpecies.map((sp) => (
+                  <button key={sp.id} type="button" className="w-full text-left px-3 py-2 hover:bg-teal-50 text-sm"
+                    onClick={() => {
+                      const label = `${sp.genus} ${sp.species}${sp.commonName ? ` · ${sp.commonName}` : ""}`;
+                      onUpdate({ speciesId: sp.id, speciesLabel: label });
+                      setQuery(label.split(" · ")[0]);
+                      setList([]);
+                    }}>
+                    <span className="italic font-medium">{sp.genus} {sp.species}</span>
+                    {sp.commonName && <span className="text-gray-500 ml-2">· {sp.commonName}</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {searching && <p className="text-xs text-gray-400 mt-1">Buscando...</p>}
           {list.length > 0 && (
             <div className="border rounded-lg max-h-40 overflow-y-auto divide-y bg-white mt-1">

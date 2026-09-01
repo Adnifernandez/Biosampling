@@ -312,6 +312,31 @@ export async function getCampaignSpecies(campaignId: string): Promise<{
   return [...map.values()].sort((a, b) => b.count - a.count).map((v) => v.sp);
 }
 
+// Species already registered at this station — across every trap/point and every date,
+// so Sherman/camera-trap entries can suggest species seen in other traps or on previous days.
+export async function getStationSpecies(stationId: string): Promise<{
+  id: string; genus: string; species: string;
+  commonName: string | null; family: string; conservationStatus: string | null;
+}[]> {
+  const rows = await prisma.occurrence.findMany({
+    where: { stationId },
+    select: {
+      speciesId: true,
+      species: { select: { id: true, genus: true, species: true, commonName: true, family: true, conservationStatus: true } },
+    },
+  });
+  const map = new Map<string, {
+    sp: { id: string; genus: string; species: string; commonName: string | null; family: string; conservationStatus: string | null };
+    count: number;
+  }>();
+  for (const r of rows) {
+    const existing = map.get(r.speciesId);
+    if (existing) existing.count++;
+    else map.set(r.speciesId, { sp: r.species, count: 1 });
+  }
+  return [...map.values()].sort((a, b) => b.count - a.count).map((v) => v.sp);
+}
+
 export async function searchSpecies(query: string, surveyType: string) {
   const pattern = `%${query}%`;
   return prisma.$queryRaw<Array<{

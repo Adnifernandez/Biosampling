@@ -38,7 +38,13 @@ export default async function NuevaOcurrenciaPage({
       ? prisma.occurrence.findMany({ where: { stationId }, select: { speciesId: true } })
       : Promise.resolve([]),
     isTransectoFauna
-      ? prisma.occurrence.findMany({ where: { stationId }, select: { id: true, speciesId: true, abundance: true } })
+      ? prisma.occurrence.findMany({
+          where: { stationId },
+          select: {
+            id: true, speciesId: true, abundance: true,
+            species: { select: { id: true, genus: true, species: true, commonName: true, family: true, conservationStatus: true } },
+          },
+        })
       : Promise.resolve([]),
     prisma.occurrence.findMany({
       where: { station: { campaignId: station.campaignId } },
@@ -66,6 +72,17 @@ export default async function NuevaOcurrenciaPage({
     abundance: o.abundance != null ? String(o.abundance) : undefined,
     key: o.id,
   }));
+
+  // Species already seen at this station — any trap, any previous day
+  const stationSpeciesMap = new Map<string, { sp: typeof transectoOccurrences[0]["species"]; count: number }>();
+  for (const o of transectoOccurrences) {
+    const existing = stationSpeciesMap.get(o.speciesId);
+    if (existing) existing.count++;
+    else stationSpeciesMap.set(o.speciesId, { sp: o.species, count: 1 });
+  }
+  const stationSpecies = [...stationSpeciesMap.values()]
+    .sort((a, b) => b.count - a.count)
+    .map((v) => v.sp);
 
   async function adjustTransectoAbundance(key: string, newAbundance: string) {
     "use server";
@@ -105,6 +122,7 @@ export default async function NuevaOcurrenciaPage({
         existingRegistrations={existingTransectoRegistrations.length > 0 ? existingTransectoRegistrations : undefined}
         onAdjustAbundance={existingTransectoRegistrations.length > 0 ? adjustTransectoAbundance : undefined}
         campaignSpecies={campaignSpecies.length > 0 ? campaignSpecies : undefined}
+        stationSpecies={stationSpecies.length > 0 ? stationSpecies : undefined}
       />
     </div>
   );

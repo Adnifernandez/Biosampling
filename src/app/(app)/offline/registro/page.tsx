@@ -13,7 +13,7 @@ import { WifiOff, Wifi, ArrowLeft, Plus, ChevronRight, CheckCircle2, Clock, Aler
 import { METHODOLOGIES } from "@/lib/methodologies";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { getStationBBSpeciesIds, getStationTransectoRegistrations, updateTransectoOccurrenceAbundance, getCampaignSpecies } from "@/app/(app)/proyectos/[id]/campanas/[cid]/estaciones/[sid]/ocurrencias/actions";
+import { getStationBBSpeciesIds, getStationTransectoRegistrations, updateTransectoOccurrenceAbundance, getCampaignSpecies, getStationSpecies } from "@/app/(app)/proyectos/[id]/campanas/[cid]/estaciones/[sid]/ocurrencias/actions";
 import { cn } from "@/lib/utils";
 
 const OccurrenceForm = dynamic(
@@ -602,6 +602,27 @@ export default function OfflineRegistroPage() {
       .catch(() => {});
   }, [step, selectedCampaign?.id]);
 
+  // Station-wide species suggestions (Trampa Sherman / Cámara trampa: other traps or previous days
+  // at this same station), fetched once per station, cached in localStorage
+  const [stationSpeciesSuggestions, setStationSpeciesSuggestions] = useState<CampaignSp[]>([]);
+  useEffect(() => {
+    if (step !== "occurrence" || selectedCampaign?.methodology !== "TRANSECTO_LINEAL_FAUNA" || !selectedStation?.id) {
+      setStationSpeciesSuggestions([]);
+      return;
+    }
+    const cacheKey = `station-species-${selectedStation.id}`;
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) setStationSpeciesSuggestions(JSON.parse(cached));
+    } catch {}
+    getStationSpecies(selectedStation.id)
+      .then(rows => {
+        setStationSpeciesSuggestions(rows);
+        try { localStorage.setItem(cacheKey, JSON.stringify(rows)); } catch {}
+      })
+      .catch(() => {});
+  }, [step, selectedCampaign?.methodology, selectedStation?.id]);
+
   // Online status
   useEffect(() => {
     setIsOnline(navigator.onLine);
@@ -960,6 +981,7 @@ export default function OfflineRegistroPage() {
             existingRegistrations={!editingOccurrence && selectedCampaign.methodology === "TRANSECTO_LINEAL_FAUNA" ? allTransectoRegistrations : undefined}
             existingBBSpeciesIds={!editingOccurrence && allBBSpeciesIds.length > 0 ? allBBSpeciesIds : undefined}
             campaignSpecies={campaignSpeciesSuggestions.length > 0 ? campaignSpeciesSuggestions : undefined}
+            stationSpecies={stationSpeciesSuggestions.length > 0 ? stationSpeciesSuggestions : undefined}
             onAdjustAbundance={async (key, newAbundance) => {
               // Server-registered occurrence (key = "srv-{occurrenceId}")
               if (key.startsWith("srv-")) {
