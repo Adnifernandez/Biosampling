@@ -6,11 +6,12 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Download, BarChart2, ListTree, Leaf, Bird, Loader2 } from "lucide-react";
+import { Download, BarChart2, ListTree, Leaf, Bird, Loader2, AlertTriangle } from "lucide-react";
 // ExcelJS loaded dynamically inside exportXLSX to avoid SSR issues
 import { SURVEY_TYPE_LABELS } from "@/lib/types";
 import { getMethodologyById } from "@/lib/methodologies";
 import { getCampaignStations } from "@/app/(app)/reportes/actions";
+import { toast } from "sonner";
 
 type SpeciesRow = {
   id: string;
@@ -201,6 +202,11 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     };
   })();
 
+  // Species missing taxonomic data (e.g. added via the quick-add button, family never filled in)
+  const incompleteSpecies = (stats?.speciesList ?? [])
+    .map(({ sp }) => sp)
+    .filter((sp) => !sp.family || sp.family.trim() === "" || sp.family === "Por clasificar");
+
   // ── Parcelas (Braun-Blanquet) matrix ──
   const bbData = (() => {
     if (!selectedCampaign || !isBB) return null;
@@ -357,6 +363,10 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
   // ── XLSX export with full styling (ExcelJS) ──
   async function exportXLSX() {
     if (!selectedCampaign || !stats || !selectedProject) return;
+    if (incompleteSpecies.length > 0) {
+      toast.error("Completa los datos de las especies pendientes antes de exportar el reporte");
+      return;
+    }
 
     // Dynamic import — ExcelJS is browser-compatible
     const ExcelJS = (await import("exceljs")).default;
@@ -883,9 +893,42 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
       {stats && selectedCampaign && !loadingStations && (
         <div className="space-y-4">
 
+          {/* Incomplete species warning — blocks export */}
+          {incompleteSpecies.length > 0 && (
+            <Card className="border-orange-200 bg-orange-50">
+              <CardContent className="py-3 px-4">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-orange-600 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-orange-800">
+                      Hay {incompleteSpecies.length} especie{incompleteSpecies.length !== 1 ? "s" : ""} sin datos completos — no se puede exportar el reporte
+                    </p>
+                    <p className="text-xs text-orange-700 mt-0.5">
+                      Completa la familia y demás datos taxonómicos en{" "}
+                      <a href="/admin/especies" className="underline font-medium">Especies</a> antes de generar el reporte.
+                    </p>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {incompleteSpecies.map((sp) => (
+                        <span key={sp.id} className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full italic">
+                          {sp.genus} {sp.species}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Export button */}
           <div className="flex justify-end">
-            <Button variant="outline" size="sm" className="gap-2" onClick={exportXLSX}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={exportXLSX}
+              disabled={incompleteSpecies.length > 0}
+            >
               <Download className="h-4 w-4" /> Exportar XLSX
             </Button>
           </div>
