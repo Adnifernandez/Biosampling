@@ -263,32 +263,33 @@ export function EspeciesClient() {
               </div>
 
               <div className="space-y-1">
-                <Label>Nombre común</Label>
-                <Input value={form.commonName} onChange={f("commonName")} placeholder="Ej: Ratón chinchilla común" />
+                <Label>Nombre común *</Label>
+                <Input value={form.commonName} onChange={f("commonName")} placeholder="Ej: Ratón chinchilla común" required />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label>Clase</Label>
-                  <Input value={form.clase} onChange={f("clase")} placeholder="Ej: Mammalia" />
+                  <Label>Clase *</Label>
+                  <Input value={form.clase} onChange={f("clase")} placeholder="Ej: Mammalia" required />
                 </div>
                 <div className="space-y-1">
-                  <Label>Orden</Label>
-                  <Input value={form.orden} onChange={f("orden")} placeholder="Ej: Rodentia" />
+                  <Label>Orden *</Label>
+                  <Input value={form.orden} onChange={f("orden")} placeholder="Ej: Rodentia" required />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label>Origen</Label>
-                  <Input value={form.origen} onChange={f("origen")} placeholder="Ej: Endémico" />
+                  <Label>Origen *</Label>
+                  <Input value={form.origen} onChange={f("origen")} placeholder="Ej: Endémico" required />
                 </div>
                 <div className="space-y-1">
-                  <Label>Estado de conservación</Label>
+                  <Label>Estado de conservación *</Label>
                   <Input
                     value={form.conservationStatus}
                     onChange={f("conservationStatus")}
                     placeholder="Ej: EN, VU"
+                    required
                   />
                   <p className="text-xs text-gray-400">Separa múltiples estados con coma (LC, NT, VU, EN, CR, EW, EX, DD)</p>
                 </div>
@@ -296,8 +297,8 @@ export function EspeciesClient() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label>Hábito</Label>
-                  <Input value={form.habito} onChange={f("habito")} placeholder="Ej: Arbusto" />
+                  <Label>Hábito *</Label>
+                  <Input value={form.habito} onChange={f("habito")} placeholder="Ej: Arbusto" required />
                 </div>
                 <div className="space-y-1">
                   <Label>Hábito macrófitas</Label>
@@ -307,12 +308,12 @@ export function EspeciesClient() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label>División</Label>
-                  <Input value={form.division} onChange={f("division")} placeholder="Ej: Magnoliophyta" />
+                  <Label>División *</Label>
+                  <Input value={form.division} onChange={f("division")} placeholder="Ej: Magnoliophyta" required />
                 </div>
                 <div className="space-y-1">
-                  <Label>Categoría</Label>
-                  <Input value={form.category} onChange={f("category")} placeholder="Ej: Nativa" />
+                  <Label>Categoría *</Label>
+                  <Input value={form.category} onChange={f("category")} placeholder="Ej: Nativa" required />
                 </div>
               </div>
 
