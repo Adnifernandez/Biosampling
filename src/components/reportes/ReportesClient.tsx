@@ -27,6 +27,7 @@ type SpeciesRow = {
   habito: string | null;
   origen: string | null;
   macrofitasHabito: string | null;
+  category: string | null;
 };
 
 type OccurrenceRow = {
@@ -202,10 +203,14 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     };
   })();
 
-  // Species missing taxonomic data (e.g. added via the quick-add button, family never filled in)
+  // Species missing required taxonomic data — same required fields as the Especies form
+  // (habito and macrofitasHabito are optional there, so they're not checked here either)
   const incompleteSpecies = (stats?.speciesList ?? [])
     .map(({ sp }) => sp)
-    .filter((sp) => !sp.family || sp.family.trim() === "" || sp.family === "Por clasificar");
+    .filter((sp) =>
+      !sp.family || sp.family === "Por clasificar" || !sp.commonName || !sp.clase
+      || !sp.orden || !sp.origen || !sp.conservationStatus || !sp.division || !sp.category
+    );
 
   // ── Parcelas (Braun-Blanquet) matrix ──
   const bbData = (() => {

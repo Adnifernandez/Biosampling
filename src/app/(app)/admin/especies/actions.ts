@@ -27,11 +27,11 @@ type SpeciesData = {
   endemic?: boolean;
 };
 
-// Every field is required except macrofitasHabito (only meaningful for aquatic macrophytes)
+// Every field is required except habito and macrofitasHabito
 function missingRequiredField(data: SpeciesData): boolean {
   return !data.type || !data.genus || !data.species || !data.family
     || !data.commonName || !data.clase || !data.orden || !data.origen
-    || !data.conservationStatus || !data.habito || !data.division || !data.category;
+    || !data.conservationStatus || !data.division || !data.category;
 }
 
 function buildData(data: SpeciesData, userId: string | null) {
@@ -55,7 +55,7 @@ function buildData(data: SpeciesData, userId: string | null) {
 
 export async function createSpecies(data: SpeciesData) {
   if (missingRequiredField(data)) {
-    return { error: "Todos los campos son obligatorios, excepto Hábito macrófitas" };
+    return { error: "Todos los campos son obligatorios, excepto Hábito y Hábito macrófitas" };
   }
   const session = await auth();
   const userId = session?.user?.id ?? null;
@@ -95,7 +95,7 @@ export async function quickCreateSpecies(input: { scientificName: string; common
 
 export async function updateSpecies(id: string, data: SpeciesData) {
   if (missingRequiredField(data)) {
-    return { error: "Todos los campos son obligatorios, excepto Hábito macrófitas" };
+    return { error: "Todos los campos son obligatorios, excepto Hábito y Hábito macrófitas" };
   }
   const session = await auth();
   const userId = session?.user?.id ?? null;

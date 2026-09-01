@@ -297,8 +297,8 @@ export function EspeciesClient() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label>Hábito *</Label>
-                  <Input value={form.habito} onChange={f("habito")} placeholder="Ej: Arbusto" required />
+                  <Label>Hábito</Label>
+                  <Input value={form.habito} onChange={f("habito")} placeholder="Ej: Arbusto" />
                 </div>
                 <div className="space-y-1">
                   <Label>Hábito macrófitas</Label>

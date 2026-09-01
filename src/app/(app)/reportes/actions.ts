@@ -17,6 +17,7 @@ const SPECIES_SELECT = {
   habito: true,
   origen: true,
   macrofitasHabito: true,
+  category: true,
 } as const;
 
 export async function getCampaignStations(campaignId: string) {
