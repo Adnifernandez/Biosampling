@@ -203,14 +203,12 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     };
   })();
 
-  // Species missing required taxonomic data — same required fields as the Especies form
-  // (habito and macrofitasHabito are optional there, so they're not checked here either)
+  // Species added via the quick-add button ("¿No está la especie? ¡Agrégala!") and never
+  // completed — family is left as "Por clasificar" until an admin fills in the rest.
+  // Species that predate the required-fields rule are left alone even if they're missing data.
   const incompleteSpecies = (stats?.speciesList ?? [])
     .map(({ sp }) => sp)
-    .filter((sp) =>
-      !sp.family || sp.family === "Por clasificar" || !sp.commonName || !sp.clase
-      || !sp.orden || !sp.origen || !sp.conservationStatus || !sp.division || !sp.category
-    );
+    .filter((sp) => sp.family === "Por clasificar");
 
   // ── Parcelas (Braun-Blanquet) matrix ──
   const bbData = (() => {
