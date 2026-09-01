@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { OccurrencePayload } from "@/lib/db";
+import { QuickAddSpeciesButton } from "@/components/ocurrencias/QuickAddSpeciesButton";
 
 // Search species: tries server first, falls back to Dexie cache when offline
 async function searchSpeciesFallback(query: string, surveyType: string): Promise<SpeciesResult[]> {
@@ -752,6 +753,7 @@ export function OccurrenceForm({
               hasExisting={!!defaultValues?.speciesId && !selectedSpecies}
               existingLabel={defaultValues?.speciesLabel}
               campaignSuggestions={campaignSpecies}
+              surveyType={surveyType}
             />
           )}
 
@@ -1285,7 +1287,7 @@ export function OccurrenceForm({
 
 // ── Species search sub-component ──
 function SpeciesSearch({
-  query, setQuery, list, selected, setSelected, searching, hasExisting, existingLabel, campaignSuggestions,
+  query, setQuery, list, selected, setSelected, searching, hasExisting, existingLabel, campaignSuggestions, surveyType,
 }: {
   query: string;
   setQuery: (v: string) => void;
@@ -1296,6 +1298,7 @@ function SpeciesSearch({
   hasExisting: boolean;
   existingLabel?: string;
   campaignSuggestions?: SpeciesResult[];
+  surveyType: "FLORA" | "FAUNA";
 }) {
   const showSuggestions = !selected && !query && !!campaignSuggestions?.length;
   const showResults = !selected && list.length > 0;
@@ -1377,6 +1380,12 @@ function SpeciesSearch({
             </button>
           ))}
         </div>
+      )}
+      {!selected && (
+        <QuickAddSpeciesButton
+          surveyType={surveyType}
+          onCreated={(sp) => { setSelected(sp); setQuery(`${sp.genus} ${sp.species}`); }}
+        />
       )}
     </div>
   );

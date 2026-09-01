@@ -59,6 +59,33 @@ export async function createSpecies(data: SpeciesData) {
   return { success: true, species: created };
 }
 
+// Quick-add from the occurrence form: only asks for scientific + common name.
+// Family/clase/etc. are left for an admin to fill in later from Especies.
+export async function quickCreateSpecies(input: { scientificName: string; commonName?: string; type: string }) {
+  const parts = input.scientificName.trim().split(/\s+/);
+  if (parts.length < 2) {
+    return { error: "Escribe género y especie, ej: Puma concolor" };
+  }
+  const genus = parts[0];
+  const species = parts.slice(1).join(" ");
+
+  const session = await auth();
+  const userId = session?.user?.id ?? null;
+  const created = await prisma.species.create({
+    data: {
+      type: input.type,
+      genus,
+      species,
+      family: "Por clasificar",
+      commonName: input.commonName?.trim() || null,
+      createdById: userId,
+      updatedById: userId,
+    },
+    include: INCLUDE,
+  });
+  return { success: true, species: created };
+}
+
 export async function updateSpecies(id: string, data: SpeciesData) {
   if (!data.genus || !data.species || !data.family || !data.type) {
     return { error: "Género, especie, familia y tipo son obligatorios" };
