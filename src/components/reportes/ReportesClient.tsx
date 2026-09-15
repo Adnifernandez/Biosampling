@@ -944,9 +944,9 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Anillamiento SAG");
 
-    const BASE = { name: "Calibri", size: 10 } as const;
-    const BANNER_BG = "FF6FA8DC";
-    const NOTE_BG = "FFB7B7B7";
+    const BASE = { name: "Calibri", size: 11, color: { argb: "FF000000" } } as const;
+    const BANNER_BG = "FF9BC2E6";
+    const NOTE_BG = "FFA6A6A6";
     const HEADER_BG = "FFBDD7EE";
     const border = { style: "thin" as const, color: { argb: "FF000000" } };
     const allBorders = { top: border, left: border, bottom: border, right: border };
@@ -964,21 +964,31 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     const colWidths = [14, 16, 16, 24, 12, 12, 12, 14, 13, 16, 14, 14, 16, 16, 11, 14, 18, 14, 14, 18, 18, 12, 12, 20];
     ws.columns = colWidths.map((width) => ({ width }));
 
-    // Row 1 — blue banner over the capture columns, relocation note over the release columns
+    // Row 1 — blue banner over the capture columns, relocation note over the release columns.
+    // Fill/border are applied to every cell in each merged range, not just the master cell,
+    // so the merged block renders as one continuous bordered box.
     ws.mergeCells(1, 1, 1, CAPTURE_COLS);
+    for (let c = 1; c <= CAPTURE_COLS; c++) {
+      const cell = ws.getCell(1, c);
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BANNER_BG } };
+      cell.border = allBorders;
+    }
     const bannerCell = ws.getCell(1, 1);
     bannerCell.value = "Ingresar un registro (fila) por cada ejemplar.\n"
       + "Los datos de aves anilladas deben ser ingresados al Sistema Nacional de Anillamiento de Aves Silvestres, no en este documento";
-    bannerCell.font = { ...BASE, bold: true, color: { argb: "FFFFFFFF" } };
+    bannerCell.font = { ...BASE, bold: true };
     bannerCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-    bannerCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BANNER_BG } };
 
     ws.mergeCells(1, CAPTURE_COLS + 1, 1, CAPTURE_COLS + RELEASE_COLS);
+    for (let c = CAPTURE_COLS + 1; c <= CAPTURE_COLS + RELEASE_COLS; c++) {
+      const cell = ws.getCell(1, c);
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NOTE_BG } };
+      cell.border = allBorders;
+    }
     const noteCell = ws.getCell(1, CAPTURE_COLS + 1);
     noteCell.value = "Solo llenar en caso de actividades de Relocalización, es decir cuando el sitio de captura es distinto al de liberación.";
     noteCell.font = { ...BASE };
     noteCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-    noteCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NOTE_BG } };
     ws.getRow(1).height = 48;
 
     // Row 2 — column headers, same fill across the whole row
@@ -994,23 +1004,18 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
 
     // Data rows
     shermanData.rows.forEach((row) => {
-      const estado = estadoFinalFor(row.sp);
       const values = [
         shermanResNumber, shermanResDate, "Micromamíferos", `${row.sp.genus} ${row.sp.species}`,
         "Indefinido", "Indefinido", "Sin Marca", "-",
         fmtDateDMY(row.date), row.trapLabel, selectedProject.commune, selectedProject.region,
         row.utm?.east ?? "", row.utm?.north ?? "", row.utm ? row.utm.zone.replace(/[NS]$/, "") : "",
         "", "", "", "", "", "", "",
-        estado, "Sin observaciones",
+        estadoFinalFor(row.sp), "Sin observaciones",
       ];
       const exRow = ws.addRow(values);
       exRow.eachCell({ includeEmpty: true }, (cell, col) => {
         cell.border = allBorders;
-        cell.font = {
-          ...BASE,
-          italic: col === 4,
-          color: col === 23 && estado === "Liberación" ? { argb: "FFB45F06" } : undefined,
-        };
+        cell.font = { ...BASE, italic: col === 4 };
         cell.alignment = { horizontal: "center", vertical: "middle" };
       });
     });
