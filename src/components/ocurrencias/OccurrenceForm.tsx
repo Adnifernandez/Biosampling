@@ -1214,27 +1214,29 @@ export function OccurrenceForm({
                 </div>
               )}
 
-              {/* GPS */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Coordenadas GPS <span className="text-gray-400 font-normal text-xs">(opcional)</span></Label>
-                  <Button type="button" variant="outline" size="sm" onClick={captureGPSFauna}
-                    disabled={gpsLoading} className="gap-1.5 h-8 text-xs">
-                    {gpsLoading
-                      ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Obteniendo...</>
-                      : <><MapPin className="h-3.5 w-3.5" /> Capturar GPS</>}
-                  </Button>
+              {/* GPS — only for the single-entry flow; trap batch entries capture their own GPS per row above */}
+              {!(!occurrenceId && (tfDetectionMethod === "Trampa Sherman" || tfDetectionMethod === "Cámara trampa")) && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Coordenadas GPS <span className="text-gray-400 font-normal text-xs">(opcional)</span></Label>
+                    <Button type="button" variant="outline" size="sm" onClick={captureGPSFauna}
+                      disabled={gpsLoading} className="gap-1.5 h-8 text-xs">
+                      {gpsLoading
+                        ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Obteniendo...</>
+                        : <><MapPin className="h-3.5 w-3.5" /> Capturar GPS</>}
+                    </Button>
+                  </div>
+                  {tfLat !== null ? (
+                    <p className="text-xs text-teal-700 bg-teal-50 rounded px-3 py-1.5 font-mono">
+                      {tfLat.toFixed(6)}, {tfLng!.toFixed(6)}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-400 bg-gray-50 rounded px-3 py-2">
+                      Presiona "Capturar GPS" para registrar las coordenadas del avistamiento.
+                    </p>
+                  )}
                 </div>
-                {tfLat !== null ? (
-                  <p className="text-xs text-teal-700 bg-teal-50 rounded px-3 py-1.5 font-mono">
-                    {tfLat.toFixed(6)}, {tfLng!.toFixed(6)}
-                  </p>
-                ) : (
-                  <p className="text-xs text-gray-400 bg-gray-50 rounded px-3 py-2">
-                    Presiona "Capturar GPS" para registrar las coordenadas del avistamiento.
-                  </p>
-                )}
-              </div>
+              )}
             </>
           )}
 
