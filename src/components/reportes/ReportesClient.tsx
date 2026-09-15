@@ -5,8 +5,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Download, BarChart2, ListTree, Leaf, Bird, Loader2, AlertTriangle } from "lucide-react";
+import { Download, BarChart2, ListTree, Leaf, Bird, Loader2, AlertTriangle, FileSpreadsheet } from "lucide-react";
 // ExcelJS loaded dynamically inside exportXLSX to avoid SSR issues
 import { SURVEY_TYPE_LABELS } from "@/lib/types";
 import { getMethodologyById } from "@/lib/methodologies";
@@ -32,11 +35,15 @@ type SpeciesRow = {
 
 type OccurrenceRow = {
   id: string;
+  date: Date | string;
   abundance: number | null;
   cover: number | null;
   groupSize: number | null;
   methodologyData: string | null;
   individualCode: string | null;
+  detectionMethod: string | null;
+  latitude: number | null;
+  longitude: number | null;
   species: SpeciesRow;
   user: { name: string };
 };
@@ -66,6 +73,41 @@ type ProjectRow = {
   commune: string;
   campaigns: CampaignRow[];
 };
+
+function fmtDateDMY(d: Date | string | null | undefined): string {
+  if (!d) return "";
+  const date = d instanceof Date ? d : new Date(d);
+  return date.toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+// "TS3" → "TS-03" — matches the trap-code format the SAG banding report expects
+function formatTrapLabel(trapId: string): string {
+  const m = trapId.match(/^([A-Za-z]+)(\d+)$/);
+  if (!m) return trapId || "—";
+  return `${m[1]}-${m[2].padStart(2, "0")}`;
+}
+
+// Same projection used for Microruteo's GPS capture — reused here to turn a Sherman
+// trap's lat/long into the UTM Este/Sur/Huso the SAG report requires.
+function latLngToUTM(lat: number, lng: number): { north: number; east: number; zone: string } {
+  const a = 6378137.0, f = 1 / 298.257223563;
+  const b = a * (1 - f), e2 = 1 - (b * b) / (a * a), k0 = 0.9996;
+  const zoneNum = Math.floor((lng + 180) / 6) + 1;
+  const zone = `${zoneNum}${lat >= 0 ? "N" : "S"}`;
+  const lr = (lat * Math.PI) / 180;
+  const lo = (((zoneNum - 1) * 6 - 180 + 3) * Math.PI) / 180;
+  const N = a / Math.sqrt(1 - e2 * Math.sin(lr) ** 2);
+  const T = Math.tan(lr) ** 2, C = (e2 / (1 - e2)) * Math.cos(lr) ** 2;
+  const A = Math.cos(lr) * ((lng * Math.PI) / 180 - lo);
+  const M = a * ((1 - e2 / 4 - (3 * e2 ** 2) / 64 - (5 * e2 ** 3) / 256) * lr
+    - ((3 * e2) / 8 + (3 * e2 ** 2) / 32 + (45 * e2 ** 3) / 1024) * Math.sin(2 * lr)
+    + ((15 * e2 ** 2) / 256 + (45 * e2 ** 3) / 1024) * Math.sin(4 * lr)
+    - ((35 * e2 ** 3) / 3072) * Math.sin(6 * lr));
+  const east = k0 * N * (A + ((1 - T + C) * A ** 3) / 6 + ((5 - 18 * T + T ** 2 + 72 * C - 58 * (e2 / (1 - e2))) * A ** 5) / 120) + 500000;
+  let north = k0 * (M + N * Math.tan(lr) * (A ** 2 / 2 + ((5 - T + 9 * C + 4 * C ** 2) * A ** 4) / 24 + ((61 - 58 * T + T ** 2 + 600 * C - 330 * (e2 / (1 - e2))) * A ** 6) / 720));
+  if (lat < 0) north += 10000000;
+  return { north: Math.round(north), east: Math.round(east), zone };
+}
 
 // Left-to-right alphabetical sort: División → Clase → Familia → Especie
 function spSort(a: SpeciesRow, b: SpeciesRow): number {
@@ -130,6 +172,9 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
   const [campaignId, setCampaignId] = useState<string>("");
   const [stations, setStations] = useState<StationRow[]>([]);
   const [loadingStations, setLoadingStations] = useState(false);
+  const [shermanDialogOpen, setShermanDialogOpen] = useState(false);
+  const [shermanResNumber, setShermanResNumber] = useState("");
+  const [shermanResDate, setShermanResDate] = useState("");
 
   useEffect(() => {
     if (!campaignId) {
@@ -834,6 +879,150 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     });
     return { rows };
   })();
+
+  // ── SAG banding report: one row per specimen caught in a Sherman trap ──
+  const shermanData = (() => {
+    if (!selectedCampaign) return null;
+    type ShermanRow = {
+      key: string;
+      sp: SpeciesRow;
+      date: Date | string;
+      trapLabel: string;
+      utm: { east: number; north: number; zone: string } | null;
+    };
+    const rows: ShermanRow[] = [];
+    for (const station of stations) {
+      for (const occ of station.occurrences) {
+        if (occ.detectionMethod !== "Trampa Sherman") continue;
+        let trapId = "";
+        if (occ.methodologyData) {
+          try { trapId = JSON.parse(occ.methodologyData).trapId ?? ""; } catch {}
+        }
+        const utm = occ.latitude != null && occ.longitude != null
+          ? latLngToUTM(occ.latitude, occ.longitude)
+          : null;
+        const specimens = Math.max(1, occ.abundance ?? 1);
+        for (let i = 0; i < specimens; i++) {
+          rows.push({
+            key: `${occ.id}-${i}`,
+            sp: occ.species,
+            date: occ.date,
+            trapLabel: formatTrapLabel(trapId),
+            utm,
+          });
+        }
+      }
+    }
+    rows.sort((a, b) =>
+      new Date(a.date).getTime() - new Date(b.date).getTime() ||
+      a.trapLabel.localeCompare(b.trapLabel, "es", { numeric: true })
+    );
+    const unresolvedSpecies = Array.from(
+      new Map(rows.filter((r) => !r.sp.origen).map((r) => [r.sp.id, r.sp])).values()
+    );
+    return { rows, unresolvedSpecies };
+  })();
+
+  function estadoFinalFor(sp: SpeciesRow): string {
+    if (!sp.origen) return "—";
+    return sp.origen === "Introducido" ? "Eutanasia" : "Liberación";
+  }
+
+  // ── SAG banding report export (separate workbook, separate button) ──
+  async function exportShermanSAG() {
+    if (!selectedCampaign || !selectedProject || !shermanData) return;
+    if (!shermanResNumber.trim() || !shermanResDate.trim()) {
+      toast.error("Ingresa el N° de Resolución SAG y su fecha");
+      return;
+    }
+    if (shermanData.unresolvedSpecies.length > 0) {
+      toast.error("Completa el origen (Nativo/Introducido) de las especies pendientes antes de exportar");
+      return;
+    }
+
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Anillamiento SAG");
+
+    const BASE = { name: "Tahoma", size: 9 } as const;
+    const BANNER_BG = "FF3D85C6";
+    const NOTE_BG = "FFB7B7B7";
+    const HEADER_BG = "FFBDD7EE";
+    const RELEASE_HEADER_BG = "FFD9D9D9";
+    const border = { style: "thin" as const, color: { argb: "FF000000" } };
+    const allBorders = { top: border, left: border, bottom: border, right: border };
+
+    const headers = [
+      "N° Resolución SAG", "Fecha Resolución SAG", "Taxón", "Nombre Científico", "Sexo", "Edad",
+      "Marca", "Código (Marca)", "Fecha Captura", "Nombre Sitio Captura", "Comuna Captura",
+      "Region Captura", "Coordenadas Este Captura", "Coordenadas Sur Captura", "Huso Captura",
+      "Fecha Liberación", "Nombre sitio Liberación", "Comuna Liberación", "Region Liberación",
+      "Coordenadas Norte Liberación", "Coordenadas Este Liberación", "Huso Liberación",
+      "Estado final", "Observaciones",
+    ];
+    const colWidths = [14, 16, 16, 24, 12, 12, 12, 14, 13, 16, 14, 14, 16, 16, 11, 14, 18, 14, 14, 18, 18, 12, 12, 20];
+    ws.columns = colWidths.map((width) => ({ width }));
+    const releaseCols = new Set([16, 17, 18, 19, 20, 21, 22]); // P..V, 1-based
+
+    // Row 1 — full-width blue banner
+    ws.mergeCells(1, 1, 1, headers.length);
+    const bannerCell = ws.getCell(1, 1);
+    bannerCell.value = "Ingresar un registro (fila) por cada ejemplar.\n"
+      + "Los datos de aves anilladas deben ser ingresados al Sistema Nacional de Anillamiento de Aves Silvestres, no en este documento";
+    bannerCell.font = { ...BASE, bold: true, color: { argb: "FFFFFFFF" } };
+    bannerCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    bannerCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BANNER_BG } };
+    ws.getRow(1).height = 32;
+
+    // Row 2 — relocation note, merged only over the liberation columns
+    ws.mergeCells(2, 16, 2, 22);
+    const noteCell = ws.getCell(2, 16);
+    noteCell.value = "Solo llenar en caso de actividades de Relocalización, es decir cuando el sitio de captura es distinto al de liberación.";
+    noteCell.font = { ...BASE, italic: true };
+    noteCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    noteCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NOTE_BG } };
+    ws.getRow(2).height = 28;
+
+    // Row 3 — column headers
+    headers.forEach((h, i) => {
+      const cell = ws.getCell(3, i + 1);
+      cell.value = h;
+      cell.font = { ...BASE, bold: true };
+      cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: releaseCols.has(i + 1) ? RELEASE_HEADER_BG : HEADER_BG } };
+      cell.border = allBorders;
+    });
+    ws.getRow(3).height = 30;
+
+    // Data rows
+    shermanData.rows.forEach((row) => {
+      const values = [
+        shermanResNumber, shermanResDate, "Micromamíferos", `${row.sp.genus} ${row.sp.species}`,
+        "Indefinido", "Indefinido", "Sin Marca", "-",
+        fmtDateDMY(row.date), row.trapLabel, selectedProject.commune, selectedProject.region,
+        row.utm?.east ?? "", row.utm?.north ?? "", row.utm ? row.utm.zone.replace(/[NS]$/, "") : "",
+        "", "", "", "", "", "", "",
+        estadoFinalFor(row.sp), "Sin observaciones",
+      ];
+      const exRow = ws.addRow(values);
+      exRow.eachCell({ includeEmpty: true }, (cell, col) => {
+        cell.border = allBorders;
+        cell.font = { ...BASE, italic: col === 4 };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+      });
+    });
+
+    const safe = (s: string) => s.replace(/[/\\?*[\]]/g, "-").replace(/\s+/g, "_");
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `SAG-Sherman-${safe(selectedProject.name)}-${safe(selectedCampaign.name)}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShermanDialogOpen(false);
+  }
 
   const fmt3 = (n: number) => n.toFixed(3).replace(".", ",");
 
@@ -1673,6 +1862,130 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {/* ── SAG: reporte de anillamiento para trampas Sherman ── */}
+          {shermanData && shermanData.rows.length > 0 && (
+            <>
+              {shermanData.unresolvedSpecies.length > 0 && (
+                <Card className="border-orange-200 bg-orange-50">
+                  <CardContent className="py-3 px-4">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 text-orange-600 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-orange-800">
+                          {shermanData.unresolvedSpecies.length} especie{shermanData.unresolvedSpecies.length !== 1 ? "s" : ""} sin origen definido — no se puede exportar el reporte SAG
+                        </p>
+                        <p className="text-xs text-orange-700 mt-0.5">
+                          El &quot;Estado final&quot; depende del origen (Nativo/Introducido). Complétalo en{" "}
+                          <a href="/admin/especies" className="underline font-medium">Especies</a>.
+                        </p>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {shermanData.unresolvedSpecies.map((sp) => (
+                            <span key={sp.id} className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full italic">
+                              {sp.genus} {sp.species}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card>
+                <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
+                  <CardTitle className="text-base">Reporte SAG — Anillamiento (Trampas Sherman)</CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => setShermanDialogOpen(true)}
+                    disabled={shermanData.unresolvedSpecies.length > 0}
+                  >
+                    <FileSpreadsheet className="h-4 w-4" /> Exportar SAG
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <p className="text-xs text-gray-500 px-4 pb-2">
+                    Un registro por ejemplar capturado. Las columnas de liberación solo se llenan en actividades de relocalización.
+                  </p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b bg-gray-50">
+                          {["N° Res. SAG", "Fecha Res. SAG", "Taxón", "Nombre Científico", "Sexo", "Edad", "Marca", "Cód. (Marca)",
+                            "Fecha Captura", "Sitio Captura", "Comuna", "Región", "Este Captura", "Sur Captura", "Huso"].map((h) => (
+                            <th key={h} className="text-left px-2.5 py-2 font-semibold text-gray-600 whitespace-nowrap">{h}</th>
+                          ))}
+                          <th colSpan={7} className="text-center px-2.5 py-1.5 font-medium text-gray-500 bg-gray-100 whitespace-nowrap">
+                            Solo relocalización
+                          </th>
+                          <th className="text-left px-2.5 py-2 font-semibold text-gray-600 whitespace-nowrap">Estado final</th>
+                          <th className="text-left px-2.5 py-2 font-semibold text-gray-600 whitespace-nowrap">Observaciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {shermanData.rows.map((row) => (
+                          <tr key={row.key} className="hover:bg-gray-50">
+                            <td className="px-2.5 py-1.5 text-gray-300">—</td>
+                            <td className="px-2.5 py-1.5 text-gray-300">—</td>
+                            <td className="px-2.5 py-1.5 whitespace-nowrap">Micromamíferos</td>
+                            <td className="px-2.5 py-1.5 italic whitespace-nowrap">{row.sp.genus} {row.sp.species}</td>
+                            <td className="px-2.5 py-1.5 whitespace-nowrap">Indefinido</td>
+                            <td className="px-2.5 py-1.5 whitespace-nowrap">Indefinido</td>
+                            <td className="px-2.5 py-1.5 whitespace-nowrap">Sin Marca</td>
+                            <td className="px-2.5 py-1.5">-</td>
+                            <td className="px-2.5 py-1.5 whitespace-nowrap font-mono">{fmtDateDMY(row.date)}</td>
+                            <td className="px-2.5 py-1.5 font-mono">{row.trapLabel}</td>
+                            <td className="px-2.5 py-1.5 whitespace-nowrap">{selectedProject?.commune}</td>
+                            <td className="px-2.5 py-1.5 whitespace-nowrap">{selectedProject?.region}</td>
+                            <td className="px-2.5 py-1.5 font-mono">{row.utm?.east ?? "—"}</td>
+                            <td className="px-2.5 py-1.5 font-mono">{row.utm?.north ?? "—"}</td>
+                            <td className="px-2.5 py-1.5 font-mono">{row.utm ? row.utm.zone.replace(/[NS]$/, "") : "—"}</td>
+                            <td colSpan={7} className="px-2.5 py-1.5 bg-gray-50"></td>
+                            <td className="px-2.5 py-1.5 whitespace-nowrap">{estadoFinalFor(row.sp)}</td>
+                            <td className="px-2.5 py-1.5 whitespace-nowrap">Sin observaciones</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Dialog open={shermanDialogOpen} onOpenChange={setShermanDialogOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Exportar reporte SAG</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 mt-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="sherman-res-number">N° Resolución SAG</Label>
+                      <Input
+                        id="sherman-res-number"
+                        value={shermanResNumber}
+                        onChange={(e) => setShermanResNumber(e.target.value)}
+                        placeholder="Ej: 205/2024"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="sherman-res-date">Fecha Resolución SAG</Label>
+                      <Input
+                        id="sherman-res-date"
+                        value={shermanResDate}
+                        onChange={(e) => setShermanResDate(e.target.value)}
+                        placeholder="Ej: 28/02/2025"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setShermanDialogOpen(false)}>Cancelar</Button>
+                    <Button onClick={exportShermanSAG}>Exportar</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
           )}
 
           {/* ── RESCATE: capturas agrupadas por clase ── */}
