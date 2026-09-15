@@ -944,14 +944,15 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Anillamiento SAG");
 
-    const BASE = { name: "Tahoma", size: 9 } as const;
-    const BANNER_BG = "FF3D85C6";
+    const BASE = { name: "Calibri", size: 10 } as const;
+    const BANNER_BG = "FF6FA8DC";
     const NOTE_BG = "FFB7B7B7";
     const HEADER_BG = "FFBDD7EE";
-    const RELEASE_HEADER_BG = "FFD9D9D9";
     const border = { style: "thin" as const, color: { argb: "FF000000" } };
     const allBorders = { top: border, left: border, bottom: border, right: border };
 
+    const CAPTURE_COLS = 15; // A..O
+    const RELEASE_COLS = 7;  // P..V
     const headers = [
       "N° Resolución SAG", "Fecha Resolución SAG", "Taxón", "Nombre Científico", "Sexo", "Edad",
       "Marca", "Código (Marca)", "Fecha Captura", "Nombre Sitio Captura", "Comuna Captura",
@@ -962,52 +963,54 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     ];
     const colWidths = [14, 16, 16, 24, 12, 12, 12, 14, 13, 16, 14, 14, 16, 16, 11, 14, 18, 14, 14, 18, 18, 12, 12, 20];
     ws.columns = colWidths.map((width) => ({ width }));
-    const releaseCols = new Set([16, 17, 18, 19, 20, 21, 22]); // P..V, 1-based
 
-    // Row 1 — full-width blue banner
-    ws.mergeCells(1, 1, 1, headers.length);
+    // Row 1 — blue banner over the capture columns, relocation note over the release columns
+    ws.mergeCells(1, 1, 1, CAPTURE_COLS);
     const bannerCell = ws.getCell(1, 1);
     bannerCell.value = "Ingresar un registro (fila) por cada ejemplar.\n"
       + "Los datos de aves anilladas deben ser ingresados al Sistema Nacional de Anillamiento de Aves Silvestres, no en este documento";
     bannerCell.font = { ...BASE, bold: true, color: { argb: "FFFFFFFF" } };
     bannerCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
     bannerCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BANNER_BG } };
-    ws.getRow(1).height = 32;
 
-    // Row 2 — relocation note, merged only over the liberation columns
-    ws.mergeCells(2, 16, 2, 22);
-    const noteCell = ws.getCell(2, 16);
+    ws.mergeCells(1, CAPTURE_COLS + 1, 1, CAPTURE_COLS + RELEASE_COLS);
+    const noteCell = ws.getCell(1, CAPTURE_COLS + 1);
     noteCell.value = "Solo llenar en caso de actividades de Relocalización, es decir cuando el sitio de captura es distinto al de liberación.";
-    noteCell.font = { ...BASE, italic: true };
+    noteCell.font = { ...BASE };
     noteCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
     noteCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NOTE_BG } };
-    ws.getRow(2).height = 28;
+    ws.getRow(1).height = 48;
 
-    // Row 3 — column headers
+    // Row 2 — column headers, same fill across the whole row
     headers.forEach((h, i) => {
-      const cell = ws.getCell(3, i + 1);
+      const cell = ws.getCell(2, i + 1);
       cell.value = h;
       cell.font = { ...BASE, bold: true };
       cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: releaseCols.has(i + 1) ? RELEASE_HEADER_BG : HEADER_BG } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: HEADER_BG } };
       cell.border = allBorders;
     });
-    ws.getRow(3).height = 30;
+    ws.getRow(2).height = 30;
 
     // Data rows
     shermanData.rows.forEach((row) => {
+      const estado = estadoFinalFor(row.sp);
       const values = [
         shermanResNumber, shermanResDate, "Micromamíferos", `${row.sp.genus} ${row.sp.species}`,
         "Indefinido", "Indefinido", "Sin Marca", "-",
         fmtDateDMY(row.date), row.trapLabel, selectedProject.commune, selectedProject.region,
         row.utm?.east ?? "", row.utm?.north ?? "", row.utm ? row.utm.zone.replace(/[NS]$/, "") : "",
         "", "", "", "", "", "", "",
-        estadoFinalFor(row.sp), "Sin observaciones",
+        estado, "Sin observaciones",
       ];
       const exRow = ws.addRow(values);
       exRow.eachCell({ includeEmpty: true }, (cell, col) => {
         cell.border = allBorders;
-        cell.font = { ...BASE, italic: col === 4 };
+        cell.font = {
+          ...BASE,
+          italic: col === 4,
+          color: col === 23 && estado === "Liberación" ? { argb: "FFB45F06" } : undefined,
+        };
         cell.alignment = { horizontal: "center", vertical: "middle" };
       });
     });
