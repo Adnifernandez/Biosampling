@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Download, BarChart2, ListTree, Leaf, Bird, Loader2, AlertTriangle, FileSpreadsheet } from "lucide-react";
+import { Download, BarChart2, ListTree, Leaf, Bird, Loader2, AlertTriangle, FileSpreadsheet, Sigma } from "lucide-react";
 // ExcelJS loaded dynamically inside exportXLSX to avoid SSR issues
 import { SURVEY_TYPE_LABELS } from "@/lib/types";
 import { getMethodologyById } from "@/lib/methodologies";
@@ -1841,9 +1841,33 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
           {isTransectoFauna && communityParamsData && communityParamsData.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Parámetros Comunitarios por Transecto</CardTitle>
+                <CardTitle className="text-base flex items-center gap-1.5">
+                  <Sigma className="h-4 w-4 text-teal-600" />
+                  Parámetros Comunitarios por Transecto
+                </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
+                <div className="px-4 pb-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
+                      <p className="text-[11px] font-semibold text-teal-800">Riqueza (S)</p>
+                      <p className="text-xs font-mono text-teal-700 mt-0.5">S = n° especies</p>
+                    </div>
+                    <div className="bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
+                      <p className="text-[11px] font-semibold text-teal-800">Abundancia (N)</p>
+                      <p className="text-xs font-mono text-teal-700 mt-0.5">N = Σ nᵢ</p>
+                    </div>
+                    <div className="bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
+                      <p className="text-[11px] font-semibold text-teal-800">Shannon (H&apos;)</p>
+                      <p className="text-xs font-mono text-teal-700 mt-0.5">H&apos; = −Σ pᵢ·ln(pᵢ)</p>
+                      <p className="text-[10px] text-teal-600 mt-0.5">pᵢ = nᵢ ⁄ N</p>
+                    </div>
+                    <div className="bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
+                      <p className="text-[11px] font-semibold text-teal-800">Equidad (J&apos;)</p>
+                      <p className="text-xs font-mono text-teal-700 mt-0.5">J&apos; = H&apos; ⁄ ln(S)</p>
+                    </div>
+                  </div>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
