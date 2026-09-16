@@ -643,7 +643,14 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
     if (isTransectoFauna && communityParamsData && communityParamsData.length > 0) {
       addSheet("Parámetros", [
         ["Transecto","Riqueza (S)","Abundancia (N)","Shannon (H')","Equidad (J')"],
-        ...communityParamsData.map((r)=>[r.name,r.S,r.N,r.H,r.J ?? ""]),
+        ...communityParamsData.map((r)=>[r.name,r.S,r.N,r.H,r.J ?? 0]),
+      ]);
+    }
+
+    if (isTransectoFauna && communityParamsTotal) {
+      addSheet("Parámetros Total", [
+        ["Riqueza (S)","Abundancia (N)","Shannon (H')","Equidad (J')"],
+        [communityParamsTotal.S,communityParamsTotal.N,communityParamsTotal.H,communityParamsTotal.J ?? 0],
       ]);
     }
 
@@ -814,6 +821,33 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
           J: J !== null ? Math.round(J * 1000) / 1000 : null,
         };
       });
+  })();
+
+  // ── Parámetros comunitarios — total consolidado (todos los transectos agrupados) ──
+  const communityParamsTotal = (() => {
+    if (!selectedCampaign || !isTransectoFauna) return null;
+    const speciesAbundance = new Map<string, number>();
+    for (const station of stations) {
+      for (const occ of station.occurrences) {
+        const n = occ.abundance ?? 1;
+        speciesAbundance.set(occ.species.id, (speciesAbundance.get(occ.species.id) ?? 0) + n);
+      }
+    }
+    const S = speciesAbundance.size;
+    const N = Array.from(speciesAbundance.values()).reduce((s, n) => s + n, 0);
+    let H = 0;
+    if (N > 0) {
+      for (const ni of speciesAbundance.values()) {
+        const pi = ni / N;
+        if (pi > 0) H -= pi * Math.log(pi);
+      }
+    }
+    const J: number | null = S > 1 ? H / Math.log(S) : S === 1 ? 0 : null;
+    return {
+      S, N,
+      H: Math.round(H * 1000) / 1000,
+      J: J !== null ? Math.round(J * 1000) / 1000 : null,
+    };
   })();
 
   // ── Clase taxonómica — aplica a campañas de fauna (transecto, rescate, etc.) ──
@@ -1832,6 +1866,17 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
                         </tr>
                       ))}
                     </tbody>
+                    {communityParamsTotal && (
+                      <tfoot>
+                        <tr className="font-bold border-t-2 border-gray-300 bg-gray-50">
+                          <td className="px-3 py-2">Total</td>
+                          <td className="px-3 py-2 text-right font-mono">{communityParamsTotal.S}</td>
+                          <td className="px-3 py-2 text-right font-mono">{communityParamsTotal.N}</td>
+                          <td className="px-3 py-2 text-right font-mono">{fmt3(communityParamsTotal.H)}</td>
+                          <td className="px-3 py-2 text-right font-mono">{communityParamsTotal.J !== null ? fmt3(communityParamsTotal.J) : <span className="text-gray-300 font-mono">—</span>}</td>
+                        </tr>
+                      </tfoot>
+                    )}
                   </table>
                 </div>
               </CardContent>
