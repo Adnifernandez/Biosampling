@@ -17,6 +17,7 @@ import {
   ClipboardList,
   FlaskConical,
   MapPin,
+  Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -35,6 +36,7 @@ const baseNavItems = [
 
 const adminNavItems = [
   { href: "/admin/usuarios",  label: "Usuarios",           icon: Users           },
+  { href: "/admin/uso",       label: "Uso de la App",      icon: Activity        },
 ];
 
 function SidebarInner({ isAdmin }: { isAdmin: boolean }) {
