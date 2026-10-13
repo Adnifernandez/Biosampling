@@ -38,15 +38,20 @@ const baseNavItems = [
 const adminNavItems = [
   { href: "/admin/usuarios",  label: "Usuarios",           icon: Users           },
   { href: "/admin/uso",       label: "Uso de la App",      icon: Activity        },
-  { href: "/recuperar",       label: "Recuperar datos",    icon: LifeBuoy        },
 ];
 
-function SidebarInner({ isAdmin }: { isAdmin: boolean }) {
+const recoverItem = { href: "/recuperar", label: "Recuperar datos", icon: LifeBuoy };
+
+function SidebarInner({ isAdmin, showRecover }: { isAdmin: boolean; showRecover: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const projectId = searchParams.get("projectId") ?? "";
 
-  const navItems = isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems;
+  const navItems = [
+    ...baseNavItems,
+    ...(isAdmin ? adminNavItems : []),
+    ...(showRecover ? [recoverItem] : []),
+  ];
 
   return (
     <aside className="hidden lg:flex flex-col w-60 shrink-0 bg-teal-900 text-white h-full">
@@ -91,7 +96,7 @@ function SidebarInner({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
-export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
+export function Sidebar({ isAdmin, showRecover }: { isAdmin: boolean; showRecover: boolean }) {
   return (
     <Suspense fallback={
       <aside className="hidden lg:flex flex-col w-60 shrink-0 bg-teal-900 text-white h-full">
@@ -110,7 +115,7 @@ export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
         </nav>
       </aside>
     }>
-      <SidebarInner isAdmin={isAdmin} />
+      <SidebarInner isAdmin={isAdmin} showRecover={showRecover} />
     </Suspense>
   );
 }

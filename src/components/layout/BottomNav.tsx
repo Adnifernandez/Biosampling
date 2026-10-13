@@ -26,8 +26,9 @@ const moreItemsBase = [
 
 const moreItemsAdmin = [
   { href: "/admin/usuarios",  label: "Usuarios",  icon: Users         },
-  { href: "/recuperar",       label: "Recuperar datos", icon: LifeBuoy },
 ];
+
+const recoverItem = { href: "/recuperar", label: "Recuperar datos", icon: LifeBuoy };
 
 function handleNavClick(e: React.MouseEvent<HTMLAnchorElement>, href: string) {
   if (!navigator.onLine) {
@@ -36,13 +37,17 @@ function handleNavClick(e: React.MouseEvent<HTMLAnchorElement>, href: string) {
   }
 }
 
-function BottomNavInner({ isAdmin }: { isAdmin: boolean }) {
+function BottomNavInner({ isAdmin, showRecover }: { isAdmin: boolean; showRecover: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const projectId = searchParams.get("projectId") ?? "";
   const [open, setOpen] = useState(false);
 
-  const moreItems = isAdmin ? [...moreItemsBase, ...moreItemsAdmin] : moreItemsBase;
+  const moreItems = [
+    ...moreItemsBase,
+    ...(isAdmin ? moreItemsAdmin : []),
+    ...(showRecover ? [recoverItem] : []),
+  ];
   const moreActive = moreItems.some((i) => pathname.startsWith(i.href));
 
   return (
@@ -142,7 +147,7 @@ function BottomNavInner({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
-export function BottomNav({ isAdmin }: { isAdmin: boolean }) {
+export function BottomNav({ isAdmin, showRecover }: { isAdmin: boolean; showRecover: boolean }) {
   return (
     <Suspense fallback={
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50"
@@ -162,7 +167,7 @@ export function BottomNav({ isAdmin }: { isAdmin: boolean }) {
         </div>
       </nav>
     }>
-      <BottomNavInner isAdmin={isAdmin} />
+      <BottomNavInner isAdmin={isAdmin} showRecover={showRecover} />
     </Suspense>
   );
 }
