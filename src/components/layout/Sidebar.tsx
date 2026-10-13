@@ -18,6 +18,7 @@ import {
   FlaskConical,
   MapPin,
   Activity,
+  LifeBuoy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -37,6 +38,7 @@ const baseNavItems = [
 const adminNavItems = [
   { href: "/admin/usuarios",  label: "Usuarios",           icon: Users           },
   { href: "/admin/uso",       label: "Uso de la App",      icon: Activity        },
+  { href: "/recuperar",       label: "Recuperar datos",    icon: LifeBuoy        },
 ];
 
 function SidebarInner({ isAdmin }: { isAdmin: boolean }) {

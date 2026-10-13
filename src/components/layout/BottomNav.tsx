@@ -6,7 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   FolderOpen, Layers, LayoutList, ClipboardList,
-  MoreHorizontal, FlaskConical, FileBarChart2, Users, X, MapPin,
+  MoreHorizontal, FlaskConical, FileBarChart2, Users, X, MapPin, LifeBuoy,
 } from "lucide-react";
 
 const PROJECT_TABS = new Set(["/campanas", "/estaciones", "/ocurrencias"]);
@@ -26,6 +26,7 @@ const moreItemsBase = [
 
 const moreItemsAdmin = [
   { href: "/admin/usuarios",  label: "Usuarios",  icon: Users         },
+  { href: "/recuperar",       label: "Recuperar datos", icon: LifeBuoy },
 ];
 
 function handleNavClick(e: React.MouseEvent<HTMLAnchorElement>, href: string) {
