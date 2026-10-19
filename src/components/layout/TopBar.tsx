@@ -11,10 +11,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { SyncStatusPill } from "@/components/layout/SyncStatusPill";
 
 export function TopBar() {
   const { data: session } = useSession();
   const [isOnline, setIsOnline] = useState(true);
+  const isAdmin = session?.user?.role === "ADMIN";
 
   useEffect(() => {
     setIsOnline(navigator.onLine);
@@ -40,7 +42,8 @@ export function TopBar() {
       </div>
 
       <div className="flex items-center gap-2">
-        {!isOnline && (
+        {isAdmin && <SyncStatusPill />}
+        {!isAdmin && !isOnline && (
           <div className="flex items-center gap-1 bg-yellow-500/20 border border-yellow-400/40 rounded-full px-2 py-0.5">
             <WifiOff className="h-3.5 w-3.5 text-yellow-300" />
             <span className="text-xs text-yellow-200">Sin conexión</span>

@@ -2,6 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
+import { useSession } from "next-auth/react";
+import Link from "next/link";
+import { useSyncOverview } from "@/hooks/useRobustSync";
+import { syncNow } from "@/lib/sync-robust";
 import { getDb } from "@/lib/db";
 import type { CachedProject, CachedCampaign, CachedStation } from "@/lib/db";
 import { OccurrenceForm } from "@/components/ocurrencias/OccurrenceForm";
@@ -66,6 +70,12 @@ export function TerrenoClient() {
     0
   );
 
+  // Admins use the robust sync: count what's waiting plus what needs review
+  const robust = useSession().data?.user?.role === "ADMIN";
+  const overview = useSyncOverview();
+  const shownCount = robust ? overview.pending + overview.rejected : (pendingCount ?? 0);
+  const isSyncing = robust ? overview.engine.running : syncing;
+
   const isGrilla = campaign?.methodology === "GRILLA";
   const sorted = (arr: CachedStation[]) =>
     [...arr].sort((a, b) => a.name.localeCompare(b.name, "es", { numeric: true }));
@@ -88,6 +98,7 @@ export function TerrenoClient() {
   }
 
   async function handleSync() {
+    if (robust) { syncNow(); return; }
     if (!isOnline || syncing) return;
     setSyncing(true);
     try {
@@ -125,17 +136,25 @@ export function TerrenoClient() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {(pendingCount ?? 0) > 0 && (
+          {robust && shownCount === 0 && !isSyncing && (
+            <Link href="/sincronizacion" className="flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium bg-green-100 text-green-700">
+              <CheckCircle2 className="w-3 h-3" />
+              Todo subido
+            </Link>
+          )}
+          {(shownCount > 0 || isSyncing) && (
             <button
               onClick={handleSync}
-              disabled={!isOnline || syncing}
+              disabled={!isOnline || isSyncing}
               className={cn(
                 "flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium",
                 isOnline ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-400 opacity-60"
               )}
             >
-              <RefreshCw className={cn("w-3 h-3", syncing && "animate-spin")} />
-              {pendingCount} pend.
+              <RefreshCw className={cn("w-3 h-3", isSyncing && "animate-spin")} />
+              {robust && isSyncing
+                ? `Subiendo ${Math.min(overview.engine.done, overview.engine.total)}/${overview.engine.total}`
+                : `${shownCount} pend.`}
             </button>
           )}
           <div className={cn("flex items-center text-xs font-medium", isOnline ? "text-green-600" : "text-red-500")}>

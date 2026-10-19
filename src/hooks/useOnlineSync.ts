@@ -10,12 +10,12 @@ async function runSync() {
   return syncPendingOccurrences();
 }
 
-async function runSeedCache() {
+export async function runSeedCache() {
   const { seedLocalCache } = await import("@/lib/sync");
   return seedLocalCache();
 }
 
-async function precachePages() {
+export async function precachePages() {
   if (!("caches" in window)) return;
   const KEY_PAGES = ["/proyectos", "/campanas", "/estaciones", "/ocurrencias", "/offline/registro", "/terreno"];
   try {

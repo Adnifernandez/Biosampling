@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +23,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { OccurrencePayload, SingleOccurrenceData } from "@/lib/db";
+import { requestSyncSoon } from "@/lib/sync-robust";
 import { QuickAddSpeciesButton } from "@/components/ocurrencias/QuickAddSpeciesButton";
 
 // Search species: tries server first, falls back to Dexie cache when offline
@@ -163,6 +165,9 @@ export function OccurrenceForm({
   stationSpecies,
 }: OccurrenceFormProps) {
   const router = useRouter();
+  // Admins (robust sync, under test): a record is never lost — if the upload
+  // fails it stays on the phone and the robust sync uploads it later.
+  const robustSync = useSession().data?.user?.role === "ADMIN";
   const isBB = methodology === "BRAUN_BLANQUET";
   const isMicroruteo = methodology === "MICRORUTEO";
   const isForestal = methodology === "PARCELAS_FORESTALES";
@@ -467,12 +472,14 @@ export function OccurrenceForm({
     const db = getDb();
     if (!db) return null;
     try {
-      return await db.pendingOccurrences.add({
+      const localId = await db.pendingOccurrences.add({
         stationId: stationId || "pending",
         stationLocalKey,
         projectId, campaignId, methodology, surveyType,
         payload, speciesLabel: label, createdAt: Date.now(), status: "pending",
       }) as number;
+      if (robustSync) requestSyncSoon();
+      return localId;
     } catch {
       toast.error("No se pudo guardar en el teléfono", {
         description: "El formulario no se borró. Revisa el espacio disponible e inténtalo de nuevo.",
@@ -481,15 +488,34 @@ export function OccurrenceForm({
     }
   }
 
-  async function saveOffline(payload: OccurrencePayload, label: string) {
+  async function saveOffline(payload: OccurrencePayload, label: string, opts: { uploadFailed?: boolean } = {}) {
     const localId = await queueOffline(payload, label);
     if (localId === null) return;
-    toast.success("Registro guardado", {
-      description: navigator.onLine ? "Se sincronizará automáticamente." : "Se subirá al reconectarte.",
-    });
+    if (opts.uploadFailed) {
+      toast.warning("No se pudo subir: quedó guardado en el teléfono", {
+        description: "Se subirá solo cuando la señal mejore.",
+      });
+    } else {
+      toast.success("Registro guardado", {
+        description: navigator.onLine ? "Se sincronizará automáticamente." : "Se subirá al reconectarte.",
+      });
+    }
     setSessionCount(n => n + 1);
     resetForm();
     onRegistered?.(label, payload, localId);
+  }
+
+  // Robust sync: send now, and if the request itself fails (weak signal,
+  // expired session, server down) keep the record on the phone instead.
+  async function sendOrQueue<T>(send: () => Promise<T>, payload: OccurrencePayload, label: string): Promise<T | null> {
+    try {
+      return await send();
+    } catch (err) {
+      setSubmitting(false);
+      if (!robustSync) throw err;
+      await saveOffline(payload, label, { uploadFailed: true });
+      return null;
+    }
   }
 
   // Sherman / cámara trampa batches. Like every other record, entries are saved
@@ -610,7 +636,11 @@ export function OccurrenceForm({
           router.push(back);
         }
       } else {
-        const result = await createGrillaOccurrences(projectId, campaignId, stationId, gridPayload);
+        const result = await sendOrQueue(
+          () => createGrillaOccurrences(projectId, campaignId, stationId, gridPayload),
+          { kind: "grilla", data: gridPayload }, `Grilla (${gridPayload.species.length} esp.)`,
+        );
+        if (!result) return;
         setSubmitting(false);
         if ("error" in result && result.error) { toast.error(String(result.error)); }
         else if ("success" in result) {
@@ -667,7 +697,11 @@ export function OccurrenceForm({
         };
         const result = occurrenceId
           ? await updateOccurrence(projectId, campaignId, stationId, occurrenceId, payload)
-          : await createOccurrence(projectId, campaignId, stationId, payload);
+          : await sendOrQueue(
+              () => createOccurrence(projectId, campaignId, stationId, payload),
+              { kind: "single", data: payload }, selectedSpecies ? `${selectedSpecies.genus} ${selectedSpecies.species}` : "Especie",
+            );
+        if (!result) return;
         setSubmitting(false);
         if ("error" in result && result.error) {
           toast.error(String(result.error));
@@ -717,7 +751,11 @@ export function OccurrenceForm({
     setSubmitting(true);
     const result = occurrenceId
       ? await updateOccurrence(projectId, campaignId, stationId, occurrenceId, payload)
-      : await createOccurrence(projectId, campaignId, stationId, payload);
+      : await sendOrQueue(
+          () => createOccurrence(projectId, campaignId, stationId, payload),
+          { kind: "single", data: payload }, selectedSpecies ? `${selectedSpecies.genus} ${selectedSpecies.species}` : "Especie",
+        );
+    if (!result) return;
     setSubmitting(false);
 
     if ("error" in result && result.error) {

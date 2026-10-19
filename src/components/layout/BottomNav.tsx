@@ -6,7 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   FolderOpen, Layers, LayoutList, ClipboardList,
-  MoreHorizontal, FlaskConical, FileBarChart2, Users, X, MapPin, LifeBuoy, BarChart3,
+  MoreHorizontal, FlaskConical, FileBarChart2, Users, X, MapPin, LifeBuoy, BarChart3, CloudUpload,
 } from "lucide-react";
 
 const PROJECT_TABS = new Set(["/campanas", "/estaciones", "/ocurrencias"]);
@@ -27,6 +27,7 @@ const moreItemsBase = [
 const moreItemsAdmin = [
   { href: "/admin/datos",     label: "Datos",     icon: BarChart3     },
   { href: "/admin/usuarios",  label: "Usuarios",  icon: Users         },
+  { href: "/sincronizacion",  label: "Sincronización", icon: CloudUpload },
 ];
 
 const recoverItem = { href: "/recuperar", label: "Recuperar datos", icon: LifeBuoy };
