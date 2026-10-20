@@ -9,9 +9,10 @@ import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Layers, ClipboardList, FolderOpen, Users, AlertTriangle, Info } from "lucide-react";
-import { format } from "date-fns";
+import { Layers, ClipboardList, FolderOpen, Users, AlertTriangle, Info, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 type UserRow = { id: string; name: string; email: string; active: boolean };
 type ProjectRow = { id: string; name: string; createdBy: string | null };
@@ -26,10 +27,27 @@ type RecordRow = {
 
 const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
 
-function fmtDate(d: Date | string | number | null | undefined): string {
-  if (!d) return "—";
-  return format(new Date(d), "d MMM yyyy", { locale: es });
+// Which date the period filter, chart and table use:
+// "field" = fecha del registro en terreno (the date typed in the form),
+// "upload" = when it reached the server (offline records count when they synced).
+type DateBasis = "field" | "upload";
+
+// Calendar day "yyyy-MM-dd" of a record for the chosen basis. The field date is
+// stored as a date-only value at UTC midnight, so it's read in UTC (otherwise
+// Chile's offset would shift it to the previous day).
+function dayOf(r: RecordRow, basis: DateBasis): string {
+  return basis === "field"
+    ? new Date(r.date).toISOString().slice(0, 10)
+    : format(new Date(r.createdAt), "yyyy-MM-dd");
 }
+
+function fmtDay(day: string | null | undefined): string {
+  if (!day) return "—";
+  return format(parseISO(day), "d MMM yyyy", { locale: es });
+}
+
+type SortKey = "project" | "user" | "campaigns" | "records" | "first" | "last";
+type SortDir = "asc" | "desc";
 
 export function UsoClient({
   users, projects, campaigns, records,
@@ -44,6 +62,15 @@ export function UsoClient({
   const [campaignId, setCampaignId] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [basis, setBasis] = useState<DateBasis>("field");
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "project", dir: "asc" });
+
+  function toggleSort(key: SortKey) {
+    setSort(prev => prev.key === key
+      ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+      // Dates and counts start with the most recent / largest first
+      : { key, dir: key === "project" || key === "user" ? "asc" : "desc" });
+  }
 
   const projectMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
   const userMap = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
@@ -59,18 +86,16 @@ export function UsoClient({
   const effectiveCampaignId = campaignOptions.some((c) => c.value === campaignId) ? campaignId : "";
 
   const filtered = useMemo(() => {
-    const from = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null;
-    const to = dateTo ? new Date(`${dateTo}T23:59:59`) : null;
     return records.filter((r) => {
       if (projectId && r.projectId !== projectId) return false;
       if (userId && r.userId !== userId) return false;
       if (effectiveCampaignId && r.campaignId !== effectiveCampaignId) return false;
-      const created = new Date(r.createdAt);
-      if (from && created < from) return false;
-      if (to && created > to) return false;
+      const day = dayOf(r, basis);
+      if (dateFrom && day < dateFrom) return false;
+      if (dateTo && day > dateTo) return false;
       return true;
     });
-  }, [records, projectId, userId, effectiveCampaignId, dateFrom, dateTo]);
+  }, [records, projectId, userId, effectiveCampaignId, dateFrom, dateTo, basis]);
 
   // ── KPIs ──
   const kpis = useMemo(() => {
@@ -116,12 +141,11 @@ export function UsoClient({
       .sort((a, b) => b.count - a.count);
   }, [filtered, userMap]);
 
-  // ── Evolution over time (by month, createdAt) ──
+  // ── Evolution over time (by month, on the chosen date) ──
   const evolutionChart = useMemo(() => {
     const map = new Map<string, number>();
     for (const r of filtered) {
-      const d = new Date(r.createdAt);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const key = dayOf(r, basis).slice(0, 7);
       map.set(key, (map.get(key) ?? 0) + 1);
     }
     return Array.from(map.entries())
@@ -131,22 +155,22 @@ export function UsoClient({
         const label = new Date(y, m - 1, 1).toLocaleDateString("es-CL", { month: "short", year: "2-digit" });
         return { key, label, count };
       });
-  }, [filtered]);
+  }, [filtered, basis]);
 
   // ── Detailed tracking table: Proyecto x Usuario ──
   const trackingRows = useMemo(() => {
-    type Acc = { records: number; first: number; last: number };
+    type Acc = { records: number; first: string; last: string };
     const map = new Map<string, Acc>();
     for (const r of filtered) {
       const key = `${r.projectId}::${r.userId}`;
-      const t = new Date(r.createdAt).getTime();
+      const day = dayOf(r, basis);
       const acc = map.get(key);
       if (acc) {
         acc.records++;
-        if (t < acc.first) acc.first = t;
-        if (t > acc.last) acc.last = t;
+        if (day < acc.first) acc.first = day;
+        if (day > acc.last) acc.last = day;
       } else {
-        map.set(key, { records: 1, first: t, last: t });
+        map.set(key, { records: 1, first: day, last: day });
       }
     }
 
@@ -173,8 +197,20 @@ export function UsoClient({
           last: acc.last,
         };
       })
-      .sort((a, b) => a.projectName.localeCompare(b.projectName, "es") || b.records - a.records);
-  }, [filtered, projectMap, userMap, campaigns, effectiveCampaignId, dateFrom, dateTo]);
+      .sort((a, b) => {
+        const byName = a.projectName.localeCompare(b.projectName, "es") || a.userName.localeCompare(b.userName, "es");
+        let cmp = 0;
+        switch (sort.key) {
+          case "project":   cmp = byName; break;
+          case "user":      cmp = a.userName.localeCompare(b.userName, "es") || a.projectName.localeCompare(b.projectName, "es"); break;
+          case "campaigns": cmp = a.approxCampaigns - b.approxCampaigns; break;
+          case "records":   cmp = a.records - b.records; break;
+          case "first":     cmp = a.first.localeCompare(b.first); break;
+          case "last":      cmp = a.last.localeCompare(b.last); break;
+        }
+        return (sort.dir === "asc" ? cmp : -cmp) || byName;
+      });
+  }, [filtered, projectMap, userMap, campaigns, effectiveCampaignId, dateFrom, dateTo, basis, sort]);
 
   const projectOptions = projects.map((p) => ({ value: p.id, label: p.name }));
   const userOptions = users.map((u) => ({ value: u.id, label: u.name }));
@@ -231,6 +267,32 @@ export function UsoClient({
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
             </div>
           </div>
+          <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
+            <span className="text-sm font-medium text-gray-700">Contar por:</span>
+            <div className="inline-flex rounded-lg border border-gray-200 p-0.5 w-fit">
+              {([
+                { value: "field", label: "Fecha en terreno" },
+                { value: "upload", label: "Fecha de carga al sistema" },
+              ] as const).map(o => (
+                <button
+                  key={o.value}
+                  onClick={() => setBasis(o.value)}
+                  className={cn(
+                    "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                    basis === o.value ? "bg-teal-700 text-white" : "text-gray-600 hover:bg-gray-100",
+                  )}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-gray-500">
+            {basis === "field"
+              ? "Se cuentan los registros cuya fecha en terreno (la que se anota en el formulario) está entre Desde y Hasta. "
+              : "Se cuentan los registros que llegaron al sistema entre Desde y Hasta (los cargados sin señal cuentan el día en que se subieron). "}
+            Los proyectos, campañas y usuarios que aparecen son los que tuvieron registros en ese período, no los creados en esas fechas.
+          </p>
         </CardContent>
       </Card>
 
@@ -364,21 +426,21 @@ export function UsoClient({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Proyecto</TableHead>
-                  <TableHead>Usuario</TableHead>
+                  <TableHead><SortButton label="Proyecto" k="project" sort={sort} onSort={toggleSort} /></TableHead>
+                  <TableHead><SortButton label="Usuario" k="user" sort={sort} onSort={toggleSort} /></TableHead>
                   <TableHead className="text-right">
                     <span className="inline-flex items-center gap-1 justify-end">
-                      Campañas creadas
+                      <SortButton label="Campañas creadas" k="campaigns" sort={sort} onSort={toggleSort} />
                       <span
-                        title="Aproximado: se calcula comparando el nombre del usuario con el campo de texto libre 'Responsable' de cada campaña. No existe en la base de datos un registro directo de quién creó cada campaña."
+                        title="Aproximado: se calcula comparando el nombre del usuario con el campo de texto libre 'Responsable' de cada campaña, usando su fecha de inicio para el período. No existe en la base de datos un registro directo de quién creó cada campaña."
                       >
                         <Info className="h-3.5 w-3.5 text-gray-400" />
                       </span>
                     </span>
                   </TableHead>
-                  <TableHead className="text-right">Registros</TableHead>
-                  <TableHead>Primera actividad</TableHead>
-                  <TableHead>Última actividad</TableHead>
+                  <TableHead className="text-right"><SortButton label="Registros" k="records" sort={sort} onSort={toggleSort} /></TableHead>
+                  <TableHead><SortButton label="Primer registro" k="first" sort={sort} onSort={toggleSort} /></TableHead>
+                  <TableHead><SortButton label="Último registro" k="last" sort={sort} onSort={toggleSort} /></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -388,8 +450,8 @@ export function UsoClient({
                     <TableCell>{r.userName}</TableCell>
                     <TableCell className="text-right">{r.approxCampaigns}</TableCell>
                     <TableCell className="text-right">{r.records}</TableCell>
-                    <TableCell className="text-gray-600">{fmtDate(r.first)}</TableCell>
-                    <TableCell className="text-gray-600">{fmtDate(r.last)}</TableCell>
+                    <TableCell className="text-gray-600">{fmtDay(r.first)}</TableCell>
+                    <TableCell className="text-gray-600">{fmtDay(r.last)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -436,5 +498,22 @@ export function UsoClient({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function SortButton({ label, k, sort, onSort }: {
+  label: string; k: SortKey; sort: { key: SortKey; dir: SortDir }; onSort: (k: SortKey) => void;
+}) {
+  const active = sort.key === k;
+  const Icon = !active ? ArrowUpDown : sort.dir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(k)}
+      className={cn("inline-flex items-center gap-1 hover:text-gray-900", active && "text-gray-900 font-semibold")}
+    >
+      {label}
+      <Icon className={cn("h-3.5 w-3.5", active ? "text-teal-700" : "text-gray-300")} />
+    </button>
   );
 }
