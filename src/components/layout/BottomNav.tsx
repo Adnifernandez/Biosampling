@@ -6,7 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   FolderOpen, Layers, LayoutList, ClipboardList,
-  MoreHorizontal, FlaskConical, FileBarChart2, Users, X, MapPin, LifeBuoy,
+  MoreHorizontal, FlaskConical, FileBarChart2, Users, X, MapPin, LifeBuoy, BarChart3,
 } from "lucide-react";
 
 const PROJECT_TABS = new Set(["/campanas", "/estaciones", "/ocurrencias"]);
@@ -25,6 +25,7 @@ const moreItemsBase = [
 ];
 
 const moreItemsAdmin = [
+  { href: "/admin/datos",     label: "Datos",     icon: BarChart3     },
   { href: "/admin/usuarios",  label: "Usuarios",  icon: Users         },
 ];
 

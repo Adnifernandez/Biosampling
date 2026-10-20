@@ -19,6 +19,7 @@ import {
   MapPin,
   Activity,
   LifeBuoy,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -37,6 +38,7 @@ const baseNavItems = [
 
 const adminNavItems = [
   { href: "/admin/usuarios",  label: "Usuarios",           icon: Users           },
+  { href: "/admin/datos",     label: "Datos",              icon: BarChart3       },
   { href: "/admin/uso",       label: "Uso de la App",      icon: Activity        },
 ];
 
