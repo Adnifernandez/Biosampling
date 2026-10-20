@@ -2,11 +2,15 @@
 
 import { useState, useSyncExternalStore } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import type { PendingOccurrence } from "@/lib/db";
+import { useSession } from "next-auth/react";
+import { toast } from "sonner";
+import { getDb } from "@/lib/db";
+import type { PendingOccurrence, PendingStation, PendingCampaign } from "@/lib/db";
+import { canDeleteLocal } from "@/lib/recovery-access";
 import { loadLocalData, downloadBackup, type LocalData } from "@/lib/offline-backup";
 import { retryRejected, subscribeSync, getSyncState, getServerSyncState } from "@/lib/sync-robust";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, AlertCircle, Clock, CloudUpload, Loader2, ShieldCheck, LogIn } from "lucide-react";
+import { CheckCircle2, AlertCircle, Clock, CloudUpload, Loader2, ShieldCheck, LogIn, Trash2 } from "lucide-react";
 
 function subscribeOnline(cb: () => void) {
   window.addEventListener("online", cb);
@@ -57,6 +61,8 @@ export function RecuperarClient() {
   const data = useLiveQuery(loadLocalData, [], undefined);
   // Records shown when "Subir ahora" was pressed, so their result stays visible afterwards
   const [ranIds, setRanIds] = useState<Set<number> | null>(null);
+  // Only some accounts may throw away records that can never be uploaded
+  const canDelete = canDeleteLocal(useSession().data?.user?.email);
 
   if (data === undefined) {
     return <p className="text-sm text-gray-400 text-center py-16">Leyendo datos del teléfono…</p>;
@@ -81,6 +87,49 @@ export function RecuperarClient() {
     const parent = s.parentId ? data!.cachedStations.find(st => st.id === s.parentId) : null;
     return parent ? `${parent.name} › ${s.name}` : s.name;
   }
+
+  // ── Delete from this phone (records that can't be uploaded, e.g. their campaign
+  // no longer exists). Never touches the server. ──
+  async function deleteOccurrence(o: PendingOccurrence) {
+    if (!window.confirm(`¿Eliminar «${o.speciesLabel}» de este teléfono?\n\nNo se subirá y no se podrá recuperar.`)) return;
+    await getDb()?.pendingOccurrences.delete(o.localId!);
+    toast.success("Registro eliminado del teléfono");
+  }
+
+  async function deleteStation(st: PendingStation) {
+    const db = getDb();
+    if (!db) return;
+    const n = await db.pendingOccurrences.where("stationLocalKey").equals(st.localKey).count();
+    const extra = n > 0 ? ` y sus ${n} registro${n > 1 ? "s" : ""}` : "";
+    if (!window.confirm(`¿Eliminar la réplica «${st.name}»${extra} de este teléfono?\n\nNo se subirá y no se podrá recuperar.`)) return;
+    await db.transaction("rw", db.pendingStations, db.pendingOccurrences, async () => {
+      await db.pendingOccurrences.where("stationLocalKey").equals(st.localKey).delete();
+      await db.pendingStations.delete(st.localId!);
+    });
+    toast.success("Réplica eliminada del teléfono");
+  }
+
+  async function deleteCampaign(c: PendingCampaign) {
+    const db = getDb();
+    if (!db) return;
+    const stations = await db.pendingStations.where("campaignLocalKey").equals(c.localKey).toArray();
+    let n = 0;
+    for (const st of stations) n += await db.pendingOccurrences.where("stationLocalKey").equals(st.localKey).count();
+    const parts = [
+      stations.length > 0 ? `${stations.length} réplica${stations.length > 1 ? "s" : ""}` : "",
+      n > 0 ? `${n} registro${n > 1 ? "s" : ""}` : "",
+    ].filter(Boolean).join(" y ");
+    if (!window.confirm(`¿Eliminar la campaña «${c.name}»${parts ? ` con sus ${parts}` : ""} de este teléfono?\n\nNo se subirá y no se podrá recuperar.`)) return;
+    await db.transaction("rw", db.pendingCampaigns, db.pendingStations, db.pendingOccurrences, async () => {
+      for (const st of stations) await db.pendingOccurrences.where("stationLocalKey").equals(st.localKey).delete();
+      await db.pendingStations.bulkDelete(stations.map(st => st.localId!));
+      await db.pendingCampaigns.delete(c.localId!);
+    });
+    toast.success("Campaña eliminada del teléfono");
+  }
+
+  const pendingCampaigns = data.campaigns.filter(c => c.status !== "synced");
+  const pendingStations = data.stations.filter(st => st.status !== "synced");
 
   async function handleUpload() {
     setRanIds(new Set(data!.occurrences.filter(o => o.status !== "synced").map(o => o.localId!)));
@@ -150,10 +199,35 @@ export function RecuperarClient() {
                     {r.text}
                   </p>
                   {r.hint && <p className="text-xs text-gray-600">{r.hint}</p>}
+                  {canDelete && o.status !== "synced" && (
+                    <DeleteButton onClick={() => deleteOccurrence(o)} disabled={engine.running} />
+                  )}
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Campañas y réplicas creadas en terreno que no han subido */}
+      {(pendingCampaigns.length + pendingStations.length) > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl divide-y">
+          <p className="p-3 text-sm font-semibold text-gray-900">Creadas en terreno, sin subir</p>
+          {pendingCampaigns.map(c => (
+            <div key={`c${c.localId}`} className="p-3">
+              <p className="text-sm font-medium text-gray-900">Campaña: {c.name}</p>
+              <p className="text-xs text-gray-500">{projectName(c.projectId)}</p>
+              {c.errorMessage && <p className="text-xs text-red-700 mt-1">{friendly(c.errorMessage)}</p>}
+              {canDelete && <DeleteButton onClick={() => deleteCampaign(c)} disabled={engine.running} />}
+            </div>
+          ))}
+          {pendingStations.map(st => (
+            <div key={`s${st.localId}`} className="p-3">
+              <p className="text-sm font-medium text-gray-900">Réplica: {st.name}</p>
+              {st.errorMessage && <p className="text-xs text-red-700 mt-1">{friendly(st.errorMessage)}</p>}
+              {canDelete && <DeleteButton onClick={() => deleteStation(st)} disabled={engine.running} />}
+            </div>
+          ))}
         </div>
       )}
 
@@ -169,5 +243,17 @@ export function RecuperarClient() {
         Descargar copia de seguridad
       </button>
     </div>
+  );
+}
+
+function DeleteButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:underline disabled:opacity-40"
+    >
+      <Trash2 className="h-3.5 w-3.5" /> Eliminar del teléfono
+    </button>
   );
 }
