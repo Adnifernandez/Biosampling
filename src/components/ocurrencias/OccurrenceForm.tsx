@@ -21,7 +21,7 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import type { OccurrencePayload } from "@/lib/db";
+import type { OccurrencePayload, SingleOccurrenceData } from "@/lib/db";
 import { QuickAddSpeciesButton } from "@/components/ocurrencias/QuickAddSpeciesButton";
 
 // Search species: tries server first, falls back to Dexie cache when offline
@@ -460,22 +460,92 @@ export function OccurrenceForm({
     setIndividuals((prev) => prev.map((ind, idx) => idx === i ? { ...ind, [field]: value } : ind));
   }
 
-  async function saveOffline(payload: OccurrencePayload, label: string) {
+  // Stores the record on the phone. Returns its localId, or null if it couldn't
+  // be stored (the form is then left untouched so nothing is lost).
+  async function queueOffline(payload: OccurrencePayload, label: string): Promise<number | null> {
     const { getDb } = await import("@/lib/db");
     const db = getDb();
-    if (!db) return;
-    const localId = await db.pendingOccurrences.add({
-      stationId: stationId || "pending",
-      stationLocalKey,
-      projectId, campaignId, methodology, surveyType,
-      payload, speciesLabel: label, createdAt: Date.now(), status: "pending",
-    }) as number;
+    if (!db) return null;
+    try {
+      return await db.pendingOccurrences.add({
+        stationId: stationId || "pending",
+        stationLocalKey,
+        projectId, campaignId, methodology, surveyType,
+        payload, speciesLabel: label, createdAt: Date.now(), status: "pending",
+      }) as number;
+    } catch {
+      toast.error("No se pudo guardar en el teléfono", {
+        description: "El formulario no se borró. Revisa el espacio disponible e inténtalo de nuevo.",
+      });
+      return null;
+    }
+  }
+
+  async function saveOffline(payload: OccurrencePayload, label: string) {
+    const localId = await queueOffline(payload, label);
+    if (localId === null) return;
     toast.success("Registro guardado", {
       description: navigator.onLine ? "Se sincronizará automáticamente." : "Se subirá al reconectarte.",
     });
     setSessionCount(n => n + 1);
     resetForm();
     onRegistered?.(label, payload, localId);
+  }
+
+  // Sherman / cámara trampa batches. Like every other record, entries are saved
+  // on the phone when offline or in Terreno, and also when an upload fails;
+  // only entries that were saved somewhere leave the form.
+  async function submitTrapEntries(validEntries: TrapEntry[]) {
+    const toData = (e: TrapEntry): SingleOccurrenceData => ({
+      speciesId: e.speciesId,
+      date: e.date,
+      abundance: e.abundance,
+      detectionMethod: tfDetectionMethod,
+      latitude: e.latitude !== null ? String(e.latitude) : undefined,
+      longitude: e.longitude !== null ? String(e.longitude) : undefined,
+      notes: notes || undefined,
+      methodologyData: JSON.stringify({ trapId, time: e.time }),
+    });
+    setSubmitting(true);
+    let uploaded = 0, queued = 0, rejected = 0;
+    let goOffline = !navigator.onLine || isOfflineStation;
+    const handled = new Set<TrapEntry>();
+    let lastError = "";
+    for (const entry of validEntries) {
+      const data = toData(entry);
+      if (!goOffline) {
+        try {
+          const result = await createOccurrence(projectId, campaignId, stationId, data);
+          if ("success" in result) { uploaded++; handled.add(entry); }
+          else { rejected++; lastError = String(result.error ?? ""); }
+          continue;
+        } catch {
+          goOffline = true;   // connection failed: save this one and the rest on the phone
+        }
+      }
+      const payload: OccurrencePayload = { kind: "single", data };
+      const localId = await queueOffline(payload, entry.speciesLabel || "Especie");
+      if (localId === null) break;
+      onRegistered?.(entry.speciesLabel || "Especie", payload, localId);
+      queued++;
+      handled.add(entry);
+    }
+    setSubmitting(false);
+
+    const saved = uploaded + queued;
+    if (saved > 0) {
+      setSessionCount(n => n + saved);
+      toast.success(`${saved} registro${saved === 1 ? "" : "s"} guardado${saved === 1 ? "" : "s"}`, {
+        description: queued > 0 ? "Quedaron en el teléfono y se subirán al reconectarte." : undefined,
+      });
+    }
+    if (handled.size === validEntries.length) {
+      resetForm();
+    } else {
+      // Keep whatever wasn't saved in the form so it can be fixed and resent
+      setTrapEntries(prev => prev.filter(e => !handled.has(e)));
+      if (rejected > 0) toast.error(`${rejected} registro${rejected === 1 ? "" : "s"} no se guardó`, { description: lastError });
+    }
   }
 
   // Save offline when station is pending OR when in terreno wizard mode
@@ -567,27 +637,7 @@ export function OccurrenceForm({
         if (!trapId) { toast.error("Selecciona la trampa"); return; }
         const validEntries = trapEntries.filter(e => e.speciesId && e.date && e.abundance);
         if (validEntries.length === 0) { toast.error("Agrega al menos un registro válido"); return; }
-        setSubmitting(true);
-        let count = 0;
-        for (const entry of validEntries) {
-          const result = await createOccurrence(projectId, campaignId, stationId, {
-            speciesId: entry.speciesId,
-            date: entry.date,
-            abundance: entry.abundance,
-            detectionMethod: tfDetectionMethod,
-            latitude: entry.latitude !== null ? String(entry.latitude) : undefined,
-            longitude: entry.longitude !== null ? String(entry.longitude) : undefined,
-            notes: notes || undefined,
-            methodologyData: JSON.stringify({ trapId, time: entry.time }),
-          });
-          if ("success" in result) count++;
-        }
-        setSubmitting(false);
-        if (count > 0) {
-          toast.success(`${count} registro${count === 1 ? "" : "s"} guardado${count === 1 ? "" : "s"}`);
-          setSessionCount(n => n + count);
-          resetForm();
-        }
+        await submitTrapEntries(validEntries);
         return;
       } else {
         if (!tfAbundance) { toast.error("Ingresa el N° de individuos"); return; }
