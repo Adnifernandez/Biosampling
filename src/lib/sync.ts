@@ -9,7 +9,20 @@ import {
 import { createCampanaData } from "@/app/(app)/campanas/actions";
 import { createEstacionData } from "@/app/(app)/estaciones/actions-offline";
 
+// Shares a lock with the duplicate-safe upload ("Recuperar datos" / robust sync)
+// so the two never send the same records at the same time.
 export async function syncPendingOccurrences(): Promise<{ synced: number; failed: number }> {
+  if (typeof navigator !== "undefined" && navigator.locks) {
+    let result = { synced: 0, failed: 0 };
+    await navigator.locks.request("biosampling-sync", { ifAvailable: true }, async lock => {
+      if (lock) result = await syncPendingUnlocked();
+    });
+    return result;
+  }
+  return syncPendingUnlocked();
+}
+
+async function syncPendingUnlocked(): Promise<{ synced: number; failed: number }> {
   const db = getDb();
   if (!db) return { synced: 0, failed: 0 };
   let synced = 0;

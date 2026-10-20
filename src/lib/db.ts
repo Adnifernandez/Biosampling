@@ -12,8 +12,14 @@ export interface PendingOccurrence {
   payload: OccurrencePayload;
   speciesLabel: string;
   createdAt: number;
-  status: "pending" | "error";
+  status: "pending" | "error" | "synced";   // "synced" only used by the robust (admin) sync
   errorMessage?: string;
+  // Robust sync: server ids fixed before the first upload attempt, so a retry
+  // after a lost response never creates duplicates (one id per row created).
+  clientIds?: string[];
+  attempts?: number;
+  syncedAt?: number;
+  alreadyOnServer?: boolean;   // the server already had an identical record; nothing was duplicated
 }
 
 // ── Pending campaigns (created offline) ──
@@ -34,6 +40,8 @@ export interface PendingCampaign {
   status: "pending" | "synced" | "error";
   serverId?: string;
   errorMessage?: string;
+  clientId?: string;           // robust sync: server id fixed before the first attempt
+  syncedAt?: number;
 }
 
 // ── Pending stations (created offline) ──
@@ -54,6 +62,8 @@ export interface PendingStation {
   status: "pending" | "synced" | "error";
   serverId?: string;
   errorMessage?: string;
+  clientId?: string;           // robust sync: server id fixed before the first attempt
+  syncedAt?: number;
 }
 
 export type OccurrencePayload =
