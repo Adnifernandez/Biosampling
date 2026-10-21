@@ -5,13 +5,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Pencil, Trash2, Search, X, FlaskConical } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, X, FlaskConical, AlertTriangle } from "lucide-react";
 import {
   createSpecies,
   updateSpecies,
   deleteSpecies,
   searchSpecies,
+  type SpeciesOrigin,
 } from "@/app/(app)/admin/especies/actions";
+import { isPendingFamily } from "@/lib/species-names";
 
 type Species = {
   id: string;
@@ -35,6 +37,11 @@ type Species = {
   updatedBy: { name: string } | null;
   _count: { occurrences: number };
 };
+
+type PendingSpecies = Species & { hasTwin: boolean };
+
+const formatDate = (d: Date | string) =>
+  new Date(d).toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" });
 
 const EMPTY_FORM = {
   type: "FAUNA",
@@ -65,26 +72,58 @@ const CONSERVATION_COLORS: Record<string, string> = {
   DD: "bg-gray-100 text-gray-500",
 };
 
-export function EspeciesClient() {
-  const [results, setResults] = useState<Species[]>([]);
-  const [searched, setSearched] = useState(false);
+function formFromSpecies(sp: Species) {
+  return {
+    type: sp.type,
+    genus: sp.genus,
+    species: sp.species,
+    // Species added from the field: the family has to be written, not kept as "Por clasificar"
+    family: isPendingFamily(sp.family) ? "" : sp.family,
+    commonName: sp.commonName ?? "",
+    clase: sp.clase ?? "",
+    orden: sp.orden ?? "",
+    origen: sp.origen ?? "",
+    conservationStatus: sp.conservationStatus ?? "",
+    habito: sp.habito ?? "",
+    macrofitasHabito: sp.macrofitasHabito ?? "",
+    division: sp.division ?? "",
+    category: sp.category ?? "",
+    endemic: sp.endemic,
+  };
+}
+
+export function EspeciesClient({
+  initialPending,
+  initialEdit,
+}: {
+  initialPending: PendingSpecies[];
+  // Opened directly when arriving from the report (?completar=<id>)
+  initialEdit: Species | null;
+}) {
+  const [results, setResults] = useState<Species[]>(initialEdit ? [initialEdit] : []);
+  const [searched, setSearched] = useState(!!initialEdit);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"ALL" | "FAUNA" | "FLORA">("ALL");
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [originFilter, setOriginFilter] = useState<SpeciesOrigin>("ALL");
+  const [pending, setPending] = useState<PendingSpecies[]>(initialPending);
+  const [showForm, setShowForm] = useState(!!initialEdit);
+  const [editingId, setEditingId] = useState<string | null>(initialEdit?.id ?? null);
+  const [editingPending, setEditingPending] = useState(!!initialEdit && isPendingFamily(initialEdit.family));
+  const [form, setForm] = useState(initialEdit ? formFromSpecies(initialEdit) : EMPTY_FORM);
   const [error, setError] = useState("");
+  const [duplicate, setDuplicate] = useState<Species | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isSearching, startSearchTransition] = useTransition();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<Record<string, string>>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const formRef = useRef<HTMLDivElement | null>(null);
 
-  function runSearch(q: string, type: string) {
+  function runSearch(q: string, type: string, origin: SpeciesOrigin) {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       startSearchTransition(async () => {
-        const res = await searchSpecies(q, type);
+        const res = await searchSpecies(q, type, origin);
         setResults(res as Species[]);
         setSearched(true);
       });
@@ -94,50 +133,60 @@ export function EspeciesClient() {
   function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
     const q = e.target.value;
     setSearch(q);
-    runSearch(q, typeFilter);
+    runSearch(q, typeFilter, originFilter);
   }
 
   function handleTypeChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const type = e.target.value as "ALL" | "FAUNA" | "FLORA";
     setTypeFilter(type);
-    runSearch(search, type);
+    runSearch(search, type, originFilter);
+  }
+
+  function handleOriginChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const origin = e.target.value as SpeciesOrigin;
+    setOriginFilter(origin);
+    runSearch(search, typeFilter, origin);
   }
 
   useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
 
+  // Coming from the report: bring the opened form into view
+  useEffect(() => {
+    if (initialEdit) formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [initialEdit]);
+
   function openNew() {
     setEditingId(null);
+    setEditingPending(false);
     setForm(EMPTY_FORM);
     setError("");
+    setDuplicate(null);
     setShowForm(true);
   }
 
   function openEdit(sp: Species) {
     setEditingId(sp.id);
-    setForm({
-      type: sp.type,
-      genus: sp.genus,
-      species: sp.species,
-      family: sp.family,
-      commonName: sp.commonName ?? "",
-      clase: sp.clase ?? "",
-      orden: sp.orden ?? "",
-      origen: sp.origen ?? "",
-      conservationStatus: sp.conservationStatus ?? "",
-      habito: sp.habito ?? "",
-      macrofitasHabito: sp.macrofitasHabito ?? "",
-      division: sp.division ?? "",
-      category: sp.category ?? "",
-      endemic: sp.endemic,
-    });
+    setEditingPending(isPendingFamily(sp.family));
+    setForm(formFromSpecies(sp));
     setError("");
+    setDuplicate(null);
     setShowForm(true);
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  }
+
+  // From the "already exists" warning: show and open the species that was already in the list
+  function openExisting(sp: Species) {
+    setResults((prev) => (prev.some((s) => s.id === sp.id) ? prev : [sp, ...prev]));
+    setSearched(true);
+    openEdit(sp);
   }
 
   function closeForm() {
     setShowForm(false);
     setEditingId(null);
+    setEditingPending(false);
     setError("");
+    setDuplicate(null);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -159,10 +208,16 @@ export function EspeciesClient() {
       const res = editingId
         ? await updateSpecies(editingId, data)
         : await createSpecies(data);
-      if (res.error) { setError(res.error); return; }
+      if (res.error) {
+        setError(res.error);
+        setDuplicate("existing" in res && res.existing ? (res.existing as Species) : null);
+        return;
+      }
       if (res.species) {
         if (editingId) {
           setResults((prev) => prev.map((s) => s.id === editingId ? res.species! as Species : s));
+          // Completed species leave the "Por completar" list
+          if (!isPendingFamily(res.species.family)) setPending((prev) => prev.filter((s) => s.id !== editingId));
         } else {
           setResults((prev) =>
             [...prev, res.species! as Species].sort((a, b) =>
@@ -184,6 +239,7 @@ export function EspeciesClient() {
           setDeletingId(null);
         } else {
           setResults((prev) => prev.filter((s) => s.id !== sp.id));
+          setPending((prev) => prev.filter((s) => s.id !== sp.id));
           setDeletingId(null);
         }
       });
@@ -198,6 +254,72 @@ export function EspeciesClient() {
 
   return (
     <div className="space-y-4">
+      {/* ── Por completar: added from the field and still "Por clasificar" ── */}
+      {pending.length > 0 && (
+        <Card className="border-orange-200 bg-orange-50">
+          <CardContent className="py-3 px-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-orange-600 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-orange-800">
+                  Hay {pending.length} especie{pending.length !== 1 ? "s" : ""} por completar
+                </p>
+                <p className="text-xs text-orange-700 mt-0.5">
+                  Se agregaron en terreno con &quot;¿No está la especie? ¡Agrégala!&quot;. Usa <strong>Completar</strong> para
+                  llenar sus datos. No crees una especie nueva con el mismo nombre: los reportes no se pueden exportar
+                  mientras falten estos datos.
+                </p>
+              </div>
+            </div>
+            <ul className="divide-y divide-orange-100 rounded-md border border-orange-100 bg-white">
+              {pending.map((sp) => (
+                <li key={sp.id} className="flex flex-col sm:flex-row sm:items-center gap-2 px-3 py-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm">
+                      <span className="italic font-medium">{sp.genus} {sp.species}</span>
+                      {sp.commonName && <span className="text-gray-500"> · {sp.commonName}</span>}
+                      <span className="ml-2 text-xs text-gray-400">{sp.type === "FAUNA" ? "Fauna" : "Flora"}</span>
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {sp.createdBy ? `Agregada por ${sp.createdBy.name}` : "Agregada"} el {formatDate(sp.createdAt)}
+                      {" · "}{sp._count.occurrences} registro{sp._count.occurrences !== 1 ? "s" : ""}
+                    </p>
+                    {sp.hasTwin && (
+                      <p className="text-xs text-orange-700 mt-0.5">
+                        Esta especie ya existe completa en el listado.{" "}
+                        {sp._count.occurrences === 0
+                          ? "Como no tiene registros, puedes eliminarla."
+                          : "Pide al administrador que las una, para no perder sus registros."}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {sp.hasTwin && sp._count.occurrences === 0 ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={isPending}
+                        onClick={() => handleDelete(sp)}
+                        className={deletingId === sp.id ? "border-red-300 text-red-700" : ""}
+                      >
+                        {deletingId === sp.id ? "¿Confirmar?" : "Eliminar"}
+                      </Button>
+                    ) : (
+                      !sp.hasTwin && (
+                        <Button size="sm" onClick={() => openEdit(sp)} className="bg-teal-700 hover:bg-teal-800 text-white">
+                          Completar
+                        </Button>
+                      )
+                    )}
+                  </div>
+                  {deleteError[sp.id] && <p className="text-xs text-red-500">{deleteError[sp.id]}</p>}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Toolbar ── */}
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
@@ -218,6 +340,17 @@ export function EspeciesClient() {
           <option value="FAUNA">Solo Fauna</option>
           <option value="FLORA">Solo Flora</option>
         </select>
+        <select
+          value={originFilter}
+          onChange={handleOriginChange}
+          aria-label="Origen de la especie"
+          className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white"
+        >
+          <option value="ALL">Todas las especies</option>
+          <option value="APP">Agregadas en la app</option>
+          <option value="INICIAL">Del listado inicial</option>
+          <option value="PENDIENTE">Por completar</option>
+        </select>
         <Button onClick={openNew} className="bg-teal-700 hover:bg-teal-800 text-white shrink-0">
           <Plus className="h-4 w-4 mr-1" /> Nueva especie
         </Button>
@@ -225,16 +358,21 @@ export function EspeciesClient() {
 
       {/* ── Form ── */}
       {showForm && (
-        <Card className="border-2 border-teal-200">
+        <Card ref={formRef} className="border-2 border-teal-200 scroll-mt-4">
           <CardContent className="py-4 px-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold text-gray-800">
-                {editingId ? "Editar especie" : "Nueva especie"}
+                {editingPending ? "Completar especie" : editingId ? "Editar especie" : "Nueva especie"}
               </h2>
               <button onClick={closeForm} className="text-gray-400 hover:text-gray-600">
                 <X className="h-4 w-4" />
               </button>
             </div>
+            {editingPending && (
+              <p className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-md px-3 py-2 mb-4">
+                Esta especie se agregó en terreno y le faltan datos. Complétalos y guarda: sus registros se mantienen.
+              </p>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -327,7 +465,19 @@ export function EspeciesClient() {
                 <span className="text-sm text-gray-700">Especie endémica</span>
               </label>
 
-              {error && <p className="text-sm text-red-500">{error}</p>}
+              {error && !duplicate && <p className="text-sm text-red-500">{error}</p>}
+              {duplicate && (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2">
+                  <p className="text-sm text-red-700 flex-1">
+                    <span className="italic font-medium">{duplicate.genus} {duplicate.species}</span> ya existe en el listado
+                    {duplicate.commonName ? ` (${duplicate.commonName})` : ""}, con {duplicate._count.occurrences} registro
+                    {duplicate._count.occurrences !== 1 ? "s" : ""}. No se creó otra.
+                  </p>
+                  <Button type="button" size="sm" variant="outline" onClick={() => openExisting(duplicate)}>
+                    Ver la que ya existe
+                  </Button>
+                </div>
+              )}
 
               <div className="flex gap-2 justify-end pt-1">
                 <Button type="button" variant="outline" onClick={closeForm}>Cancelar</Button>
@@ -346,7 +496,9 @@ export function EspeciesClient() {
           <CardContent className="py-12 text-center">
             <Search className="h-10 w-10 mx-auto mb-2 text-gray-300" />
             <p className="text-gray-500 text-sm">Busca una especie por nombre, familia o clase</p>
-            <p className="text-gray-400 text-xs mt-1">También puedes filtrar por Flora o Fauna</p>
+            <p className="text-gray-400 text-xs mt-1">
+              También puedes filtrar por Flora o Fauna, o ver solo las agregadas en la app
+            </p>
           </CardContent>
         </Card>
       ) : isSearching ? (
@@ -406,7 +558,9 @@ export function EspeciesClient() {
                     </td>
                     <td className="px-4 py-2.5 text-right text-gray-500">{sp._count.occurrences}</td>
                     <td className="px-4 py-2.5 text-xs text-gray-400 whitespace-nowrap">
-                      {sp.createdBy && <div>Creado por <span className="text-gray-600">{sp.createdBy.name}</span></div>}
+                      {sp.createdBy
+                        ? <div>Creado por <span className="text-gray-600">{sp.createdBy.name}</span> · {formatDate(sp.createdAt)}</div>
+                        : <div>Listado inicial</div>}
                       {sp.updatedBy && sp.updatedBy.name !== sp.createdBy?.name && (
                         <div>Editado por <span className="text-gray-600">{sp.updatedBy.name}</span></div>
                       )}

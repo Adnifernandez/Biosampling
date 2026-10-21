@@ -1138,14 +1138,19 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
                       Hay {incompleteSpecies.length} especie{incompleteSpecies.length !== 1 ? "s" : ""} sin datos completos — no se puede exportar el reporte
                     </p>
                     <p className="text-xs text-orange-700 mt-0.5">
-                      Completa la familia y demás datos taxonómicos en{" "}
-                      <a href="/admin/especies" className="underline font-medium">Especies</a> antes de generar el reporte.
+                      Toca cada especie para completar su familia y demás datos taxonómicos en{" "}
+                      <a href="/admin/especies" className="underline font-medium">Especies</a>. No crees una especie nueva:
+                      los registros están en la que ya existe.
                     </p>
                     <div className="flex flex-wrap gap-1 mt-2">
                       {incompleteSpecies.map((sp) => (
-                        <span key={sp.id} className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full italic">
+                        <a
+                          key={sp.id}
+                          href={`/admin/especies?completar=${encodeURIComponent(sp.id)}`}
+                          className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full italic underline underline-offset-2 hover:bg-orange-200"
+                        >
                           {sp.genus} {sp.species}
-                        </span>
+                        </a>
                       ))}
                     </div>
                   </div>

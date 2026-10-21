@@ -48,7 +48,14 @@ export function QuickAddSpeciesButton({
       toast.error(result.error ?? "No se pudo agregar la especie");
       return;
     }
-    toast.success("Especie agregada");
+    if ("existing" in result && result.existing) {
+      const sp = result.species;
+      toast.success("Esta especie ya estaba en el listado", {
+        description: `Se seleccionó ${sp.genus} ${sp.species}${sp.commonName ? ` (${sp.commonName})` : ""}. No se creó otra.`,
+      });
+    } else {
+      toast.success("Especie agregada");
+    }
     onCreated(result.species);
     reset();
     setOpen(false);
