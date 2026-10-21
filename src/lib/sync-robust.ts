@@ -9,7 +9,7 @@ import {
   syncCampaignsBatch, syncStationsBatch, syncOccurrencesBatch,
 } from "@/app/(app)/sincronizacion/actions";
 
-// Robust sync (admins, under test). Guarantees:
+// Robust sync. Guarantees:
 // - A local record is never deleted: it is marked "synced" only after the server
 //   confirms it, and purged SYNCED_RETENTION_MS later.
 // - Server ids are fixed on the device before the first attempt, so retries after

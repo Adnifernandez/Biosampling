@@ -10,8 +10,7 @@ import { precachePages, runSeedCache } from "@/hooks/useOnlineSync";
 
 const PERIODIC_MS = 60_000;
 
-// Mounted once per session (admins). Same caching duties as useOnlineSync,
-// plus the robust sync triggers.
+// Mounted once per session: service worker + offline caches, plus the sync triggers.
 export function useRobustSyncTriggers() {
   useEffect(() => {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});

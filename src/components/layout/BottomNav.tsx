@@ -22,12 +22,12 @@ const moreItemsBase = [
   { href: "/admin/especies",  label: "Especies",  icon: FlaskConical  },
   { href: "/reportes",        label: "Reportes",  icon: FileBarChart2 },
   { href: "/terreno",         label: "Terreno",   icon: MapPin        },
+  { href: "/sincronizacion",  label: "Sincronización", icon: CloudUpload },
 ];
 
 const moreItemsAdmin = [
   { href: "/admin/datos",     label: "Datos",     icon: BarChart3     },
   { href: "/admin/usuarios",  label: "Usuarios",  icon: Users         },
-  { href: "/sincronizacion",  label: "Sincronización", icon: CloudUpload },
 ];
 
 const recoverItem = { href: "/recuperar", label: "Recuperar datos", icon: LifeBuoy };

@@ -2,8 +2,7 @@
 
 import { signOut } from "next-auth/react";
 import { useSession } from "next-auth/react";
-import { useState, useEffect } from "react";
-import { LogOut, Leaf, WifiOff } from "lucide-react";
+import { LogOut, Leaf } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,18 +14,6 @@ import { SyncStatusPill } from "@/components/layout/SyncStatusPill";
 
 export function TopBar() {
   const { data: session } = useSession();
-  const [isOnline, setIsOnline] = useState(true);
-  const isAdmin = session?.user?.role === "ADMIN";
-
-  useEffect(() => {
-    setIsOnline(navigator.onLine);
-    const on = () => setIsOnline(true);
-    const off = () => setIsOnline(false);
-    window.addEventListener("online", on);
-    window.addEventListener("offline", off);
-    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
-  }, []);
-
   const initials = session?.user?.name
     ?.split(" ")
     .map((n) => n[0])
@@ -42,13 +29,7 @@ export function TopBar() {
       </div>
 
       <div className="flex items-center gap-2">
-        {isAdmin && <SyncStatusPill />}
-        {!isAdmin && !isOnline && (
-          <div className="flex items-center gap-1 bg-yellow-500/20 border border-yellow-400/40 rounded-full px-2 py-0.5">
-            <WifiOff className="h-3.5 w-3.5 text-yellow-300" />
-            <span className="text-xs text-yellow-200">Sin conexión</span>
-          </div>
-        )}
+        <SyncStatusPill />
 
         <DropdownMenu>
           <DropdownMenuTrigger className="p-1 rounded hover:bg-teal-700 transition-colors">

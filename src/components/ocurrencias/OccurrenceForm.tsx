@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -165,9 +164,6 @@ export function OccurrenceForm({
   stationSpecies,
 }: OccurrenceFormProps) {
   const router = useRouter();
-  // Admins (robust sync, under test): a record is never lost — if the upload
-  // fails it stays on the phone and the robust sync uploads it later.
-  const robustSync = useSession().data?.user?.role === "ADMIN";
   const isBB = methodology === "BRAUN_BLANQUET";
   const isMicroruteo = methodology === "MICRORUTEO";
   const isForestal = methodology === "PARCELAS_FORESTALES";
@@ -478,7 +474,7 @@ export function OccurrenceForm({
         projectId, campaignId, methodology, surveyType,
         payload, speciesLabel: label, createdAt: Date.now(), status: "pending",
       }) as number;
-      if (robustSync) requestSyncSoon();
+      requestSyncSoon();
       return localId;
     } catch {
       toast.error("No se pudo guardar en el teléfono", {
@@ -510,9 +506,8 @@ export function OccurrenceForm({
   async function sendOrQueue<T>(send: () => Promise<T>, payload: OccurrencePayload, label: string): Promise<T | null> {
     try {
       return await send();
-    } catch (err) {
+    } catch {
       setSubmitting(false);
-      if (!robustSync) throw err;
       await saveOffline(payload, label, { uploadFailed: true });
       return null;
     }

@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useSyncOverview } from "@/hooks/useRobustSync";
 import { CheckCircle2, Loader2, AlertCircle, CloudUpload, WifiOff } from "lucide-react";
 
-// Always-visible sync status for admins (robust sync). Taps open /sincronizacion.
+// Always-visible sync status. Taps open /sincronizacion.
 // Designed for the dark teal TopBar / Sidebar.
 export function SyncStatusPill({ className }: { className?: string }) {
   const { pending, rejected, engine, isOnline } = useSyncOverview();

@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useSyncOverview } from "@/hooks/useRobustSync";
 import { syncNow } from "@/lib/sync-robust";
@@ -22,17 +21,6 @@ export function TerrenoClient() {
   const [station, setStation]   = useState<CachedStation | null>(null);
   const [subStation, setSubStation] = useState<CachedStation | null>(null);
   const [sessionOccs, setSessionOccs] = useState<SessionOcc[]>([]);
-  const [isOnline, setIsOnline] = useState(true);
-  const [syncing, setSyncing]   = useState(false);
-
-  useEffect(() => {
-    setIsOnline(navigator.onLine);
-    const on  = () => setIsOnline(true);
-    const off = () => setIsOnline(false);
-    window.addEventListener("online", on);
-    window.addEventListener("offline", off);
-    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
-  }, []);
 
   const projects = useLiveQuery(
     async (): Promise<CachedProject[]> => {
@@ -64,17 +52,11 @@ export function TerrenoClient() {
     [] as CachedStation[]
   );
 
-  const pendingCount = useLiveQuery(
-    () => getDb()?.pendingOccurrences.where("status").equals("pending").count() ?? Promise.resolve(0),
-    [],
-    0
-  );
-
-  // Admins use the robust sync: count what's waiting plus what needs review
-  const robust = useSession().data?.user?.role === "ADMIN";
+  // What's waiting to upload plus what needs review
   const overview = useSyncOverview();
-  const shownCount = robust ? overview.pending + overview.rejected : (pendingCount ?? 0);
-  const isSyncing = robust ? overview.engine.running : syncing;
+  const isOnline = overview.isOnline;
+  const shownCount = overview.pending + overview.rejected;
+  const isSyncing = overview.engine.running;
 
   const isGrilla = campaign?.methodology === "GRILLA";
   const sorted = (arr: CachedStation[]) =>
@@ -97,16 +79,8 @@ export function TerrenoClient() {
     else if (step === "campaign")     { setCampaign(null);  setStep("project");  }
   }
 
-  async function handleSync() {
-    if (robust) { syncNow(); return; }
-    if (!isOnline || syncing) return;
-    setSyncing(true);
-    try {
-      const { syncPendingOccurrences } = await import("@/lib/sync");
-      await syncPendingOccurrences();
-    } finally {
-      setSyncing(false);
-    }
+  function handleSync() {
+    syncNow();
   }
 
   const subtitle: Record<Step, string> = {
@@ -136,7 +110,7 @@ export function TerrenoClient() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {robust && shownCount === 0 && !isSyncing && (
+          {shownCount === 0 && !isSyncing && (
             <Link href="/sincronizacion" className="flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium bg-green-100 text-green-700">
               <CheckCircle2 className="w-3 h-3" />
               Todo subido
@@ -152,7 +126,7 @@ export function TerrenoClient() {
               )}
             >
               <RefreshCw className={cn("w-3 h-3", isSyncing && "animate-spin")} />
-              {robust && isSyncing
+              {isSyncing
                 ? `Subiendo ${Math.min(overview.engine.done, overview.engine.total)}/${overview.engine.total}`
                 : `${shownCount} pend.`}
             </button>

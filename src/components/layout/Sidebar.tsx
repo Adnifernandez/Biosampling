@@ -36,13 +36,13 @@ const baseNavItems = [
   { href: "/reportes",        label: "Reportes",           icon: FileBarChart2   },
   { href: "/admin/especies",  label: "Especies",           icon: FlaskConical    },
   { href: "/terreno",         label: "Modo Terreno",       icon: MapPin          },
+  { href: "/sincronizacion",  label: "Sincronización",     icon: CloudUpload     },
 ];
 
 const adminNavItems = [
   { href: "/admin/usuarios",  label: "Usuarios",           icon: Users           },
   { href: "/admin/datos",     label: "Datos",              icon: BarChart3       },
   { href: "/admin/uso",       label: "Uso de la App",      icon: Activity        },
-  { href: "/sincronizacion",  label: "Sincronización",     icon: CloudUpload     },
 ];
 
 const recoverItem = { href: "/recuperar", label: "Recuperar datos", icon: LifeBuoy };
@@ -88,7 +88,7 @@ function SidebarInner({ isAdmin, showRecover }: { isAdmin: boolean; showRecover:
       </nav>
 
       <div className="px-3 py-4 border-t border-teal-700 space-y-2">
-        {isAdmin && <SyncStatusPill className="mx-3 w-fit" />}
+        <SyncStatusPill className="mx-3 w-fit" />
         <Button
           variant="ghost"
           className="w-full justify-start text-teal-200 hover:bg-teal-800 hover:text-white gap-3"

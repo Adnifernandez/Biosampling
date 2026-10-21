@@ -23,7 +23,7 @@ export function ClientProviders({
 }) {
   return (
     <SessionProvider session={session}>
-      <SyncManager robust={session?.user?.role === "ADMIN"} />
+      <SyncManager />
       <OfflineNavFix />
       {children}
     </SessionProvider>

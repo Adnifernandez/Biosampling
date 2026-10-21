@@ -12,7 +12,7 @@ export interface PendingOccurrence {
   payload: OccurrencePayload;
   speciesLabel: string;
   createdAt: number;
-  status: "pending" | "error" | "synced";   // "synced" only used by the robust (admin) sync
+  status: "pending" | "error" | "synced";   // "synced": confirmed by the server, kept 30 days
   errorMessage?: string;
   // Robust sync: server ids fixed before the first upload attempt, so a retry
   // after a lost response never creates duplicates (one id per row created).
