@@ -119,6 +119,26 @@ async function prepare(db: BioSamplingDB) {
         .modify((o: PendingOccurrence) => { o.stationId = s.serverId!; delete o.stationLocalKey; });
     }
 
+    // Records that can never be sent (no réplica, or a réplica/campaign missing on
+    // this phone) would otherwise sit "pending" forever: surface them for review.
+    const orphan = (message: string) => (r: { status: string; errorMessage?: string; attempts?: number }) => {
+      r.status = "error"; r.errorMessage = message; r.attempts = (r.attempts ?? 0) + 1;
+    };
+    for (const missing of ["", "pending"]) {
+      await db.pendingOccurrences.where("stationId").equals(missing)
+        .filter(o => o.status === "pending" && !o.stationLocalKey).modify(orphan("No tiene réplica asignada"));
+    }
+    const stationKeys = new Set((await db.pendingStations.toArray()).map(s => s.localKey));
+    for (const key of (await db.pendingOccurrences.orderBy("stationLocalKey").uniqueKeys()) as string[]) {
+      if (stationKeys.has(key)) continue;
+      await db.pendingOccurrences.where("stationLocalKey").equals(key)
+        .filter(o => o.status === "pending").modify(orphan("Su réplica no está en este teléfono"));
+    }
+    const campaignKeys = new Set((await db.pendingCampaigns.toArray()).map(c => c.localKey));
+    await db.pendingStations
+      .filter(s => s.status === "pending" && !s.campaignId && !(s.campaignLocalKey && campaignKeys.has(s.campaignLocalKey)))
+      .modify(orphan("La réplica no tiene campaña asignada"));
+
     if (!legacyMigrated) {
       // Errors written by the old sync have no `attempts`; give them a fresh try
       const reset = (r: { status: string; attempts?: number; errorMessage?: string }) => {
@@ -340,7 +360,7 @@ async function doRun(db: BioSamplingDB, manual: boolean) {
     toast.error(`${counts.rejected} registro${counts.rejected > 1 ? "s" : ""} necesita${counts.rejected > 1 ? "n" : ""} revisión`, {
       description: "Siguen guardados en el teléfono.",
       // Pages that already list the problems don't need the link
-      action: ["/recuperar", "/sincronizacion"].includes(window.location.pathname)
+      action: window.location.pathname === "/sincronizacion"
         ? undefined
         : { label: "Ver detalle", onClick: () => { window.location.href = "/sincronizacion"; } },
       duration: 15_000,

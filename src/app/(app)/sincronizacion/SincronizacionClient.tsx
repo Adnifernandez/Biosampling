@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
+import { useSession } from "next-auth/react";
+import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getDb } from "@/lib/db";
@@ -11,7 +13,7 @@ import { syncNow, retryRejected } from "@/lib/sync-robust";
 import { downloadBackup } from "@/lib/offline-backup";
 import { cn } from "@/lib/utils";
 import {
-  CloudUpload, CheckCircle2, AlertCircle, WifiOff, Loader2, RefreshCw, Download, ShieldCheck, Clock, LogIn,
+  Trash2, CloudUpload, CheckCircle2, AlertCircle, WifiOff, Loader2, RefreshCw, Download, ShieldCheck, Clock, LogIn,
 } from "lucide-react";
 
 interface Lists {
@@ -97,6 +99,47 @@ export function SincronizacionClient() {
     null,
   );
   const now = useNow(5_000);
+  // Only admins may throw away records that can never be uploaded (e.g. their campaign
+  // no longer exists on the server). Deleting never touches the server.
+  const isAdmin = useSession().data?.user?.role === "ADMIN";
+
+  async function deleteOccurrence(o: PendingOccurrence) {
+    if (!window.confirm(`¿Eliminar «${o.speciesLabel}» de este teléfono?\n\nNo se subirá y no se podrá recuperar.`)) return;
+    await getDb()?.pendingOccurrences.delete(o.localId!);
+    toast.success("Registro eliminado del teléfono");
+  }
+
+  async function deleteStation(st: PendingStation) {
+    const db = getDb();
+    if (!db) return;
+    const n = await db.pendingOccurrences.where("stationLocalKey").equals(st.localKey).count();
+    const extra = n > 0 ? ` y sus ${n} registro${n > 1 ? "s" : ""}` : "";
+    if (!window.confirm(`¿Eliminar la réplica «${st.name}»${extra} de este teléfono?\n\nNo se subirá y no se podrá recuperar.`)) return;
+    await db.transaction("rw", db.pendingStations, db.pendingOccurrences, async () => {
+      await db.pendingOccurrences.where("stationLocalKey").equals(st.localKey).delete();
+      await db.pendingStations.delete(st.localId!);
+    });
+    toast.success("Réplica eliminada del teléfono");
+  }
+
+  async function deleteCampaign(c: PendingCampaign) {
+    const db = getDb();
+    if (!db) return;
+    const stations = await db.pendingStations.where("campaignLocalKey").equals(c.localKey).toArray();
+    let n = 0;
+    for (const st of stations) n += await db.pendingOccurrences.where("stationLocalKey").equals(st.localKey).count();
+    const parts = [
+      stations.length > 0 ? `${stations.length} réplica${stations.length > 1 ? "s" : ""}` : "",
+      n > 0 ? `${n} registro${n > 1 ? "s" : ""}` : "",
+    ].filter(Boolean).join(" y ");
+    if (!window.confirm(`¿Eliminar la campaña «${c.name}»${parts ? ` con sus ${parts}` : ""} de este teléfono?\n\nNo se subirá y no se podrá recuperar.`)) return;
+    await db.transaction("rw", db.pendingCampaigns, db.pendingStations, db.pendingOccurrences, async () => {
+      for (const st of stations) await db.pendingOccurrences.where("stationLocalKey").equals(st.localKey).delete();
+      await db.pendingStations.bulkDelete(stations.map(st => st.localId!));
+      await db.pendingCampaigns.delete(c.localId!);
+    });
+    toast.success("Campaña eliminada del teléfono");
+  }
 
   const projectName  = (id?: string) => (id && lists?.projectNames.get(id)) || "Proyecto";
   const campaignName = (id?: string) => (id && lists?.campaignNames.get(id)) || "Campaña creada en terreno";
@@ -238,18 +281,21 @@ export function SincronizacionClient() {
           {lists.rejectedCamp.map(c => (
             <ProblemRow key={`c${c.localId}`} title={`Campaña: ${c.name}`} place={projectName(c.projectId)}
               message={c.errorMessage} disabled={!isOnline || engine.running}
-              onRetry={() => retryRejected({ campaigns: [c.localId!] })} />
+              onRetry={() => retryRejected({ campaigns: [c.localId!] })}
+              onDelete={isAdmin ? () => deleteCampaign(c) : undefined} />
           ))}
           {lists.rejectedSta.map(s => (
             <ProblemRow key={`s${s.localId}`} title={`Réplica: ${s.name}`} place={campaignName(s.campaignId)}
               message={s.errorMessage} disabled={!isOnline || engine.running}
-              onRetry={() => retryRejected({ stations: [s.localId!] })} />
+              onRetry={() => retryRejected({ stations: [s.localId!] })}
+              onDelete={isAdmin ? () => deleteStation(s) : undefined} />
           ))}
           {lists.rejectedOcc.map(o => (
             <ProblemRow key={`o${o.localId}`} title={o.speciesLabel}
               place={`${projectName(o.projectId)} · ${stationName(o)} · ${format(o.createdAt, "dd-MM-yyyy HH:mm")}`}
               message={o.errorMessage} disabled={!isOnline || engine.running}
-              onRetry={() => retryRejected({ occurrences: [o.localId!] })} />
+              onRetry={() => retryRejected({ occurrences: [o.localId!] })}
+              onDelete={isAdmin ? () => deleteOccurrence(o) : undefined} />
           ))}
         </div>
       )}
@@ -297,8 +343,8 @@ export function SincronizacionClient() {
   );
 }
 
-function ProblemRow({ title, place, message, onRetry, disabled }: {
-  title: string; place: string; message?: string; onRetry: () => void; disabled: boolean;
+function ProblemRow({ title, place, message, onRetry, onDelete, disabled }: {
+  title: string; place: string; message?: string; onRetry: () => void; onDelete?: () => void; disabled: boolean;
 }) {
   return (
     <div className="text-xs border-t pt-2">
@@ -311,6 +357,12 @@ function ProblemRow({ title, place, message, onRetry, disabled }: {
       </div>
       <p className="text-gray-400">{place}</p>
       {message && <p className="text-red-600 mt-0.5">{message}</p>}
+      {onDelete && (
+        <button onClick={onDelete} disabled={disabled}
+          className="mt-1 inline-flex items-center gap-1 text-red-600 font-medium hover:underline disabled:opacity-40">
+          <Trash2 className="h-3.5 w-3.5" /> Eliminar del teléfono
+        </button>
+      )}
     </div>
   );
 }

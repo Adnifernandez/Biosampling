@@ -6,7 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   FolderOpen, Layers, LayoutList, ClipboardList,
-  MoreHorizontal, FlaskConical, FileBarChart2, Users, X, MapPin, LifeBuoy, BarChart3, CloudUpload,
+  MoreHorizontal, FlaskConical, FileBarChart2, Users, X, MapPin, BarChart3, CloudUpload,
 } from "lucide-react";
 
 const PROJECT_TABS = new Set(["/campanas", "/estaciones", "/ocurrencias"]);
@@ -30,8 +30,6 @@ const moreItemsAdmin = [
   { href: "/admin/usuarios",  label: "Usuarios",  icon: Users         },
 ];
 
-const recoverItem = { href: "/recuperar", label: "Recuperar datos", icon: LifeBuoy };
-
 function handleNavClick(e: React.MouseEvent<HTMLAnchorElement>, href: string) {
   if (!navigator.onLine) {
     e.preventDefault();
@@ -39,7 +37,7 @@ function handleNavClick(e: React.MouseEvent<HTMLAnchorElement>, href: string) {
   }
 }
 
-function BottomNavInner({ isAdmin, showRecover }: { isAdmin: boolean; showRecover: boolean }) {
+function BottomNavInner({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const projectId = searchParams.get("projectId") ?? "";
@@ -48,7 +46,6 @@ function BottomNavInner({ isAdmin, showRecover }: { isAdmin: boolean; showRecove
   const moreItems = [
     ...moreItemsBase,
     ...(isAdmin ? moreItemsAdmin : []),
-    ...(showRecover ? [recoverItem] : []),
   ];
   const moreActive = moreItems.some((i) => pathname.startsWith(i.href));
 
@@ -149,7 +146,7 @@ function BottomNavInner({ isAdmin, showRecover }: { isAdmin: boolean; showRecove
   );
 }
 
-export function BottomNav({ isAdmin, showRecover }: { isAdmin: boolean; showRecover: boolean }) {
+export function BottomNav({ isAdmin }: { isAdmin: boolean }) {
   return (
     <Suspense fallback={
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50"
@@ -169,7 +166,7 @@ export function BottomNav({ isAdmin, showRecover }: { isAdmin: boolean; showReco
         </div>
       </nav>
     }>
-      <BottomNavInner isAdmin={isAdmin} showRecover={showRecover} />
+      <BottomNavInner isAdmin={isAdmin} />
     </Suspense>
   );
 }
