@@ -237,6 +237,9 @@ export async function listPendingSpecies() {
 }
 
 export async function deleteSpecies(id: string) {
+  // Only admins may delete species, even ones without occurrences
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return { error: "Solo un administrador puede eliminar especies" };
   const count = await prisma.occurrence.count({ where: { speciesId: id } });
   if (count > 0) {
     return { error: `No se puede eliminar: tiene ${count} ocurrencia${count !== 1 ? "s" : ""} asociada${count !== 1 ? "s" : ""}` };

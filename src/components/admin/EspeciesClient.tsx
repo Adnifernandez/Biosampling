@@ -95,10 +95,13 @@ function formFromSpecies(sp: Species) {
 export function EspeciesClient({
   initialPending,
   initialEdit,
+  isAdmin,
 }: {
   initialPending: PendingSpecies[];
   // Opened directly when arriving from the report (?completar=<id>)
   initialEdit: Species | null;
+  // Only admins may delete species (the server checks it too)
+  isAdmin: boolean;
 }) {
   const [results, setResults] = useState<Species[]>(initialEdit ? [initialEdit] : []);
   const [searched, setSearched] = useState(!!initialEdit);
@@ -288,13 +291,14 @@ export function EspeciesClient({
                       <p className="text-xs text-orange-700 mt-0.5">
                         Esta especie ya existe completa en el listado.{" "}
                         {sp._count.occurrences === 0
-                          ? "Como no tiene registros, puedes eliminarla."
+                          ? (isAdmin ? "Como no tiene registros, puedes eliminarla." : "Como no tiene registros, un administrador puede eliminarla.")
                           : "Pide al administrador que las una, para no perder sus registros."}
                       </p>
                     )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {sp.hasTwin && sp._count.occurrences === 0 ? (
+                      isAdmin && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -304,6 +308,7 @@ export function EspeciesClient({
                       >
                         {deletingId === sp.id ? "¿Confirmar?" : "Eliminar"}
                       </Button>
+                      )
                     ) : (
                       !sp.hasTwin && (
                         <Button size="sm" onClick={() => openEdit(sp)} className="bg-teal-700 hover:bg-teal-800 text-white">
@@ -574,6 +579,7 @@ export function EspeciesClient({
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
+                        {isAdmin && (
                         <button
                           onClick={() => handleDelete(sp)}
                           disabled={isPending}
@@ -586,7 +592,8 @@ export function EspeciesClient({
                         >
                           {deletingId === sp.id ? "¿Confirmar?" : <Trash2 className="h-3.5 w-3.5" />}
                         </button>
-                        {deletingId === sp.id && (
+                        )}
+                        {isAdmin && deletingId === sp.id && (
                           <button
                             onClick={() => setDeletingId(null)}
                             className="p-1.5 rounded hover:bg-gray-100 text-gray-400 text-xs"
