@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,6 @@ import { AlertTriangle, Bird, FileText, Leaf, Loader2, Plus, X } from "lucide-re
 import { getMethodologyById } from "@/lib/methodologies";
 import { getCampanasReporteWord } from "@/app/(app)/reportes/word/actions";
 import {
-  CATEGORIAS_EC,
   datosFauna,
   datosFlora,
   especiesPorClasificar,
@@ -55,7 +54,7 @@ const FIGURAS: Record<TipoReporte, { clave: string; nombre: string }[]> = {
 // Lo que se recuerda entre reportes del mismo proyecto (en este navegador)
 const CAMPOS_PROYECTO = [
   "nombreProyecto", "tipoEstudio", "descripcionArea", "superficieHa", "antecedentesHabitat",
-  "unidadesDominantes", "antecedenteSitio", "normaEC", "categoriasEC",
+  "unidadesDominantes", "antecedenteSitio", "normaEC",
 ] as const;
 const claveProyecto = (projectId: string, tipo: TipoReporte) => `biosampling:reporte-word:${projectId}:${tipo}`;
 const CLAVE_PROFESIONES = "biosampling:reporte-word:profesiones";
@@ -131,17 +130,16 @@ export function ReporteWordClient({
   const [form, setForm] = useState<FormularioReporte>(formularioInicial);
   const [figuras, setFiguras] = useState<Record<string, File | null>>({});
   const [generando, setGenerando] = useState(false);
+  const [tipoOtro, setTipoOtro] = useState(false);
 
   const proyecto = projects.find((p) => p.id === projectId);
-  const campanasDelTipo = useMemo(
-    () => (proyecto?.campaigns ?? []).filter((c) => c.surveyType === tipo),
-    [proyecto, tipo]
-  );
-  const temporadas = useMemo(() => {
-    const grupos = new Map<string, CampaignOption[]>();
-    for (const c of campanasDelTipo) grupos.set(temporadaDe(c.name), [...(grupos.get(temporadaDe(c.name)) ?? []), c]);
-    return Array.from(grupos.entries());
-  }, [campanasDelTipo]);
+  const region = proyecto?.region ?? "";
+  // "Otro…" queda elegido también cuando el tipo guardado no está en la lista
+  const tipoEstudioOtro = tipoOtro || (!!form.tipoEstudio && !TIPOS_ESTUDIO.includes(form.tipoEstudio));
+  const campanasDelTipo = (proyecto?.campaigns ?? []).filter((c) => c.surveyType === tipo);
+  const grupos = new Map<string, CampaignOption[]>();
+  for (const c of campanasDelTipo) grupos.set(temporadaDe(c.name), [...(grupos.get(temporadaDe(c.name)) ?? []), c]);
+  const temporadas = Array.from(grupos.entries());
   const temporadasElegidas = Array.from(
     new Set(campanasDelTipo.filter((c) => seleccion.includes(c.id)).map((c) => temporadaDe(c.name)))
   );
@@ -183,15 +181,17 @@ export function ReporteWordClient({
   }, [claveSeleccion, projectId, tipo]);
 
   // Campaña anterior para la comparación (sólo fauna)
+  const idsContraste = contraste
+    ? campanasDelTipo.filter((c) => temporadaDe(c.name) === contraste).map((c) => c.id).join(",")
+    : "";
   useEffect(() => {
-    const ids = campanasDelTipo.filter((c) => temporadaDe(c.name) === contraste).map((c) => c.id);
-    if (!contraste || ids.length === 0) return;
+    if (!idsContraste) return;
     let cancelado = false;
-    getCampanasReporteWord(ids)
+    getCampanasReporteWord(idsContraste.split(","))
       .then((datos) => { if (!cancelado) setCampanasContraste(datos); })
       .catch(() => { if (!cancelado) toast.error("No se pudo cargar la campaña de comparación"); });
     return () => { cancelado = true; };
-  }, [contraste, campanasDelTipo]);
+  }, [idsContraste]);
 
   // Recuerda los datos del proyecto y la profesión de cada persona para el próximo reporte
   useEffect(() => {
@@ -213,6 +213,7 @@ export function ReporteWordClient({
     setContraste("");
     setForm(formularioInicial());
     setFiguras({});
+    setTipoOtro(false);
     setListo(false);
     setCargando(nuevaSeleccion.length > 0);
   }
@@ -238,7 +239,7 @@ export function ReporteWordClient({
   }
 
   const porClasificar = especiesPorClasificar(campanas);
-  const resumen = resumenCampanas(campanas);
+  const resumen = resumenCampanas(campanas, region);
   const temporadaActual = temporadasElegidas.join(" / ");
   const puedeGenerar =
     !!form.nombreProyecto.trim() && campanas.length > 0 && !cargando && porClasificar.length === 0 && !generando;
@@ -252,7 +253,6 @@ export function ReporteWordClient({
           .filter((e): e is [string, File] => !!e[1])
           .map(([clave, archivo]) => prepararFigura(clave, archivo))
       );
-      const region = proyecto?.region ?? "";
       const datos =
         tipo === "FAUNA"
           ? datosFauna(
@@ -350,11 +350,17 @@ export function ReporteWordClient({
           </p>
         )}
         {hayDatos && (
-          <p className="text-sm text-gray-600">
-            <span className="font-semibold">{resumen.especies}</span> especies ·{" "}
-            <span className="font-semibold">{resumen.individuos}</span> individuos ·{" "}
-            <span className="font-semibold">{resumen.estaciones}</span> estaciones
-          </p>
+          <div className="text-sm text-gray-600 space-y-0.5">
+            <p>
+              <span className="font-semibold">{resumen.especies}</span> especies ·{" "}
+              <span className="font-semibold">{resumen.individuos}</span> individuos ·{" "}
+              <span className="font-semibold">{resumen.estaciones}</span> estaciones
+            </p>
+            <p>
+              <span className="font-semibold">{resumen.enCategoria}</span> en categoría de conservación
+              <span className="text-gray-400"> (CR, EN o VU según la región del proyecto, igual que el Excel)</span>
+            </p>
+          </div>
         )}
 
         {hayDatos && porClasificar.length > 0 && (
@@ -409,20 +415,41 @@ export function ReporteWordClient({
               <Input value={form.nombreProyecto} onChange={(e) => set("nombreProyecto", e.target.value)} placeholder="Ej: Parque Fotovoltaico Los Andes" />
             </Campo>
             <Campo label="Tipo de estudio">
-              <Input list="tipos-estudio" value={form.tipoEstudio} onChange={(e) => set("tipoEstudio", e.target.value)} placeholder="Ej: Declaración de Impacto Ambiental (DIA)" />
-              <datalist id="tipos-estudio">
-                {TIPOS_ESTUDIO.map((t) => <option key={t} value={t} />)}
-              </datalist>
+              <Select
+                value={tipoEstudioOtro ? "otro" : form.tipoEstudio}
+                onValueChange={(v) => {
+                  setTipoOtro(v === "otro");
+                  set("tipoEstudio", !v || v === "otro" ? "" : v);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue>
+                    {tipoEstudioOtro ? "Otro" : form.tipoEstudio || <span className="text-muted-foreground">Seleccionar...</span>}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {TIPOS_ESTUDIO.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                  <SelectItem value="otro">Otro…</SelectItem>
+                </SelectContent>
+              </Select>
+              {tipoEstudioOtro && (
+                <Input
+                  value={form.tipoEstudio}
+                  onChange={(e) => set("tipoEstudio", e.target.value)}
+                  placeholder="Escribe el tipo de estudio"
+                />
+              )}
             </Campo>
             <div className="grid grid-cols-2 gap-3">
               <Campo label="Mes y año de la portada">
                 <Input value={form.mesAnio} onChange={(e) => set("mesAnio", e.target.value)} />
               </Campo>
-              <Campo label="Época">
-                <Input list="epocas" value={form.epoca} onChange={(e) => set("epoca", e.target.value)} placeholder="Ej: primaveral" />
-                <datalist id="epocas">
-                  {["estival", "otoñal", "invernal", "primaveral"].map((t) => <option key={t} value={t} />)}
-                </datalist>
+              <Campo label="Época" ayuda="Según la temporada de la campaña.">
+                <p className="h-8 flex items-center px-2.5 rounded-lg border border-input bg-gray-50 text-sm text-gray-700">
+                  {form.epoca || <span className="text-gray-400">La campaña no indica temporada</span>}
+                </p>
               </Campo>
               <Campo label="Fecha inicio">
                 <Input type="date" value={form.fechaInicio} onChange={(e) => set("fechaInicio", e.target.value)} />
@@ -520,35 +547,11 @@ export function ReporteWordClient({
             )}
           </Seccion>
 
-          <Seccion titulo="6. Especies en categoría de conservación">
-            <p className="text-xs text-gray-500">
-              Marca qué categorías cuentan como «especie en categoría de conservación». Por defecto sólo las amenazadas (CR, EN, VU), igual que el Excel.
-              Si una especie tiene categorías distintas por zona, se usa la de la región del proyecto.
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {CATEGORIAS_EC.map(({ codigo, nombre }) => (
-                <label key={codigo} className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-teal-600"
-                    checked={form.categoriasEC.includes(codigo)}
-                    onChange={(e) =>
-                      set("categoriasEC", e.target.checked ? [...form.categoriasEC, codigo] : form.categoriasEC.filter((c) => c !== codigo))
-                    }
-                  />
-                  <span><span className="font-semibold">{codigo}</span> <span className="text-gray-500">{nombre}</span></span>
-                </label>
-              ))}
-            </div>
-            {!esFauna && (
-              <Campo label="Norma o decreto (opcional)" ayuda="Se agrega junto a la categoría en la tabla. Ej: RCE.">
+          {!esFauna && (
+            <Seccion titulo="6. Conservación, COT y conclusiones">
+              <Campo label="Norma o decreto de conservación (opcional)" ayuda="Se agrega junto a la categoría en la tabla de especies en categoría. Ej: RCE.">
                 <Input value={form.normaEC} onChange={(e) => set("normaEC", e.target.value)} className="max-w-60" />
               </Campo>
-            )}
-          </Seccion>
-
-          {!esFauna && (
-            <Seccion titulo="7. COT y conclusiones">
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="checkbox" className="h-4 w-4 accent-teal-600" checked={form.incluirCot} onChange={(e) => set("incluirCot", e.target.checked)} />
                 Incluir Carta de Ocupación de Tierras (COT) / formaciones vegetacionales
@@ -570,15 +573,15 @@ export function ReporteWordClient({
             </Seccion>
           )}
 
-          <Seccion titulo={`${esFauna ? 7 : 8}. Observaciones`}>
+          <Seccion titulo={`${esFauna ? 6 : 7}. Observaciones`}>
             <Campo label="Observaciones de terreno" ayuda="Viene con los comentarios de las campañas. Si queda vacío, la sección no aparece.">
               <Textarea rows={4} value={form.observaciones} onChange={(e) => set("observaciones", e.target.value)} />
             </Campo>
           </Seccion>
 
-          <Seccion titulo={`${esFauna ? 8 : 9}. Figuras (opcional)`}>
+          <Seccion titulo={`${esFauna ? 7 : 8}. Figuras (opcional)`}>
             <p className="text-xs text-gray-500">
-              Sube los mapas como imagen (PNG o JPG). Si no subes una, el Word queda con un aviso para pegarla después.
+              Sube los mapas como imagen (PNG o JPG). Si no subes una, el Word queda con un aviso destacado para pegarla después.
             </p>
             {FIGURAS[tipo].map(({ clave, nombre }) => (
               <Campo key={clave} label={nombre}>
@@ -596,8 +599,12 @@ export function ReporteWordClient({
               {generando ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
               Descargar Word
             </Button>
-            {!form.nombreProyecto.trim() && (
+            {!form.nombreProyecto.trim() ? (
               <p className="text-xs text-gray-400">Escribe el nombre del proyecto para descargar.</p>
+            ) : (
+              <p className="text-xs text-gray-400">
+                Lo que quede sin completar saldrá <span className="bg-yellow-200 px-1 rounded">destacado en amarillo</span> en el Word.
+              </p>
             )}
           </div>
         </>

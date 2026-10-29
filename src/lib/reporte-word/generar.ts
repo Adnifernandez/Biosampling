@@ -60,6 +60,33 @@ function insertarFigura(zip: PizZip, figura: Figura) {
   zip.file("word/document.xml", documento);
 }
 
+// Lo que quedó pendiente ("[Completar: …]", "[Insertar aquí la figura…]") se destaca en amarillo
+const PENDIENTE = /(\[(?:Completar|Insertar)[^\]]*\])/;
+// Propiedades que Word exige que vayan después de w:highlight dentro de w:rPr
+const DESPUES_DE_HIGHLIGHT = /<w:(u|effect|bdr|shd|fitText|vertAlign|rtl|cs|em|lang|eastAsianLayout|specVanish|oMath)\b/;
+
+function conResaltado(rPr: string): string {
+  const marca = '<w:highlight w:val="yellow"/>';
+  if (!rPr) return `<w:rPr>${marca}</w:rPr>`;
+  const siguiente = rPr.match(DESPUES_DE_HIGHLIGHT);
+  return siguiente ? rPr.replace(siguiente[0], marca + siguiente[0]) : rPr.replace("</w:rPr>", `${marca}</w:rPr>`);
+}
+
+function destacarPendientes(xml: string): string {
+  // El rPr no puede contener "</w:rPr>": así la búsqueda nunca salta de un run a otro
+  return xml.replace(
+    /<w:r(?: [^>]*)?>(<w:rPr>(?:(?!<\/w:rPr>)[\s\S])*<\/w:rPr>)?<w:t(?: [^>]*)?>([^<]*)<\/w:t><\/w:r>/g,
+    (run, rPr: string | undefined, texto: string) => {
+      if (!PENDIENTE.test(texto)) return run;
+      return texto
+        .split(PENDIENTE)
+        .filter(Boolean)
+        .map((parte) => `<w:r>${PENDIENTE.test(parte) ? conResaltado(rPr ?? "") : rPr ?? ""}<w:t xml:space="preserve">${parte}</w:t></w:r>`)
+        .join("");
+    }
+  );
+}
+
 export function llenarPlantilla(plantilla: ArrayBuffer, datos: object, figuras: Figura[]): PizZip {
   const doc = new Docxtemplater(new PizZip(plantilla), {
     paragraphLoop: true,
@@ -69,6 +96,7 @@ export function llenarPlantilla(plantilla: ArrayBuffer, datos: object, figuras: 
   doc.render({ ...datos, ...Object.fromEntries(figuras.map((f) => [f.clave, true])) });
   const zip = doc.getZip();
   for (const figura of figuras) insertarFigura(zip, figura);
+  zip.file("word/document.xml", destacarPendientes(zip.file("word/document.xml")!.asText()));
   return zip;
 }
 

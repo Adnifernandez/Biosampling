@@ -60,7 +60,6 @@ export type FormularioReporte = {
   mostrarEquipo: boolean;
   profesionales: Profesional[];
   observaciones: string;
-  categoriasEC: string[];
   // Fauna
   antecedentesHabitat: string;
   nPoa: string;
@@ -84,19 +83,8 @@ export type FormularioReporte = {
   incluirConclusiones: boolean;
 };
 
-export const CATEGORIAS_EC = [
-  { codigo: "EX", nombre: "Extinta" },
-  { codigo: "EW", nombre: "Extinta en estado silvestre" },
-  { codigo: "CR", nombre: "En peligro crítico" },
-  { codigo: "EN", nombre: "En peligro" },
-  { codigo: "VU", nombre: "Vulnerable" },
-  { codigo: "NT", nombre: "Casi amenazada" },
-  { codigo: "LC", nombre: "Preocupación menor" },
-  { codigo: "DD", nombre: "Datos insuficientes" },
-];
-
-// Igual que el Excel actual: sólo las amenazadas
-export const CATEGORIAS_EC_POR_DEFECTO = ["CR", "EN", "VU"];
+// "Especie en categoría de conservación" = amenazada, igual que la hoja Conservación del Excel
+const CATEGORIAS_AMENAZADAS = ["CR", "EN", "VU"];
 
 export const EPOCAS: Record<string, string> = {
   Verano: "estival",
@@ -241,17 +229,18 @@ export function especiesPorClasificar(campanas: CampanaReporte[]): EspecieReport
   return consolidar(campanas).map((f) => f.sp).filter((sp) => sp.family === "Por clasificar");
 }
 
-export function resumenCampanas(campanas: CampanaReporte[]) {
+const esEC = (sp: EspecieReporte, region: string) =>
+  estadoEnRegion(sp.conservationStatus, region).codigos.some((c) => CATEGORIAS_AMENAZADAS.includes(c));
+
+export function resumenCampanas(campanas: CampanaReporte[], region: string) {
   const filas = consolidar(campanas);
   return {
     especies: filas.length,
     individuos: filas.reduce((s, f) => s + f.abundancia, 0),
     estaciones: campanas.reduce((s, c) => s + c.stations.length, 0),
+    enCategoria: filas.filter((f) => esEC(f.sp, region)).length,
   };
 }
-
-const esEC = (sp: EspecieReporte, categorias: string[], region: string) =>
-  estadoEnRegion(sp.conservationStatus, region).codigos.some((c) => categorias.includes(c));
 
 function listaEC(filas: FilaEspecie[], region: string): string {
   return unirLista(
@@ -301,7 +290,6 @@ export function formularioInicial(): FormularioReporte {
     mostrarEquipo: true,
     profesionales: [],
     observaciones: "",
-    categoriasEC: CATEGORIAS_EC_POR_DEFECTO,
     antecedentesHabitat: "",
     nPoa: "",
     detallePoa: "",
@@ -348,6 +336,8 @@ function datosComunes(form: FormularioReporte, filas: FilaEspecie[], profesional
   return {
     nombreProyecto: form.nombreProyecto.trim(),
     tipoEstudio: completar(form.tipoEstudio, "tipo de estudio"),
+    // "en el marco de la Declaración…" / "en el marco del Estudio…"
+    delTipoEstudio: `${/^(declaraci|consulta|adenda|evaluaci|l[ií]nea)/i.test(form.tipoEstudio.trim()) ? "de la" : "del"} ${completar(form.tipoEstudio, "tipo de estudio")}`,
     mesAnio: form.mesAnio.trim(),
     epoca: completar(form.epoca, "época"),
     ...fechasTexto(form.fechaInicio, form.fechaFin),
@@ -499,7 +489,7 @@ export function datosFauna(
   const filas = consolidar(campanas);
   const profesionales = profesionalesConNombre(form);
   const estado = (sp: EspecieReporte) => estadoEnRegion(sp.conservationStatus, region).texto;
-  const ec = filas.filter((f) => esEC(f.sp, form.categoriasEC, region));
+  const ec = filas.filter((f) => esEC(f.sp, region));
   const base = datosComunes(form, filas, profesionales, ec);
   const abundanciaTotal = filas.reduce((s, f) => s + f.abundancia, 0);
   const nTransectos = campanas.reduce((s, c) => s + c.stations.length, 0);
@@ -509,7 +499,7 @@ export function datosFauna(
     const filasAntes = consolidar(contraste.campanas);
     const r1 = filasAntes.length, r2 = filas.length;
     const a1 = filasAntes.reduce((s, f) => s + f.abundancia, 0), a2 = abundanciaTotal;
-    const ec1 = filasAntes.filter((f) => esEC(f.sp, form.categoriasEC, region)).length, ec2 = ec.length;
+    const ec1 = filasAntes.filter((f) => esEC(f.sp, region)).length, ec2 = ec.length;
     comparacion = {
       campAnterior: contraste.nombre,
       campActual: nombreActual,
@@ -625,7 +615,7 @@ function sintesisFamilias(filas: FilaEspecie[]): string {
 
 export function datosFlora(form: FormularioReporte, region: string, campanas: CampanaReporte[]) {
   const filas = consolidar(campanas);
-  const ec = filas.filter((f) => esEC(f.sp, form.categoriasEC, region));
+  const ec = filas.filter((f) => esEC(f.sp, region));
   const base = datosComunes(form, filas, profesionalesConNombre(form), ec);
   const nFamilias = new Set(filas.map((f) => f.sp.family).filter(Boolean)).size;
   const norma = form.normaEC.trim();
