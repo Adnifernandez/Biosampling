@@ -1,8 +1,12 @@
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReportesClient } from "@/components/reportes/ReportesClient";
 
 export default async function ReportesPage() {
+  const session = await auth();
+  const isAdmin = session?.user?.role === "ADMIN";
+
   const projects = await prisma.project.findMany({
     orderBy: { name: "asc" },
     select: {
@@ -31,7 +35,7 @@ export default async function ReportesPage() {
         <h1 className="text-xl font-bold text-gray-900">Reportes</h1>
         <p className="text-sm text-gray-500">Resumen de datos por proyecto y campaña</p>
       </div>
-      <ReportesClient projects={projects} />
+      <ReportesClient projects={projects} isAdmin={isAdmin} />
     </div>
   );
 }

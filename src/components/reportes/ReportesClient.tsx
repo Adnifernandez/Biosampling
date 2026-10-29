@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Download, BarChart2, ListTree, Leaf, Bird, Loader2, AlertTriangle, FileSpreadsheet, Sigma } from "lucide-react";
+import { Download, BarChart2, ListTree, Leaf, Bird, Loader2, AlertTriangle, FileSpreadsheet, FileText, Sigma } from "lucide-react";
+import { ButtonLink } from "@/components/ui/button-link";
 // ExcelJS loaded dynamically inside exportXLSX to avoid SSR issues
 import { SURVEY_TYPE_LABELS } from "@/lib/types";
 import { getMethodologyById } from "@/lib/methodologies";
@@ -167,7 +168,7 @@ function statusBadge(raw: string | null) {
   );
 }
 
-export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
+export function ReportesClient({ projects, isAdmin }: { projects: ProjectRow[]; isAdmin: boolean }) {
   const [projectId, setProjectId] = useState<string>("");
   const [campaignId, setCampaignId] = useState<string>("");
   const [stations, setStations] = useState<StationRow[]>([]);
@@ -1112,6 +1113,19 @@ export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
               </Select>
             </div>
           </div>
+          {/* Reporte Word (plantillas DSS) — sólo administradores */}
+          {isAdmin && (
+            <div className="flex justify-end mt-3">
+              <ButtonLink
+                href={`/reportes/word?proyecto=${encodeURIComponent(projectId)}&campana=${encodeURIComponent(campaignId)}`}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <FileText className="h-4 w-4" /> Generar reporte Word
+              </ButtonLink>
+            </div>
+          )}
         </CardContent>
       </Card>
 
