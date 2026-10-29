@@ -117,7 +117,10 @@ export function mesAnioActual(fecha = new Date()): string {
   return `${mes.charAt(0).toUpperCase()}${mes.slice(1)} ${fecha.getFullYear()}`;
 }
 
-const completar = (valor: string, que: string) => valor.trim() || `[Completar: ${que}]`;
+// Los textos libres van dentro de un párrafo: los saltos de línea se vuelven espacios
+const linea = (s: string) => s.replace(/\s+/g, " ").trim();
+
+const completar = (valor: string, que: string) => linea(valor) || `[Completar: ${que}]`;
 
 const plural = (n: number, singular: string, pluralTxt: string) => `${n} ${n === 1 ? singular : pluralTxt}`;
 
@@ -353,9 +356,23 @@ function datosComunes(form: FormularioReporte, filas: FilaEspecie[], profesional
       rol: p.rol.trim() || "—",
     })),
     observaciones: form.observaciones.trim(),
+    // Un párrafo por línea escrita (un salto de línea dentro de un párrafo justificado lo estira)
+    observacionesParrafos: form.observaciones.split(/\n+/).map(linea).filter(Boolean),
     riquezaTexto: plural(filas.length, "especie", "especies"),
     hayEC: ec.length > 0,
+    // "Fuente: Elaboración propia, 2026." como pide el formato DSS
+    anioReporte: String(new Date().getFullYear()),
+    ...numerosDeTabla(form.mostrarEquipo && profesionales.length > 0, ec.length > 0),
   };
+}
+
+// Las tablas se numeran en orden de aparición; las condicionales no ocupan número si no salen
+function numerosDeTabla(conEquipo: boolean, conEC: boolean) {
+  let n = 0;
+  const tabEquipo = conEquipo ? ++n : 0;
+  const tabEspecies = ++n;
+  const tabEC = conEC ? ++n : 0;
+  return { tabEquipo, tabEspecies, tabEC, tabSiguiente: n + 1 };
 }
 
 const profesionalesConNombre = (form: FormularioReporte) => form.profesionales.filter((p) => p.nombre.trim());
@@ -432,7 +449,7 @@ function dimensionTransectos(campanas: CampanaReporte[]): string {
 }
 
 function textoConDetalle(base: string, detalle: string): string {
-  const d = detalle.trim();
+  const d = linea(detalle);
   if (!base) return d;
   return d ? `${base}; ${d}` : base;
 }
@@ -461,8 +478,8 @@ function metodologiasFauna(form: FormularioReporte) {
           ? `, ${camaras === 1 ? "operativa" : "operativas"} durante ${form.duracionCamaras.trim()}.`
           : ".")
       : "",
-    textoEvidencias: form.evidencias.trim(),
-    textoOtras: form.otrasMetodologias.trim(),
+    textoEvidencias: linea(form.evidencias),
+    textoOtras: linea(form.otrasMetodologias),
   };
 }
 
@@ -524,7 +541,6 @@ export function datosFauna(
       : `Durante la campaña se registraron ${ec.length} especies clasificadas en alguna categoría de conservación vigente. Estas corresponden a `) +
     `${listaEC(ec, region)}.`;
 
-  const observaciones = base.observaciones;
   return {
     ...base,
     fraseEquipo:
@@ -533,7 +549,7 @@ export function datosFauna(
         : profesionales.length === 1
           ? " En dichas actividades participó 1 profesional del Equipo de Medio Biótico de DSS S.A."
           : ` En dichas actividades participaron ${profesionales.length} profesionales del Equipo de Medio Biótico de DSS S.A.`,
-    antecedentesHabitat: form.antecedentesHabitat.trim(),
+    antecedentesHabitat: linea(form.antecedentesHabitat),
     nTransectos: nTransectos || completar("", "número de transectos"),
     dimensionTransectos: dimensionTransectos(campanas),
     ...metodologiasFauna(form),
@@ -559,13 +575,11 @@ export function datosFauna(
       abundancia,
       ubicacion: Array.from(estaciones).sort((a, b) => a.localeCompare(b, "es", { numeric: true })).join(", "),
     })),
-    secObs: 5,
-    secComp: observaciones ? 6 : 5,
     comparacion,
+    tabComp: base.tabSiguiente,
     // En el orden de la lista, no en el que se marcaron
     medidas: MEDIDAS_FAUNA.filter((m) => form.medidas.includes(m.id)).map(({ titulo, parrafos }) => ({ titulo, parrafos })),
     hayMedidas: form.medidas.length > 0,
-    secReq: 5 + (observaciones ? 1 : 0) + (comparacion ? 1 : 0),
   };
 }
 
@@ -635,13 +649,12 @@ export function datosFlora(form: FormularioReporte, region: string, campanas: Ca
     `${listaEC(ec, region)}.`;
 
   const cot = form.incluirCot;
-  const obs = !!base.observaciones;
   return {
     ...base,
     unidadesDominantes: completar(form.unidadesDominantes, "unidades vegetacionales dominantes"),
-    antecedenteSitio: form.antecedenteSitio.trim(),
+    antecedenteSitio: linea(form.antecedenteSitio),
     unidadesMuestreo: unidadesMuestreo(campanas),
-    descripcionMetodologia: form.descripcionMetodologia.trim(),
+    descripcionMetodologia: linea(form.descripcionMetodologia),
     familiasTexto: nFamilias === 1 ? "1 familia" : `${nFamilias} familias diferentes`,
     sintesisFamilias: sintesisFamilias(filas),
     especies: filas.map(({ sp }) => ({
@@ -663,7 +676,7 @@ export function datosFlora(form: FormularioReporte, region: string, campanas: Ca
     })),
     incluirCot: cot,
     nUnidadesCot: completar(form.nUnidadesCot, "N° de unidades"),
-    descripcionCot: form.descripcionCot.trim(),
+    descripcionCot: linea(form.descripcionCot),
     figCotNum: ec.length > 0 ? 4 : 3,
     incluirConclusiones: form.incluirConclusiones,
     sintesisConservacion:
@@ -676,8 +689,5 @@ export function datosFlora(form: FormularioReporte, region: string, campanas: Ca
       cot && form.nUnidadesCot.trim()
         ? `Se identificaron ${form.nUnidadesCot.trim()} unidades o formaciones vegetacionales en el área de estudio.`
         : "",
-    secCot: 4,
-    secObs: cot ? 5 : 4,
-    secConc: 4 + (cot ? 1 : 0) + (obs ? 1 : 0),
   };
 }

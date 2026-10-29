@@ -96,7 +96,10 @@ export function llenarPlantilla(plantilla: ArrayBuffer, datos: object, figuras: 
   doc.render({ ...datos, ...Object.fromEntries(figuras.map((f) => [f.clave, true])) });
   const zip = doc.getZip();
   for (const figura of figuras) insertarFigura(zip, figura);
-  zip.file("word/document.xml", destacarPendientes(zip.file("word/document.xml")!.asText()));
+  // También en portada y encabezado (ahí aparece el tipo de estudio)
+  for (const archivo of zip.file(/^word\/(document|header\d+|footer\d+)\.xml$/)) {
+    zip.file(archivo.name, destacarPendientes(archivo.asText()));
+  }
   return zip;
 }
 
