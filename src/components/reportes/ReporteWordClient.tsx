@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Bird, FileText, Leaf, Loader2, Plus, X } from "lucide-react";
+import { AlertTriangle, Bird, Check, FileText, Leaf, Loader2, Plus, X } from "lucide-react";
 import { getMethodologyById } from "@/lib/methodologies";
 import { getCampanasReporteWord } from "@/app/(app)/reportes/word/actions";
 import {
@@ -24,6 +24,7 @@ import {
   type TipoReporte,
 } from "@/lib/reporte-word/datos";
 import { generarWord, prepararFigura } from "@/lib/reporte-word/generar";
+import { MEDIDAS_FAUNA } from "@/lib/reporte-word/medidas";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -579,7 +580,46 @@ export function ReporteWordClient({
             </Campo>
           </Seccion>
 
-          <Seccion titulo={`${esFauna ? 7 : 8}. Figuras (opcional)`}>
+          {esFauna && (
+            <Seccion titulo="7. Requerimientos ambientales asociados a los hallazgos">
+              <p className="text-xs text-gray-500">
+                Toca las medidas recomendadas. Cada una se agrega al final del reporte con su texto completo; si no marcas ninguna, la sección no aparece.
+              </p>
+              <div className="grid gap-2">
+                {MEDIDAS_FAUNA.map((m) => {
+                  const marcada = form.medidas.includes(m.id);
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() =>
+                        set("medidas", marcada ? form.medidas.filter((id) => id !== m.id) : [...form.medidas, m.id])
+                      }
+                      className={cn(
+                        "flex items-start gap-3 px-3 py-3 rounded-xl border-2 text-left transition-all",
+                        marcada ? "border-blue-600 bg-blue-50" : "border-gray-200 hover:border-gray-300 bg-white"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "mt-0.5 h-4 w-4 shrink-0 rounded border-2 flex items-center justify-center",
+                          marcada ? "border-blue-600 bg-blue-600 text-white" : "border-gray-300"
+                        )}
+                      >
+                        {marcada && <Check className="h-3 w-3" />}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-gray-900">{m.titulo}</span>
+                        <span className="block text-xs text-gray-500 line-clamp-2">{m.parrafos[0]}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Seccion>
+          )}
+
+          <Seccion titulo="8. Figuras (opcional)">
             <p className="text-xs text-gray-500">
               Sube los mapas como imagen (PNG o JPG). Si no subes una, el Word queda con un aviso destacado para pegarla después.
             </p>

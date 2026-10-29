@@ -1,5 +1,6 @@
 // Arma los datos que llenan las plantillas Word de reporte (public/plantillas/*.docx).
 // Todo lo que sale de terreno se calcula aquí; lo que la app no guarda viene del formulario.
+import { MEDIDAS_FAUNA } from "./medidas";
 
 export type TipoReporte = "FLORA" | "FAUNA";
 
@@ -72,6 +73,7 @@ export type FormularioReporte = {
   duracionCamaras: string;
   evidencias: string;
   otrasMetodologias: string;
+  medidas: string[]; // ids de MEDIDAS_FAUNA marcadas
   // Flora
   unidadesDominantes: string;
   antecedenteSitio: string;
@@ -301,6 +303,7 @@ export function formularioInicial(): FormularioReporte {
     duracionCamaras: "",
     evidencias: "",
     otrasMetodologias: "",
+    medidas: [],
     unidadesDominantes: "",
     antecedenteSitio: "",
     descripcionMetodologia: "",
@@ -559,6 +562,10 @@ export function datosFauna(
     secObs: 5,
     secComp: observaciones ? 6 : 5,
     comparacion,
+    // En el orden de la lista, no en el que se marcaron
+    medidas: MEDIDAS_FAUNA.filter((m) => form.medidas.includes(m.id)).map(({ titulo, parrafos }) => ({ titulo, parrafos })),
+    hayMedidas: form.medidas.length > 0,
+    secReq: 5 + (observaciones ? 1 : 0) + (comparacion ? 1 : 0),
   };
 }
 
