@@ -5,15 +5,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Pencil, Trash2, Search, X, FlaskConical, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, X, FlaskConical, AlertTriangle, Download, Loader2 } from "lucide-react";
 import {
   createSpecies,
   updateSpecies,
   deleteSpecies,
   searchSpecies,
+  exportAllSpecies,
   type SpeciesOrigin,
 } from "@/app/(app)/admin/especies/actions";
 import { isPendingFamily } from "@/lib/species-names";
+import { exportarListadoEspecies } from "@/lib/exportar-especies";
+import { toast } from "sonner";
 
 type Species = {
   id: string;
@@ -121,6 +124,26 @@ export function EspeciesClient({
   const [deleteError, setDeleteError] = useState<Record<string, string>>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const formRef = useRef<HTMLDivElement | null>(null);
+  const [exportando, setExportando] = useState(false);
+
+  // Listado completo (no sólo lo buscado) — sólo administradores; el servidor también lo revisa
+  async function exportarExcel() {
+    setExportando(true);
+    try {
+      const res = await exportAllSpecies();
+      if ("error" in res) {
+        toast.error(res.error);
+        return;
+      }
+      await exportarListadoEspecies(res.species);
+      toast.success(`Listado exportado: ${res.species.length} especies`);
+    } catch (e) {
+      console.error(e);
+      toast.error("No se pudo exportar el listado");
+    } finally {
+      setExportando(false);
+    }
+  }
 
   function runSearch(q: string, type: string, origin: SpeciesOrigin) {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -356,6 +379,12 @@ export function EspeciesClient({
           <option value="INICIAL">Del listado inicial</option>
           <option value="PENDIENTE">Por completar</option>
         </select>
+        {isAdmin && (
+          <Button variant="outline" onClick={exportarExcel} disabled={exportando} className="shrink-0">
+            {exportando ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
+            Exportar Excel
+          </Button>
+        )}
         <Button onClick={openNew} className="bg-teal-700 hover:bg-teal-800 text-white shrink-0">
           <Plus className="h-4 w-4 mr-1" /> Nueva especie
         </Button>

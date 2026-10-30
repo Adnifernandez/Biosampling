@@ -247,3 +247,14 @@ export async function deleteSpecies(id: string) {
   await prisma.species.delete({ where: { id } });
   return { success: true };
 }
+
+// Listado completo para exportar a Excel (sólo administradores)
+export async function exportAllSpecies() {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return { error: "Solo un administrador puede exportar el listado" };
+  const species = await prisma.species.findMany({
+    orderBy: [{ type: "asc" }, { clase: "asc" }, { family: "asc" }, { genus: "asc" }, { species: "asc" }],
+    include: INCLUDE,
+  });
+  return { species };
+}

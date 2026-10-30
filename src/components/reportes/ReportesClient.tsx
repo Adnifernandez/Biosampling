@@ -15,6 +15,7 @@ import { ButtonLink } from "@/components/ui/button-link";
 import { SURVEY_TYPE_LABELS } from "@/lib/types";
 import { getMethodologyById } from "@/lib/methodologies";
 import { getCampaignStations } from "@/app/(app)/reportes/actions";
+import { cuentaComoEC } from "@/lib/reporte-word/datos";
 import { toast } from "sonner";
 
 type SpeciesRow = {
@@ -119,12 +120,6 @@ function spSort(a: SpeciesRow, b: SpeciesRow): number {
   const f = (a.family || "").localeCompare(b.family || "", "es");
   if (f !== 0) return f;
   return `${a.genus} ${a.species}`.localeCompare(`${b.genus} ${b.species}`, "es");
-}
-
-function primaryStatus(raw: string | null): string {
-  if (!raw) return "";
-  const m = raw.match(/^(CR|EN|VU|NT|LC|DD|EW|EX|NE|NA)/i);
-  return m ? m[1].toUpperCase() : raw;
 }
 
 // "VU (XV-XIV), NT (X-XII)" → each comma-separated entry kept intact, joined with " ; "
@@ -233,8 +228,9 @@ export function ReportesClient({ projects, isAdmin }: { projects: ProjectRow[]; 
           name: s.name.length > 8 ? s.name.slice(0, 8) + "…" : s.name,
           ocurrencias: s.occurrences.length,
         }));
-    const endangered = speciesList.filter((s) =>
-      ["CR", "EN", "VU"].includes(primaryStatus(s.sp.conservationStatus))
+    // Mismo criterio que el reporte Word: CR, EN, VU, NT o LC vigente en la región del proyecto
+    const enCategoria = speciesList.filter((s) =>
+      cuentaComoEC(s.sp.conservationStatus, selectedProject?.region ?? "")
     );
     return {
       totalSpecies: speciesMap.size,
@@ -245,7 +241,7 @@ export function ReportesClient({ projects, isAdmin }: { projects: ProjectRow[]; 
         : stations.length,
       speciesList,
       stationData,
-      endangered,
+      enCategoria,
     };
   })();
 
@@ -693,10 +689,10 @@ export function ReportesClient({ projects, isAdmin }: { projects: ProjectRow[]; 
       ]);
     }
 
-    if (stats.endangered.length > 0) {
+    if (stats.enCategoria.length > 0) {
       addSheet("Conservación", [
         ["Familia","Especie","Nombre Común","Estado Conservación"],
-        ...stats.endangered.map(({sp})=>[
+        ...stats.enCategoria.map(({sp})=>[
           sp.family,`${sp.genus} ${sp.species}`,sp.commonName??"",allStatusesText(sp.conservationStatus),
         ]),
       ]);
@@ -1232,17 +1228,17 @@ export function ReportesClient({ projects, isAdmin }: { projects: ProjectRow[]; 
             </Card>
           )}
 
-          {/* Endangered alert */}
-          {stats.endangered.length > 0 && (
+          {/* Especies en categoría de conservación (mismo criterio que el Word) */}
+          {stats.enCategoria.length > 0 && (
             <Card className="border-orange-200 bg-orange-50">
               <CardContent className="py-3 px-4">
                 <p className="text-sm font-medium text-orange-800 mb-1">
-                  Especies de conservación prioritaria: {stats.endangered.length}
+                  Especies en categoría de conservación: {stats.enCategoria.length}
                 </p>
                 <div className="flex flex-wrap gap-1">
-                  {stats.endangered.map((e) => (
+                  {stats.enCategoria.map((e) => (
                     <span key={e.sp.id} className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
-                      {e.sp.genus} {e.sp.species} ({primaryStatus(e.sp.conservationStatus)})
+                      {e.sp.genus} {e.sp.species} ({allStatusesText(e.sp.conservationStatus)})
                     </span>
                   ))}
                 </div>

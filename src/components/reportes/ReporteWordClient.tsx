@@ -359,7 +359,7 @@ export function ReporteWordClient({
             </p>
             <p>
               <span className="font-semibold">{resumen.enCategoria}</span> en categoría de conservación
-              <span className="text-gray-400"> (CR, EN o VU según la región del proyecto, igual que el Excel)</span>
+              <span className="text-gray-400"> (CR, EN, VU, NT o LC vigente en la región del proyecto)</span>
             </p>
           </div>
         )}

@@ -85,8 +85,9 @@ export type FormularioReporte = {
   incluirConclusiones: boolean;
 };
 
-// "Especie en categoría de conservación" = amenazada, igual que la hoja Conservación del Excel
-const CATEGORIAS_AMENAZADAS = ["CR", "EN", "VU"];
+// "Especie en categoría de conservación": con alguna de estas categorías vigente en la región del
+// proyecto. NE, DD, NA y "No clasificada" no cuentan.
+const CATEGORIAS_EN_REPORTE = ["CR", "EN", "VU", "NT", "LC"];
 
 export const EPOCAS: Record<string, string> = {
   Verano: "estival",
@@ -234,8 +235,15 @@ export function especiesPorClasificar(campanas: CampanaReporte[]): EspecieReport
   return consolidar(campanas).map((f) => f.sp).filter((sp) => sp.family === "Por clasificar");
 }
 
-const esEC = (sp: EspecieReporte, region: string) =>
-  estadoEnRegion(sp.conservationStatus, region).codigos.some((c) => CATEGORIAS_AMENAZADAS.includes(c));
+// Criterio único para el Word, el Excel y la pantalla de Reportes. La región sólo decide si la especie
+// cuenta (p. ej. "CR (X)" no cuenta en un proyecto de la III); siempre se muestra el estado completo.
+export function cuentaComoEC(estado: string | null, region: string): boolean {
+  return estadoEnRegion(estado, region).codigos.some((c) => CATEGORIAS_EN_REPORTE.includes(c));
+}
+
+const esEC = (sp: EspecieReporte, region: string) => cuentaComoEC(sp.conservationStatus, region);
+
+const estadoCompleto = (sp: EspecieReporte) => linea(sp.conservationStatus ?? "") || "—";
 
 export function resumenCampanas(campanas: CampanaReporte[], region: string) {
   const filas = consolidar(campanas);
@@ -247,12 +255,12 @@ export function resumenCampanas(campanas: CampanaReporte[], region: string) {
   };
 }
 
-function listaEC(filas: FilaEspecie[], region: string): string {
+function listaEC(filas: FilaEspecie[]): string {
   return unirLista(
     filas.map(({ sp }) => {
       // Sólo el primer nombre común: "Olivillo, teque, tique…" → "Olivillo"
       const comun = sp.commonName ? ` (${sp.commonName.split(",")[0].trim()})` : "";
-      return `${nombreCientifico(sp)}${comun}, en categoría ${estadoEnRegion(sp.conservationStatus, region).texto}`;
+      return `${nombreCientifico(sp)}${comun}, en categoría ${estadoCompleto(sp)}`;
     }),
     "y",
     "; "
@@ -508,7 +516,6 @@ export function datosFauna(
 ) {
   const filas = consolidar(campanas);
   const profesionales = profesionalesConNombre(form);
-  const estado = (sp: EspecieReporte) => estadoEnRegion(sp.conservationStatus, region).texto;
   const ec = filas.filter((f) => esEC(f.sp, region));
   const base = datosComunes(form, filas, profesionales, ec);
   const abundanciaTotal = filas.reduce((s, f) => s + f.abundancia, 0);
@@ -539,7 +546,7 @@ export function datosFauna(
     (ec.length === 1
       ? "Durante la campaña se registró 1 especie clasificada en alguna categoría de conservación vigente. Esta corresponde a "
       : `Durante la campaña se registraron ${ec.length} especies clasificadas en alguna categoría de conservación vigente. Estas corresponden a `) +
-    `${listaEC(ec, region)}.`;
+    `${listaEC(ec)}.`;
 
   return {
     ...base,
@@ -563,7 +570,7 @@ export function datosFauna(
       especie: nombreCientifico(sp),
       nombreComun: sp.commonName || "—",
       origen: normalizarOrigen(sp.origen),
-      ec: estado(sp),
+      ec: estadoCompleto(sp),
       abundancia,
     })),
     ecParrafo,
@@ -571,7 +578,7 @@ export function datosFauna(
       especie: nombreCientifico(sp),
       nombreComun: sp.commonName || "—",
       origen: normalizarOrigen(sp.origen),
-      categoria: estado(sp),
+      categoria: estadoCompleto(sp),
       abundancia,
       ubicacion: Array.from(estaciones).sort((a, b) => a.localeCompare(b, "es", { numeric: true })).join(", "),
     })),
@@ -640,13 +647,12 @@ export function datosFlora(form: FormularioReporte, region: string, campanas: Ca
   const base = datosComunes(form, filas, profesionalesConNombre(form), ec);
   const nFamilias = new Set(filas.map((f) => f.sp.family).filter(Boolean)).size;
   const norma = form.normaEC.trim();
-  const estado = (sp: EspecieReporte) => estadoEnRegion(sp.conservationStatus, region).texto;
 
   const ecParrafo =
     (ec.length === 1
       ? "Dentro del área de estudio se registró 1 especie clasificada en alguna categoría de conservación vigente. Esta corresponde a "
       : `Dentro del área de estudio se registraron ${ec.length} especies clasificadas en alguna categoría de conservación vigente. Estas corresponden a `) +
-    `${listaEC(ec, region)}.`;
+    `${listaEC(ec)}.`;
 
   const cot = form.incluirCot;
   return {
@@ -664,7 +670,7 @@ export function datosFlora(form: FormularioReporte, region: string, campanas: Ca
       nombreComun: sp.commonName || "—",
       habito: sp.habito || "—",
       origen: normalizarOrigen(sp.origen),
-      ec: estado(sp),
+      ec: estadoCompleto(sp),
     })),
     ecParrafo,
     especiesEC: ec.map(({ sp }) => ({
@@ -672,7 +678,7 @@ export function datosFlora(form: FormularioReporte, region: string, campanas: Ca
       nombreComun: sp.commonName || "—",
       habito: sp.habito || "—",
       origen: normalizarOrigen(sp.origen),
-      categoria: norma ? `${estado(sp)} – ${norma}` : estado(sp),
+      categoria: norma ? `${estadoCompleto(sp)} – ${norma}` : estadoCompleto(sp),
     })),
     incluirCot: cot,
     nUnidadesCot: completar(form.nUnidadesCot, "N° de unidades"),
