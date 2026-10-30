@@ -190,13 +190,13 @@ export function SearchableSelect({
         onClick={() => open ? setOpen(false) : openDropdown()}
         onKeyDown={handleTriggerKeyDown}
         className={cn(
-          "flex h-8 w-full items-center justify-between gap-1.5 rounded-lg border border-input bg-transparent pl-2.5 pr-2 text-sm transition-colors outline-none select-none",
+          "flex min-h-8 w-full items-center justify-between gap-1.5 rounded-lg border border-input bg-transparent py-1 pl-2.5 pr-2 text-sm transition-colors outline-none select-none",
           "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
           "disabled:cursor-not-allowed disabled:opacity-50",
           !displayLabel && "text-muted-foreground"
         )}
       >
-        <span className="flex-1 truncate text-left">
+        <span className="flex-1 break-words text-left">
           {displayLabel ?? placeholder}
         </span>
         <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />

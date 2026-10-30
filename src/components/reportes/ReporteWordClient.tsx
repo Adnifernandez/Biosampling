@@ -40,6 +40,10 @@ const OPCIONES_EQUIPO = [
   { value: OTRA_PERSONA, label: "Otra persona…" },
 ];
 
+// Botón de lista a todo el ancho, mostrando completo lo elegido (sin cortar con "…")
+const TRIGGER_COMPLETO =
+  "w-full whitespace-normal text-left data-[size=default]:h-auto data-[size=default]:min-h-8 *:data-[slot=select-value]:line-clamp-none";
+
 const TIPOS_ESTUDIO = [
   "Declaración de Impacto Ambiental (DIA)",
   "Estudio de Impacto Ambiental (EIA)",
@@ -411,7 +415,7 @@ export function ReporteWordClient({
                 setContraste(!v || v === "ninguna" ? "" : v);
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className={TRIGGER_COMPLETO}>
                 <SelectValue>{contraste || "Sin comparación"}</SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -439,7 +443,7 @@ export function ReporteWordClient({
                   set("tipoEstudio", !v || v === "otro" ? "" : v);
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className={TRIGGER_COMPLETO}>
                   <SelectValue>
                     {tipoEstudioOtro ? "Otro" : form.tipoEstudio || <span className="text-muted-foreground">Seleccionar...</span>}
                   </SelectValue>

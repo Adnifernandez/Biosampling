@@ -13,7 +13,7 @@ export const PROFESIONALES_DSS = [
   { corto: "Katterin Gutiérrez", nombre: "Katterin Gutiérrez Inostroza", profesion: "Ingeniera en Recursos Naturales" },
   { corto: "Macarena Toledo", nombre: "Macarena Toledo Muñoz", profesion: "Bióloga" },
   { corto: "Nicolás Cortés", nombre: "Nicolás Cortés Soto", profesion: "Ingeniero en Recursos Naturales" },
-  { corto: "Rodrigo Martínez", nombre: "Rodrigo Nicolás Martínez Maldonado", profesion: "Ingeniero en Recursos Naturales" },
+  { corto: "Rodrigo Martínez", nombre: "Rodrigo Martínez Maldonado", profesion: "Ingeniero en Recursos Naturales" },
   { corto: "Vicente Santibáñez", nombre: "Vicente Santibáñez Bermeo", profesion: "Ingeniero en Conservación de Recursos Naturales" },
 ];
 
