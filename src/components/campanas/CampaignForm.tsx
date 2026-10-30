@@ -13,15 +13,13 @@ import { Search } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { METHODOLOGIES } from "@/lib/methodologies";
+import { RESPONSABLES_CAMPANA } from "@/lib/equipo-dss";
 import { createCampaign, updateCampaign } from "@/app/(app)/proyectos/[id]/campanas/actions";
 import { toast } from "sonner";
 import type { SurveyType } from "@/lib/types";
 
-const RESPONSIBLE_PERSONS = [
-  "Álvaro Esparza","Ángela Schafer","Catalina Lastra","Claudia Cortés",
-  "Diego Verdugo","Gabriel Cruz","Gabriel Meriot","Graciela Páez",
-  "Katterin Gutiérrez","Macarena Toledo","Nicolás Cortés","Rodrigo Martínez","Vicente Santibáñez",
-];
+// Lista única del equipo DSS (también la usa el reporte Word)
+const RESPONSIBLE_PERSONS = RESPONSABLES_CAMPANA;
 
 const schema = z.object({
   name: z.string().min(2, "Mínimo 2 caracteres"),

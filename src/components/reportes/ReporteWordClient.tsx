@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Bird, Check, FileText, Leaf, Loader2, Plus, X } from "lucide-react";
+import { AlertTriangle, Bird, Check, FileText, ImageIcon, Leaf, Loader2, Plus, X } from "lucide-react";
 import { getMethodologyById } from "@/lib/methodologies";
 import { getCampanasReporteWord } from "@/app/(app)/reportes/word/actions";
 import {
@@ -21,15 +21,24 @@ import {
   valoresDeCampanas,
   type CampanaReporte,
   type FormularioReporte,
+  type Profesional,
   type TipoReporte,
 } from "@/lib/reporte-word/datos";
 import { generarWord, prepararFigura } from "@/lib/reporte-word/generar";
 import { MEDIDAS_FAUNA } from "@/lib/reporte-word/medidas";
+import { PROFESIONALES_DSS, buscarProfesional } from "@/lib/equipo-dss";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type CampaignOption = { id: string; name: string; surveyType: string; methodology: string; startDate: Date | string };
 type ProjectOption = { id: string; name: string; region: string; campaigns: CampaignOption[] };
+
+// Lista desplegable del equipo (la profesión se llena sola) + opción para escribir a alguien más
+const OTRA_PERSONA = "__otra__";
+const OPCIONES_EQUIPO = [
+  ...PROFESIONALES_DSS.map((p) => ({ value: p.nombre, label: p.nombre })),
+  { value: OTRA_PERSONA, label: "Otra persona…" },
+];
 
 const TIPOS_ESTUDIO = [
   "Declaración de Impacto Ambiental (DIA)",
@@ -168,7 +177,14 @@ export function ReporteWordClient({
           ...f,
           ...delProyecto,
           ...deCampanas,
-          profesionales: (deCampanas.profesionales ?? []).map((p) => ({ ...p, ...profesiones[p.nombre] })),
+          // "Catalina Lastra" (campaña) → nombre completo y profesión de la lista DSS; el rol se recuerda
+          profesionales: (deCampanas.profesionales ?? []).map((p) => {
+            const dss = buscarProfesional(p.nombre);
+            const previo = profesiones[dss?.nombre ?? p.nombre] ?? profesiones[p.nombre];
+            return dss
+              ? { nombre: dss.nombre, profesion: dss.profesion, rol: previo?.rol ?? "" }
+              : { ...p, ...previo, libre: true };
+          }),
         }));
         setListo(true);
       })
@@ -489,26 +505,37 @@ export function ReporteWordClient({
               <input type="checkbox" className="h-4 w-4 accent-teal-600" checked={form.mostrarEquipo} onChange={(e) => set("mostrarEquipo", e.target.checked)} />
               Incluir la tabla del equipo en el reporte
             </label>
-            {form.profesionales.map((p, i) => (
-              <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center">
-                {(["nombre", "profesion", "rol"] as const).map((campo) => (
-                  <Input
-                    key={campo}
-                    value={p[campo]}
-                    placeholder={campo === "nombre" ? "Nombre" : campo === "profesion" ? "Profesión" : "Rol"}
-                    onChange={(e) =>
-                      set("profesionales", form.profesionales.map((x, j) => (j === i ? { ...x, [campo]: e.target.value } : x)))
-                    }
-                  />
-                ))}
-                <Button
-                  type="button" variant="ghost" size="icon" aria-label="Quitar"
-                  onClick={() => set("profesionales", form.profesionales.filter((_, j) => j !== i))}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
+            {form.profesionales.map((p, i) => {
+              const cambiar = (cambios: Partial<Profesional>) =>
+                set("profesionales", form.profesionales.map((x, j) => (j === i ? { ...x, ...cambios } : x)));
+              return (
+                <div key={i} className="grid grid-cols-1 sm:grid-cols-[2fr_1.6fr_1fr_auto] gap-2 items-center">
+                  {/* Se elige del equipo DSS (la profesión se llena sola); "Otra persona…" permite escribirla */}
+                  {p.libre ? (
+                    <Input value={p.nombre} placeholder="Nombre" onChange={(e) => cambiar({ nombre: e.target.value })} />
+                  ) : (
+                    <SearchableSelect
+                      value={p.nombre}
+                      options={OPCIONES_EQUIPO}
+                      placeholder="Elegir profesional..."
+                      onChange={(v) =>
+                        v === OTRA_PERSONA
+                          ? cambiar({ nombre: "", profesion: "", libre: true })
+                          : cambiar({ nombre: v, profesion: buscarProfesional(v)?.profesion ?? "" })
+                      }
+                    />
+                  )}
+                  <Input value={p.profesion} placeholder="Profesión" onChange={(e) => cambiar({ profesion: e.target.value })} />
+                  <Input value={p.rol} placeholder="Rol" onChange={(e) => cambiar({ rol: e.target.value })} />
+                  <Button
+                    type="button" variant="ghost" size="icon" aria-label="Quitar persona"
+                    onClick={() => set("profesionales", form.profesionales.filter((_, j) => j !== i))}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              );
+            })}
             <Button
               type="button" variant="outline" size="sm" className="gap-1"
               onClick={() => set("profesionales", [...form.profesionales, { nombre: "", profesion: "", rol: "" }])}
@@ -620,15 +647,32 @@ export function ReporteWordClient({
             <p className="text-xs text-gray-500">
               Sube los mapas como imagen (PNG o JPG). Si no subes una, el Word queda con un aviso destacado para pegarla después.
             </p>
-            {FIGURAS[tipo].map(({ clave, nombre }) => (
-              <Campo key={clave} label={nombre}>
-                <Input
-                  type="file"
-                  accept="image/png,image/jpeg"
-                  onChange={(e) => setFiguras((f) => ({ ...f, [clave]: e.target.files?.[0] ?? null }))}
-                />
-              </Campo>
-            ))}
+            {FIGURAS[tipo].map(({ clave, nombre }) => {
+              const archivo = figuras[clave];
+              return (
+                <Campo key={clave} label={nombre}>
+                  {archivo ? (
+                    // Con imagen elegida: se muestra el nombre y se puede quitar si fue un error
+                    <div className="flex items-center gap-2 rounded-lg border border-input bg-gray-50 px-2.5 py-1.5">
+                      <ImageIcon className="h-4 w-4 text-teal-600 shrink-0" />
+                      <span className="text-sm text-gray-700 truncate flex-1" title={archivo.name}>{archivo.name}</span>
+                      <Button
+                        type="button" variant="ghost" size="sm" className="gap-1 text-red-600 hover:text-red-700 shrink-0"
+                        onClick={() => setFiguras((f) => ({ ...f, [clave]: null }))}
+                      >
+                        <X className="h-4 w-4" /> Quitar
+                      </Button>
+                    </div>
+                  ) : (
+                    <Input
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      onChange={(e) => setFiguras((f) => ({ ...f, [clave]: e.target.files?.[0] ?? null }))}
+                    />
+                  )}
+                </Campo>
+              );
+            })}
           </Seccion>
 
           <div className="flex flex-col items-end gap-1 pb-4">

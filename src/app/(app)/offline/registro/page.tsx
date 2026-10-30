@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { WifiOff, Wifi, ArrowLeft, Plus, ChevronRight, CheckCircle2, Clock, AlertCircle, X, Pencil, Trash2 } from "lucide-react";
 import { METHODOLOGIES } from "@/lib/methodologies";
+import { RESPONSABLES_CAMPANA } from "@/lib/equipo-dss";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { getStationBBSpeciesIds, getStationTransectoRegistrations, updateTransectoOccurrenceAbundance, getCampaignSpecies, getStationSpecies } from "@/app/(app)/proyectos/[id]/campanas/[cid]/estaciones/[sid]/ocurrencias/actions";
@@ -23,11 +24,8 @@ const OccurrenceForm = dynamic(
 
 // ── Constants ──
 const SEASONS = ["Verano", "Otoño", "Invierno", "Primavera"] as const;
-const RESPONSIBLE_PERSONS = [
-  "Álvaro Esparza", "Ángela Schafer", "Catalina Lastra", "Claudia Cortés",
-  "Diego Verdugo", "Gabriel Cruz", "Gabriel Meriot", "Graciela Páez",
-  "Katterin Gutiérrez", "Macarena Toledo", "Nicolás Cortés", "Rodrigo Martínez", "Vicente Santibáñez",
-];
+// Lista única del equipo DSS (también la usa el reporte Word)
+const RESPONSIBLE_PERSONS = RESPONSABLES_CAMPANA;
 
 function generateLocalKey(): string {
   return `lk_${Date.now()}_${Math.floor(Math.random() * 100000)}`;

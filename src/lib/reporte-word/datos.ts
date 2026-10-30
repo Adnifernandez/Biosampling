@@ -47,7 +47,8 @@ export type CampanaReporte = {
   stations: EstacionReporte[];
 };
 
-export type Profesional = { nombre: string; profesion: string; rol: string };
+// libre: sólo para el formulario, cuando la persona no está en la lista del equipo DSS
+export type Profesional = { nombre: string; profesion: string; rol: string; libre?: boolean };
 
 export type FormularioReporte = {
   nombreProyecto: string;

@@ -11,16 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Sun, Leaf, Snowflake, Flower2, Bird, FolderOpen, Search } from "lucide-react";
 import { METHODOLOGIES } from "@/lib/methodologies";
+import { RESPONSABLES_CAMPANA } from "@/lib/equipo-dss";
 import { createCampana, updateCampana } from "@/app/(app)/campanas/actions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
-const RESPONSIBLE_PERSONS = [
-  "Álvaro Esparza","Ángela Schafer","Catalina Lastra","Claudia Cortés",
-  "Diego Verdugo","Gabriel Cruz","Gabriel Meriot","Graciela Páez",
-  "Katterin Gutiérrez","Macarena Toledo","Nicolás Cortés","Rodrigo Martínez","Vicente Santibáñez",
-];
+// Lista única del equipo DSS (también la usa el reporte Word)
+const RESPONSIBLE_PERSONS = RESPONSABLES_CAMPANA;
 
 const SEASONS = [
   { id: "Verano",    label: "Verano",    icon: Sun,       color: "text-yellow-500" },
