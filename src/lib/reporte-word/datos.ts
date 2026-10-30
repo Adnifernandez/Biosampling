@@ -369,8 +369,6 @@ function datosComunes(form: FormularioReporte, filas: FilaEspecie[], profesional
     observacionesParrafos: form.observaciones.split(/\n+/).map(linea).filter(Boolean),
     riquezaTexto: plural(filas.length, "especie", "especies"),
     hayEC: ec.length > 0,
-    // "Fuente: Elaboración propia, 2026." como pide el formato DSS
-    anioReporte: String(new Date().getFullYear()),
     ...numerosDeTabla(form.mostrarEquipo && profesionales.length > 0, ec.length > 0),
   };
 }
