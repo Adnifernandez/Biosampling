@@ -2,7 +2,7 @@
 // "corto" es como se guarda en las campañas; "nombre" y "profesion" van en la tabla del reporte.
 
 export const PROFESIONALES_DSS = [
-  { corto: "Álvaro Esparza", nombre: "Álvaro Matías Esparza Moreno", profesion: "Ingeniero en Recursos Naturales" },
+  { corto: "Álvaro Esparza", nombre: "Álvaro Esparza Moreno", profesion: "Ingeniero en Recursos Naturales" },
   { corto: "Ángela Schafer", nombre: "Ángela Schafer Navarro", profesion: "Bióloga Marina" },
   { corto: "Catalina Lastra", nombre: "Catalina Lastra Avendaño", profesion: "Ingeniera en Biotecnología Vegetal" },
   { corto: "Claudia Cortés", nombre: "Claudia Cortés Flores", profesion: "Geógrafa" },
