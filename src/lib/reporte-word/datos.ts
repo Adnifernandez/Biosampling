@@ -30,6 +30,8 @@ export type EstacionReporte = {
   length: number | null;
   width: number | null;
   area: number | null;
+  latitude: number | null;
+  longitude: number | null;
   occurrences: OcurrenciaReporte[];
   children: { id: string; name: string; occurrences: OcurrenciaReporte[] }[];
 };
@@ -328,18 +330,124 @@ export function valoresDeCampanas(tipo: TipoReporte, campanas: CampanaReporte[])
   };
 }
 
-// Las metodologías marcadas, como subtítulos de "Diseño de Muestreo"
-function datosMuestreo(tipo: TipoReporte, form: FormularioReporte) {
+// Las metodologías marcadas, como subtítulos de "Diseño de Muestreo", y la frase que anuncia
+// la tabla de puntos y las metodologías al final del primer párrafo
+function datosMuestreo(tipo: TipoReporte, form: FormularioReporte, base: { hayPuntos: boolean; tabPuntos: number }) {
   const metodologias = metodologiasDelReporte(tipo, form.metodologias, form.datosMetodologia, form.otrasMetodologias);
+  const tabla = base.hayPuntos ? `la ubicación de los puntos de muestreo se presenta en la Tabla ${base.tabPuntos}` : "";
+  const metodos = metodologias.length ? "las metodologías aplicadas se describen a continuación" : "";
+  const frase = [tabla, metodos].filter(Boolean).join(" y ");
   return {
     metodologias,
-    introMetodologias: metodologias.length ? " Las metodologías aplicadas se describen a continuación." : "",
+    introMetodologias: frase ? ` ${frase.charAt(0).toUpperCase()}${frase.slice(1)}.` : "",
   };
+}
+
+// ── Tabla de puntos de muestreo (coordenadas UTM, Datum WGS84) ──
+
+const TIPO_PUNTO: Record<string, string> = {
+  BRAUN_BLANQUET: "Parcela",
+  PARCELAS_FORESTALES: "Parcela forestal",
+  GRILLA: "Transecto (grilla)",
+  MICRORUTEO: "Microruteo",
+  TRANSECTO_LINEAL_FAUNA: "Transecto",
+  PUNTO_CONTEO: "Punto de conteo",
+  TRAMPA_CAMARA: "Cámara trampa",
+  RED_NIEBLA: "Red de niebla",
+  VES: "VES",
+};
+
+const husoDe = (longitud: number) => Math.floor((longitud + 180) / 6) + 1;
+
+// Latitud/longitud (WGS84) → Este/Norte en el huso indicado (fórmulas de Snyder, error de milímetros)
+export function aUTM(latitud: number, longitud: number, huso: number): { este: number; norte: number } {
+  const a = 6378137;
+  const f = 1 / 298.257223563;
+  const k0 = 0.9996;
+  const e2 = f * (2 - f);
+  const ep2 = e2 / (1 - e2);
+  const fi = (latitud * Math.PI) / 180;
+  const lambda0 = (((huso - 1) * 6 - 180 + 3) * Math.PI) / 180;
+  const N = a / Math.sqrt(1 - e2 * Math.sin(fi) ** 2);
+  const T = Math.tan(fi) ** 2;
+  const C = ep2 * Math.cos(fi) ** 2;
+  const A = Math.cos(fi) * ((longitud * Math.PI) / 180 - lambda0);
+  const M =
+    a *
+    ((1 - e2 / 4 - (3 * e2 ** 2) / 64 - (5 * e2 ** 3) / 256) * fi -
+      ((3 * e2) / 8 + (3 * e2 ** 2) / 32 + (45 * e2 ** 3) / 1024) * Math.sin(2 * fi) +
+      ((15 * e2 ** 2) / 256 + (45 * e2 ** 3) / 1024) * Math.sin(4 * fi) -
+      ((35 * e2 ** 3) / 3072) * Math.sin(6 * fi));
+  const este = k0 * N * (A + ((1 - T + C) * A ** 3) / 6 + ((5 - 18 * T + T ** 2 + 72 * C - 58 * ep2) * A ** 5) / 120) + 500000;
+  let norte =
+    k0 *
+    (M +
+      N * Math.tan(fi) * (A ** 2 / 2 + ((5 - T + 9 * C + 4 * C ** 2) * A ** 4) / 24 + ((61 - 58 * T + T ** 2 + 600 * C - 330 * ep2) * A ** 6) / 720));
+  if (latitud < 0) norte += 10_000_000;
+  return { este, norte };
+}
+
+const conUbicacion = (s: EstacionReporte) => !!s.latitude && !!s.longitude;
+
+// Un solo huso para todo el reporte (el de la mayoría de los puntos), como se usa en los informes.
+// Si ningún punto tiene ubicación, no hay tabla. Los puntos repetidos entre campañas salen una vez.
+export function puntosMuestreo(campanas: CampanaReporte[]) {
+  const estaciones = campanas.flatMap((c) =>
+    c.stations.map((s) => ({ s, tipo: TIPO_PUNTO[c.methodology] ?? "Punto de muestreo" }))
+  );
+  const ubicadas = estaciones.filter(({ s }) => conUbicacion(s));
+  if (ubicadas.length === 0) return { hayPuntos: false, puntos: [], husoPuntos: "", nConUbicacion: 0 };
+
+  const conteo = new Map<number, number>();
+  for (const { s } of ubicadas) conteo.set(husoDe(s.longitude!), (conteo.get(husoDe(s.longitude!)) ?? 0) + 1);
+  const huso = [...conteo.entries()].sort((x, y) => y[1] - x[1])[0][0];
+  const sur = ubicadas.filter(({ s }) => s.latitude! < 0).length >= ubicadas.length / 2;
+  const entero = (n: number) => Math.round(n).toLocaleString("es-CL");
+
+  const vistos = new Set<string>();
+  const puntos = estaciones
+    .map(({ s, tipo }) => {
+      const utm = conUbicacion(s) ? aUTM(s.latitude!, s.longitude!, huso) : null;
+      return { punto: s.name, tipo, este: utm ? entero(utm.este) : "—", norte: utm ? entero(utm.norte) : "—" };
+    })
+    .filter((p) => {
+      const clave = `${p.tipo}|${p.punto}|${p.este}|${p.norte}`;
+      if (vistos.has(clave)) return false;
+      vistos.add(clave);
+      return true;
+    })
+    .sort((x, y) => x.tipo.localeCompare(y.tipo, "es") || x.punto.localeCompare(y.punto, "es", { numeric: true }));
+
+  return { hayPuntos: true, puntos, husoPuntos: `${huso}${sur ? "S" : "N"}`, nConUbicacion: ubicadas.length };
+}
+
+// Lo que sale solo de terreno en "Diseño de Muestreo", para mostrarlo en el formulario
+export function resumenMuestreo(tipo: TipoReporte, campanas: CampanaReporte[]): string[] {
+  const partes: string[] = [];
+  if (tipo === "FLORA") {
+    const unidades = unidadesMuestreo(campanas);
+    if (!unidades.startsWith("[")) partes.push(unidades);
+  } else {
+    const n = campanas.reduce((s, c) => s + c.stations.length, 0);
+    const dim = dimensionTransectos(campanas);
+    if (n > 0) partes.push(`${plural(n, "transecto", "transectos")}${dim.startsWith("[") ? "" : ` de ${dim}`}`);
+  }
+  const { nConUbicacion } = puntosMuestreo(campanas);
+  if (nConUbicacion > 0) partes.push(`tabla de coordenadas de ${plural(nConUbicacion, "punto", "puntos")}`);
+  return partes;
 }
 
 // ── Datos comunes a ambos reportes ──
 
-function datosComunes(form: FormularioReporte, filas: FilaEspecie[], profesionales: Profesional[], ec: FilaEspecie[]) {
+function datosComunes(
+  form: FormularioReporte,
+  filas: FilaEspecie[],
+  profesionales: Profesional[],
+  ec: FilaEspecie[],
+  campanas: CampanaReporte[]
+) {
+  const puntos = puntosMuestreo(campanas);
+  const conEquipo = form.mostrarEquipo && profesionales.length > 0;
   return {
     nombreProyecto: form.nombreProyecto.trim(),
     tipoEstudio: completar(form.tipoEstudio, "tipo de estudio"),
@@ -361,17 +469,21 @@ function datosComunes(form: FormularioReporte, filas: FilaEspecie[], profesional
     observacionesParrafos: form.observaciones.split(/\n+/).map(linea).filter(Boolean),
     riquezaTexto: plural(filas.length, "especie", "especies"),
     hayEC: ec.length > 0,
-    ...numerosDeTabla(form.mostrarEquipo && profesionales.length > 0, ec.length > 0),
+    hayPuntos: puntos.hayPuntos,
+    puntos: puntos.puntos,
+    husoPuntos: puntos.husoPuntos,
+    ...numerosDeTabla(conEquipo, puntos.hayPuntos, ec.length > 0),
   };
 }
 
 // Las tablas se numeran en orden de aparición; las condicionales no ocupan número si no salen
-function numerosDeTabla(conEquipo: boolean, conEC: boolean) {
+function numerosDeTabla(conEquipo: boolean, conPuntos: boolean, conEC: boolean) {
   let n = 0;
   const tabEquipo = conEquipo ? ++n : 0;
+  const tabPuntos = conPuntos ? ++n : 0;
   const tabEspecies = ++n;
   const tabEC = conEC ? ++n : 0;
-  return { tabEquipo, tabEspecies, tabEC, tabSiguiente: n + 1 };
+  return { tabEquipo, tabPuntos, tabEspecies, tabEC, tabSiguiente: n + 1 };
 }
 
 const profesionalesConNombre = (form: FormularioReporte) => form.profesionales.filter((p) => p.nombre.trim());
@@ -473,7 +585,7 @@ export function datosFauna(
   const filas = consolidar(campanas);
   const profesionales = profesionalesConNombre(form);
   const ec = filas.filter((f) => esEC(f.sp, region));
-  const base = datosComunes(form, filas, profesionales, ec);
+  const base = datosComunes(form, filas, profesionales, ec, campanas);
   const abundanciaTotal = filas.reduce((s, f) => s + f.abundancia, 0);
   const nTransectos = campanas.reduce((s, c) => s + c.stations.length, 0);
 
@@ -515,7 +627,7 @@ export function datosFauna(
     antecedentesHabitat: linea(form.antecedentesHabitat),
     nTransectos: nTransectos || completar("", "número de transectos"),
     dimensionTransectos: dimensionTransectos(campanas),
-    ...datosMuestreo("FAUNA", form),
+    ...datosMuestreo("FAUNA", form, base),
     abundanciaTotal: abundanciaTotal || "",
     fraseGrupos: fraseGrupos(filas),
     sintesisResultados: sintesisResultadosFauna(filas),
@@ -600,7 +712,7 @@ function sintesisFamilias(filas: FilaEspecie[]): string {
 export function datosFlora(form: FormularioReporte, region: string, campanas: CampanaReporte[]) {
   const filas = consolidar(campanas);
   const ec = filas.filter((f) => esEC(f.sp, region));
-  const base = datosComunes(form, filas, profesionalesConNombre(form), ec);
+  const base = datosComunes(form, filas, profesionalesConNombre(form), ec, campanas);
   const nFamilias = new Set(filas.map((f) => f.sp.family).filter(Boolean)).size;
   const norma = form.normaEC.trim();
 
@@ -616,7 +728,7 @@ export function datosFlora(form: FormularioReporte, region: string, campanas: Ca
     unidadesDominantes: completar(form.unidadesDominantes, "unidades vegetacionales dominantes"),
     antecedenteSitio: linea(form.antecedenteSitio),
     unidadesMuestreo: unidadesMuestreo(campanas),
-    ...datosMuestreo("FLORA", form),
+    ...datosMuestreo("FLORA", form, base),
     familiasTexto: nFamilias === 1 ? "1 familia" : `${nFamilias} familias diferentes`,
     sintesisFamilias: sintesisFamilias(filas),
     especies: filas.map(({ sp }) => ({

@@ -17,6 +17,7 @@ import {
   especiesPorClasificar,
   formularioInicial,
   resumenCampanas,
+  resumenMuestreo,
   temporadaDe,
   valoresDeCampanas,
   type CampanaReporte,
@@ -26,7 +27,7 @@ import {
 } from "@/lib/reporte-word/datos";
 import { generarWord, prepararFigura } from "@/lib/reporte-word/generar";
 import { MEDIDAS_FAUNA } from "@/lib/reporte-word/medidas";
-import { METODOLOGIAS } from "@/lib/reporte-word/metodologias";
+import { METODOLOGIAS, type CampoMetodologia } from "@/lib/reporte-word/metodologias";
 import { PROFESIONALES_DSS, buscarProfesional } from "@/lib/equipo-dss";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -163,6 +164,64 @@ function CampoChico({ label, children }: { label: React.ReactNode; children: Rea
       <Label className="text-xs text-gray-600">{label}</Label>
       {children}
     </div>
+  );
+}
+
+// Datos de una metodología: los Sí/No como casillas arriba y el resto como cuadros de texto.
+// Los que dependen de un Sí/No (p. ej. especies del playback) aparecen sólo si está marcado.
+function CamposMetodologia({
+  campos,
+  valores,
+  onChange,
+}: {
+  campos: CampoMetodologia[];
+  valores: Record<string, string>;
+  onChange: (clave: string, valor: string) => void;
+}) {
+  const visibles = campos.filter((c) => !c.soloSi || valores[c.soloSi] === "si");
+  const casillas = visibles.filter((c) => c.tipo === "sino");
+  const cuadros = visibles.filter((c) => c.tipo !== "sino");
+  return (
+    <>
+      {casillas.length > 0 && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          {casillas.map((c) => (
+            <label key={c.clave} className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-teal-600"
+                checked={valores[c.clave] === "si"}
+                onChange={(e) => onChange(c.clave, e.target.checked ? "si" : "")}
+              />
+              {c.etiqueta}
+            </label>
+          ))}
+        </div>
+      )}
+      {cuadros.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {cuadros.map((c) => (
+            <CampoChico key={c.clave} label={c.etiqueta}>
+              <Input
+                type={c.tipo === "numero" ? "number" : "text"}
+                min={c.tipo === "numero" ? 0 : undefined}
+                placeholder={c.ejemplo ? `Ej: ${c.ejemplo}` : undefined}
+                list={c.sugerencias ? `sugerencias-${c.clave}` : undefined}
+                value={valores[c.clave] ?? ""}
+                onChange={(e) => onChange(c.clave, e.target.value)}
+              />
+              {c.sugerencias && (
+                <datalist id={`sugerencias-${c.clave}`}>
+                  {c.sugerencias.map((s) => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
+              )}
+            </CampoChico>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -325,6 +384,7 @@ export function ReporteWordClient({
 
   const porClasificar = especiesPorClasificar(campanas);
   const resumen = resumenCampanas(campanas, region);
+  const muestreoDeTerreno = resumenMuestreo(tipo, campanas);
   const temporadaActual = temporadasElegidas.join(" / ");
   const puedeGenerar =
     !!form.nombreProyecto.trim() && campanas.length > 0 && !cargando && porClasificar.length === 0 && !generando;
@@ -628,6 +688,11 @@ export function ReporteWordClient({
               Toca las metodologías que se aplicaron. Cada una se agrega al Word con su texto estándar.
               Los datos de abajo son opcionales: si los llenas, se agrega una frase con ellos al final de esa metodología.
             </p>
+            {muestreoDeTerreno.length > 0 && (
+              <p className="text-xs text-gray-600 rounded-lg bg-gray-50 px-3 py-2">
+                <span className="font-semibold">Sale solo de terreno (no hay que escribirlo):</span> {muestreoDeTerreno.join(" · ")}.
+              </p>
+            )}
             <div className="grid gap-2">
               {METODOLOGIAS[tipo].map((m) => {
                 const marcada = form.metodologias.includes(m.id);
@@ -642,19 +707,11 @@ export function ReporteWordClient({
                     }
                   >
                     {m.campos.length > 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {m.campos.map((c) => (
-                          <CampoChico key={c.clave} label={c.etiqueta}>
-                            <Input
-                              type={c.numero ? "number" : "text"}
-                              min={c.numero ? 0 : undefined}
-                              placeholder={`Ej: ${c.ejemplo}`}
-                              value={form.datosMetodologia[c.clave] ?? ""}
-                              onChange={(e) => set("datosMetodologia", { ...form.datosMetodologia, [c.clave]: e.target.value })}
-                            />
-                          </CampoChico>
-                        ))}
-                      </div>
+                      <CamposMetodologia
+                        campos={m.campos}
+                        valores={form.datosMetodologia}
+                        onChange={(clave, valor) => set("datosMetodologia", { ...form.datosMetodologia, [clave]: valor })}
+                      />
                     ) : m.id === "COT" ? (
                       // La COT trae además su sección de resultados en el Word
                       <>

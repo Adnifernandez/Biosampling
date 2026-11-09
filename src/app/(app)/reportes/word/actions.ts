@@ -53,6 +53,8 @@ export async function getCampanasReporteWord(campaignIds: string[]): Promise<Cam
           length: true,
           width: true,
           area: true,
+          latitude: true,
+          longitude: true,
           occurrences: { select: OCCURRENCE_SELECT },
           children: {
             select: { id: true, name: true, occurrences: { select: OCCURRENCE_SELECT } },
