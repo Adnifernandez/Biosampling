@@ -26,6 +26,7 @@ import {
 } from "@/lib/reporte-word/datos";
 import { generarWord, prepararFigura } from "@/lib/reporte-word/generar";
 import { MEDIDAS_FAUNA } from "@/lib/reporte-word/medidas";
+import { METODOLOGIAS } from "@/lib/reporte-word/metodologias";
 import { PROFESIONALES_DSS, buscarProfesional } from "@/lib/equipo-dss";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -65,9 +66,10 @@ const FIGURAS: Record<TipoReporte, { clave: string; nombre: string }[]> = {
   ],
 };
 
-// Lo que se recuerda entre reportes del mismo proyecto (en este navegador)
+// Lo que se recuerda entre reportes del mismo proyecto (en este navegador).
+// El nombre del proyecto no: se escribe cada vez.
 const CAMPOS_PROYECTO = [
-  "nombreProyecto", "tipoEstudio", "descripcionArea", "superficieHa", "antecedentesHabitat",
+  "tipoEstudio", "descripcionArea", "superficieHa", "antecedentesHabitat",
   "unidadesDominantes", "antecedenteSitio", "normaEC",
 ] as const;
 const claveProyecto = (projectId: string, tipo: TipoReporte) => `biosampling:reporte-word:${projectId}:${tipo}`;
@@ -114,6 +116,53 @@ function Seccion({ titulo, children }: { titulo: string; children: React.ReactNo
       </CardHeader>
       <CardContent className="space-y-4">{children}</CardContent>
     </Card>
+  );
+}
+
+const COLORES_OPCION = {
+  azul: { marcada: "border-blue-600 bg-blue-50", casilla: "border-blue-600 bg-blue-600" },
+  verde: { marcada: "border-teal-600 bg-teal-50", casilla: "border-teal-600 bg-teal-600" },
+};
+
+// Opción que se marca con un clic (metodologías, medidas). Marcada, muestra debajo sus campos.
+function OpcionMarcable({
+  marcada,
+  titulo,
+  onClick,
+  color,
+  children,
+}: {
+  marcada: boolean;
+  titulo: string;
+  onClick: () => void;
+  color: keyof typeof COLORES_OPCION;
+  children?: React.ReactNode;
+}) {
+  const c = COLORES_OPCION[color];
+  return (
+    <div className={cn("rounded-xl border-2 transition-all", marcada ? c.marcada : "border-gray-200 hover:border-gray-300 bg-white")}>
+      <button type="button" onClick={onClick} className="w-full flex items-center gap-3 px-3 py-3 text-left">
+        <span
+          className={cn(
+            "h-4 w-4 shrink-0 rounded border-2 flex items-center justify-center",
+            marcada ? `${c.casilla} text-white` : "border-gray-300"
+          )}
+        >
+          {marcada && <Check className="h-3 w-3" />}
+        </span>
+        <span className="text-sm font-semibold text-gray-900">{titulo}</span>
+      </button>
+      {marcada && children && <div className="px-3 pb-3 space-y-2">{children}</div>}
+    </div>
+  );
+}
+
+function CampoChico({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs text-gray-600">{label}</Label>
+      {children}
+    </div>
   );
 }
 
@@ -172,7 +221,7 @@ export function ReporteWordClient({
         if (cancelado) return;
         const guardado = leerGuardado<Partial<FormularioReporte>>(claveProyecto(projectId, tipo)) ?? {};
         const profesiones = leerGuardado<Record<string, { profesion: string; rol: string }>>(CLAVE_PROFESIONES) ?? {};
-        const deCampanas = valoresDeCampanas(datos);
+        const deCampanas = valoresDeCampanas(tipo, datos);
         const delProyecto = Object.fromEntries(
           CAMPOS_PROYECTO.filter((k) => guardado[k] !== undefined).map((k) => [k, guardado[k]])
         );
@@ -549,55 +598,73 @@ export function ReporteWordClient({
           </Seccion>
 
           <Seccion titulo="5. Diseño de muestreo">
-            {esFauna ? (
-              <>
-                <p className="text-xs text-gray-400">Deja en blanco lo que no se hizo: no aparecerá en el reporte.</p>
-                {([
-                  ["Puntos de Observación de Aves (POA)", "nPoa", "detallePoa", "Detalle (opcional)"],
-                  ["Fauna nocturna (PFN/TFN)", "nNocturno", "detalleNocturno", "Detalle (opcional)"],
-                  ["Trampas Sherman", "nSherman", "nochesSherman", "N° de noches"],
-                  ["Cámaras trampa", "nCamaras", "duracionCamaras", "Duración (ej: 4 noches)"],
-                ] as const).map(([titulo, campoN, campoDetalle, ph]) => (
-                  <Campo key={campoN} label={titulo}>
-                    <div className="grid grid-cols-[6rem_1fr] gap-2">
-                      <Input type="number" min={0} placeholder="N°" value={form[campoN]} onChange={(e) => set(campoN, e.target.value)} />
-                      <Input placeholder={ph} value={form[campoDetalle]} onChange={(e) => set(campoDetalle, e.target.value)} />
-                    </div>
-                  </Campo>
-                ))}
-                <Campo label="Evidencias indirectas">
-                  <Input value={form.evidencias} onChange={(e) => set("evidencias", e.target.value)} placeholder="Ej: búsqueda de fecas, huellas y madrigueras" />
-                </Campo>
-                <Campo label="Otras metodologías">
-                  <Input value={form.otrasMetodologias} onChange={(e) => set("otrasMetodologias", e.target.value)} />
-                </Campo>
-              </>
-            ) : (
-              <Campo label="Descripción de la metodología" ayuda="Viene precargada según las metodologías de las campañas; puedes editarla.">
-                <Textarea rows={4} value={form.descripcionMetodologia} onChange={(e) => set("descripcionMetodologia", e.target.value)} />
-              </Campo>
-            )}
+            <p className="text-xs text-gray-500">
+              Toca las metodologías que se aplicaron. Cada una se agrega al Word con su texto estándar; debajo completa los datos de esta campaña.
+              Lo que quede vacío saldrá destacado en amarillo.
+            </p>
+            <div className="grid gap-2">
+              {METODOLOGIAS[tipo].map((m) => {
+                const marcada = form.metodologias.includes(m.id);
+                return (
+                  <OpcionMarcable
+                    key={m.id}
+                    marcada={marcada}
+                    titulo={m.titulo}
+                    color={esFauna ? "azul" : "verde"}
+                    onClick={() =>
+                      set("metodologias", marcada ? form.metodologias.filter((id) => id !== m.id) : [...form.metodologias, m.id])
+                    }
+                  >
+                    {m.campos.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {m.campos.map((c) => (
+                          <CampoChico
+                            key={c.clave}
+                            label={<>{c.etiqueta}{c.opcional && <span className="font-normal text-gray-400"> (opcional)</span>}</>}
+                          >
+                            <Input
+                              type={c.numero ? "number" : "text"}
+                              min={c.numero ? 0 : undefined}
+                              placeholder={`Ej: ${c.ejemplo}`}
+                              value={form.datosMetodologia[c.clave] ?? ""}
+                              onChange={(e) => set("datosMetodologia", { ...form.datosMetodologia, [c.clave]: e.target.value })}
+                            />
+                          </CampoChico>
+                        ))}
+                      </div>
+                    ) : m.id === "COT" ? (
+                      // La COT trae además su sección de resultados en el Word
+                      <>
+                        <p className="text-xs text-gray-500">Agrega también la sección de resultados «Carta de Ocupación de Tierras (COT)».</p>
+                        <CampoChico label="N° de unidades o formaciones">
+                          <Input type="number" min={0} value={form.nUnidadesCot} onChange={(e) => set("nUnidadesCot", e.target.value)} className="max-w-40" />
+                        </CampoChico>
+                        <CampoChico label="Descripción de los resultados">
+                          <Textarea value={form.descripcionCot} onChange={(e) => set("descripcionCot", e.target.value)} />
+                        </CampoChico>
+                      </>
+                    ) : null}
+                  </OpcionMarcable>
+                );
+              })}
+            </div>
+            <Campo
+              label="Otras metodologías (opcional)"
+              ayuda={
+                esFauna
+                  ? "Si se aplicó algo que no está en la lista. Cada línea es un párrafo."
+                  : "Viene con lo de las campañas que no está en la lista (parcelas forestales, grillas, microruteo); puedes editarla. Cada línea es un párrafo."
+              }
+            >
+              <Textarea rows={3} value={form.otrasMetodologias} onChange={(e) => set("otrasMetodologias", e.target.value)} />
+            </Campo>
           </Seccion>
 
           {!esFauna && (
-            <Seccion titulo="6. Conservación, COT y conclusiones">
+            <Seccion titulo="6. Conservación y conclusiones">
               <Campo label="Norma o decreto de conservación (opcional)" ayuda="Se agrega junto a la categoría en la tabla de especies en categoría. Ej: RCE.">
                 <Input value={form.normaEC} onChange={(e) => set("normaEC", e.target.value)} className="max-w-60" />
               </Campo>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="checkbox" className="h-4 w-4 accent-teal-600" checked={form.incluirCot} onChange={(e) => set("incluirCot", e.target.checked)} />
-                Incluir Carta de Ocupación de Tierras (COT) / formaciones vegetacionales
-              </label>
-              {form.incluirCot && (
-                <>
-                  <Campo label="N° de unidades o formaciones">
-                    <Input type="number" min={0} value={form.nUnidadesCot} onChange={(e) => set("nUnidadesCot", e.target.value)} className="max-w-40" />
-                  </Campo>
-                  <Campo label="Descripción de los resultados">
-                    <Textarea value={form.descripcionCot} onChange={(e) => set("descripcionCot", e.target.value)} />
-                  </Campo>
-                </>
-              )}
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="checkbox" className="h-4 w-4 accent-teal-600" checked={form.incluirConclusiones} onChange={(e) => set("incluirConclusiones", e.target.checked)} />
                 Incluir conclusiones
@@ -620,27 +687,15 @@ export function ReporteWordClient({
                 {MEDIDAS_FAUNA.map((m) => {
                   const marcada = form.medidas.includes(m.id);
                   return (
-                    <button
+                    <OpcionMarcable
                       key={m.id}
-                      type="button"
+                      marcada={marcada}
+                      titulo={m.titulo}
+                      color="azul"
                       onClick={() =>
                         set("medidas", marcada ? form.medidas.filter((id) => id !== m.id) : [...form.medidas, m.id])
                       }
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-3 rounded-xl border-2 text-left transition-all",
-                        marcada ? "border-blue-600 bg-blue-50" : "border-gray-200 hover:border-gray-300 bg-white"
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "h-4 w-4 shrink-0 rounded border-2 flex items-center justify-center",
-                          marcada ? "border-blue-600 bg-blue-600 text-white" : "border-gray-300"
-                        )}
-                      >
-                        {marcada && <Check className="h-3 w-3" />}
-                      </span>
-                      <span className="text-sm font-semibold text-gray-900">{m.titulo}</span>
-                    </button>
+                    />
                   );
                 })}
               </div>

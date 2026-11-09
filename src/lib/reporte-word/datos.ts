@@ -1,6 +1,7 @@
 // Arma los datos que llenan las plantillas Word de reporte (public/plantillas/*.docx).
 // Todo lo que sale de terreno se calcula aquí; lo que la app no guarda viene del formulario.
 import { MEDIDAS_FAUNA } from "./medidas";
+import { metodologiasDelReporte, metodologiasPorDefecto } from "./metodologias";
 
 export type TipoReporte = "FLORA" | "FAUNA";
 
@@ -62,25 +63,18 @@ export type FormularioReporte = {
   mostrarEquipo: boolean;
   profesionales: Profesional[];
   observaciones: string;
+  // Diseño de muestreo (ver metodologias.ts)
+  metodologias: string[]; // ids marcados
+  datosMetodologia: Record<string, string>; // N° de POA, horarios, cebos… (clave del campo → valor)
+  otrasMetodologias: string;
   // Fauna
   antecedentesHabitat: string;
-  nPoa: string;
-  detallePoa: string;
-  nNocturno: string;
-  detalleNocturno: string;
-  nSherman: string;
-  nochesSherman: string;
-  nCamaras: string;
-  duracionCamaras: string;
-  evidencias: string;
-  otrasMetodologias: string;
   medidas: string[]; // ids de MEDIDAS_FAUNA marcadas
   // Flora
   unidadesDominantes: string;
   antecedenteSitio: string;
-  descripcionMetodologia: string;
   normaEC: string;
-  incluirCot: boolean;
+  // La sección de resultados COT sale si se marcó la metodología "COT"
   nUnidadesCot: string;
   descripcionCot: string;
   incluirConclusiones: boolean;
@@ -275,9 +269,8 @@ export function profesionalesDe(campanas: CampanaReporte[]): string[] {
   return Array.from(new Set(nombres));
 }
 
+// Para "Otras metodologías" de flora. Braun-Blanquet no va: ya está en la lista de metodologías.
 const METODOLOGIA_TEXTO: Record<string, string> = {
-  BRAUN_BLANQUET:
-    "En cada parcela se registró la composición florística y la cobertura de cada especie según la escala de abundancia-dominancia de Braun-Blanquet.",
   PARCELAS_FORESTALES:
     "En cada parcela forestal se midió, para cada individuo, el diámetro a la altura del tocón (DAT), el diámetro a la altura del pecho (DAP) y la altura total.",
   GRILLA:
@@ -288,7 +281,7 @@ const METODOLOGIA_TEXTO: Record<string, string> = {
 
 export function metodologiaPorDefecto(campanas: CampanaReporte[]): string {
   const ids = Array.from(new Set(campanas.map((c) => c.methodology)));
-  return ids.map((id) => METODOLOGIA_TEXTO[id]).filter(Boolean).join(" ");
+  return ids.map((id) => METODOLOGIA_TEXTO[id]).filter(Boolean).join("\n");
 }
 
 export function formularioInicial(): FormularioReporte {
@@ -304,44 +297,42 @@ export function formularioInicial(): FormularioReporte {
     mostrarEquipo: true,
     profesionales: [],
     observaciones: "",
-    antecedentesHabitat: "",
-    nPoa: "",
-    detallePoa: "",
-    nNocturno: "",
-    detalleNocturno: "",
-    nSherman: "",
-    nochesSherman: "",
-    nCamaras: "",
-    duracionCamaras: "",
-    evidencias: "",
+    metodologias: [],
+    datosMetodologia: {},
     otrasMetodologias: "",
+    antecedentesHabitat: "",
     medidas: [],
     unidadesDominantes: "",
     antecedenteSitio: "",
-    descripcionMetodologia: "",
     normaEC: "",
-    incluirCot: false,
     nUnidadesCot: "",
     descripcionCot: "",
     incluirConclusiones: true,
   };
 }
 
-// Lo que se puede sacar de las campañas: fechas, época, equipo, comentarios, trampas.
-export function valoresDeCampanas(campanas: CampanaReporte[]): Partial<FormularioReporte> {
+// Lo que se puede sacar de las campañas: fechas, época, equipo, comentarios, metodologías y trampas.
+export function valoresDeCampanas(tipo: TipoReporte, campanas: CampanaReporte[]): Partial<FormularioReporte> {
   const inicios = campanas.map((c) => c.startDate).filter(Boolean).sort();
   const fines = campanas.map((c) => c.endDate).filter(Boolean).sort();
   const estacion = campanas.map((c) => estacionDelAnio(c.name)).find(Boolean);
-  const suma = (k: "shermanTrapCount" | "cameraTrapCount") => campanas.reduce((s, c) => s + (c[k] ?? 0), 0);
   return {
     fechaInicio: inicios[0] ?? "",
     fechaFin: fines[fines.length - 1] ?? "",
     epoca: estacion ? EPOCAS[estacion] : "",
     profesionales: profesionalesDe(campanas).map((nombre) => ({ nombre, profesion: "", rol: "" })),
     observaciones: campanas.map((c) => c.notes?.trim()).filter(Boolean).join("\n"),
-    nSherman: suma("shermanTrapCount") ? String(suma("shermanTrapCount")) : "",
-    nCamaras: suma("cameraTrapCount") ? String(suma("cameraTrapCount")) : "",
-    descripcionMetodologia: metodologiaPorDefecto(campanas),
+    ...metodologiasPorDefecto(tipo, campanas),
+    otrasMetodologias: tipo === "FLORA" ? metodologiaPorDefecto(campanas) : "",
+  };
+}
+
+// Las metodologías marcadas, como subtítulos de "Diseño de Muestreo"
+function datosMuestreo(tipo: TipoReporte, form: FormularioReporte) {
+  const metodologias = metodologiasDelReporte(tipo, form.metodologias, form.datosMetodologia, form.otrasMetodologias);
+  return {
+    metodologias,
+    introMetodologias: metodologias.length ? " Las metodologías aplicadas se describen a continuación." : "",
   };
 }
 
@@ -455,41 +446,6 @@ function dimensionTransectos(campanas: CampanaReporte[]): string {
   return unirLista(Array.from(medidas).slice(0, 3));
 }
 
-function textoConDetalle(base: string, detalle: string): string {
-  const d = linea(detalle);
-  if (!base) return d;
-  return d ? `${base}; ${d}` : base;
-}
-
-function metodologiasFauna(form: FormularioReporte) {
-  const n = (v: string) => parseInt(v, 10) || 0;
-  const poa = n(form.nPoa);
-  const noct = n(form.nNocturno);
-  const sherman = n(form.nSherman);
-  const camaras = n(form.nCamaras);
-  return {
-    textoPoa: textoConDetalle(poa ? `${plural(poa, "Punto", "Puntos")} de Observación de Aves (POA)` : "", form.detallePoa),
-    textoNocturno: textoConDetalle(
-      noct ? `${plural(noct, "Punto o Transecto", "Puntos o Transectos")} de Fauna Nocturna (PFN/TFN)` : "",
-      form.detalleNocturno
-    ),
-    textoSherman: sherman
-      ? `${plural(sherman, "Trampa Sherman", "Trampas Sherman")}` +
-        (form.nochesSherman.trim()
-          ? `, ${sherman === 1 ? "operativa" : "operativas"} durante ${plural(n(form.nochesSherman), "noche", "noches")}.`
-          : ".")
-      : "",
-    textoCamaras: camaras
-      ? `${plural(camaras, "Cámara trampa", "Cámaras trampa")}` +
-        (form.duracionCamaras.trim()
-          ? `, ${camaras === 1 ? "operativa" : "operativas"} durante ${form.duracionCamaras.trim()}.`
-          : ".")
-      : "",
-    textoEvidencias: linea(form.evidencias),
-    textoOtras: linea(form.otrasMetodologias),
-  };
-}
-
 function cambio(antes: number, despues: number): string {
   const d = despues - antes;
   if (d > 0) return `Aumenta (+${d})`;
@@ -558,7 +514,7 @@ export function datosFauna(
     antecedentesHabitat: linea(form.antecedentesHabitat),
     nTransectos: nTransectos || completar("", "número de transectos"),
     dimensionTransectos: dimensionTransectos(campanas),
-    ...metodologiasFauna(form),
+    ...datosMuestreo("FAUNA", form),
     abundanciaTotal: abundanciaTotal || "",
     fraseGrupos: fraseGrupos(filas),
     sintesisResultados: sintesisResultadosFauna(filas),
@@ -653,13 +609,13 @@ export function datosFlora(form: FormularioReporte, region: string, campanas: Ca
       : `Dentro del área de estudio se registraron ${ec.length} especies clasificadas en alguna categoría de conservación vigente. Estas corresponden a `) +
     `${listaEC(ec)}.`;
 
-  const cot = form.incluirCot;
+  const cot = form.metodologias.includes("COT");
   return {
     ...base,
     unidadesDominantes: completar(form.unidadesDominantes, "unidades vegetacionales dominantes"),
     antecedenteSitio: linea(form.antecedenteSitio),
     unidadesMuestreo: unidadesMuestreo(campanas),
-    descripcionMetodologia: linea(form.descripcionMetodologia),
+    ...datosMuestreo("FLORA", form),
     familiasTexto: nFamilias === 1 ? "1 familia" : `${nFamilias} familias diferentes`,
     sintesisFamilias: sintesisFamilias(filas),
     especies: filas.map(({ sp }) => ({
