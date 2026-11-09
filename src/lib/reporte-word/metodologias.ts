@@ -1,6 +1,7 @@
 // Metodologías que se pueden marcar en el formulario del reporte Word. Las marcadas se incluyen en
 // "Diseño de Muestreo", cada una con su título, su texto estándar (tal cual) y, al final, una frase
 // con los datos de la campaña (N° de puntos, horarios, cebos…), que cambian en cada proyecto.
+// Los datos son opcionales: si no se llenan, va sólo el texto estándar (sin aviso en amarillo).
 import type { CampanaReporte, TipoReporte } from "./datos";
 
 export type CampoMetodologia = {
@@ -8,7 +9,6 @@ export type CampoMetodologia = {
   etiqueta: string;
   ejemplo: string;
   numero?: boolean;
-  opcional?: boolean;
 };
 
 type Valor = (clave: string) => string;
@@ -18,8 +18,6 @@ export type Metodologia = {
   titulo: string;
   parrafos: string[];
   campos: CampoMetodologia[];
-  // Si se marcó y no se llenó ningún dato obligatorio, sale este aviso en amarillo en el Word
-  pendiente?: string;
   // Frase con los datos de la campaña; "" si no hay datos
   esfuerzo?: (v: Valor) => string;
 };
@@ -52,7 +50,7 @@ export const METODOLOGIAS_FLORA: Metodologia[] = [
       "Para caracterizar la composición florística y abundancia de especies se establecen parcelas de muestreo distribuidas de manera que representen las distintas unidades vegetacionales previamente identificadas. En cada parcela se registran las especies de flora vascular presentes y su cobertura.",
     ],
     // El número y la superficie ya salen de terreno, en el primer párrafo de "Diseño de Muestreo"
-    campos: [{ clave: "parcelasForma", etiqueta: "Forma y tamaño de las parcelas", ejemplo: "cuadradas de 10 × 10 m", opcional: true }],
+    campos: [{ clave: "parcelasForma", etiqueta: "Forma y tamaño de las parcelas", ejemplo: "cuadradas de 10 × 10 m" }],
     esfuerzo: (v) => (v("parcelasForma") ? `Las parcelas utilizadas fueron ${v("parcelasForma")}.` : ""),
   },
   {
@@ -87,7 +85,7 @@ export const METODOLOGIAS_FLORA: Metodologia[] = [
       "Cuando las características del área de estudio o el alcance del proyecto requieran caracterizar vegetación asociada a ambientes húmedos, se realiza un levantamiento específico de flora hidrófila. Para ello se prospectan sectores asociados a cuerpos de agua, zonas anegadas o suelos con condiciones de humedad, registrando las especies indicadoras presentes y clasificándolas de acuerdo con las referencias aplicables para vegetación de humedales.",
     ],
     campos: [
-      { clave: "hidrofilaTransectos", etiqueta: "N° de transectos hacia el cuerpo de agua", ejemplo: "4", numero: true, opcional: true },
+      { clave: "hidrofilaTransectos", etiqueta: "N° de transectos hacia el cuerpo de agua", ejemplo: "4", numero: true },
     ],
     esfuerzo: (v) => {
       const n = entero(v("hidrofilaTransectos"));
@@ -106,7 +104,7 @@ export const METODOLOGIAS_FAUNA: Metodologia[] = [
       "La caracterización general de fauna se realiza mediante recorridos pedestres a través de transectos distribuidos en los distintos ambientes presentes en el área de estudio. Durante los recorridos se registran observaciones directas de ejemplares y evidencias indirectas de presencia, aplicando metodologías específicas de acuerdo con cada grupo taxonómico.",
     ],
     // El número y las medidas de los transectos ya salen de terreno, en el primer párrafo
-    campos: [{ clave: "transectosEsfuerzo", etiqueta: "Esfuerzo por transecto", ejemplo: "1 hora con 2 observadores", opcional: true }],
+    campos: [{ clave: "transectosEsfuerzo", etiqueta: "Esfuerzo por transecto", ejemplo: "1 hora con 2 observadores" }],
     esfuerzo: (v) => (v("transectosEsfuerzo") ? `El esfuerzo aplicado en cada transecto fue de ${v("transectosEsfuerzo")}.` : ""),
   },
   {
@@ -122,7 +120,6 @@ export const METODOLOGIAS_FAUNA: Metodologia[] = [
       { clave: "poaTiempo", etiqueta: "Tiempo por punto", ejemplo: "10 minutos" },
       { clave: "poaHorario", etiqueta: "Horario", ejemplo: "07:00 a 11:00 h" },
     ],
-    pendiente: "N° de POA, radio de observación, tiempo por punto y horario",
     esfuerzo: (v) => {
       const n = entero(v("poaN"));
       const con = juntar(
@@ -149,7 +146,6 @@ export const METODOLOGIAS_FAUNA: Metodologia[] = [
       { clave: "nocHorario", etiqueta: "Horario", ejemplo: "20:00 a 23:00 h" },
       { clave: "nocTiempo", etiqueta: "Tiempo de escucha", ejemplo: "10 minutos por punto" },
     ],
-    pendiente: "N° de transectos, noches, horario y tiempo de escucha",
     esfuerzo: (v) => {
       const n = entero(v("nocN"));
       const noches = entero(v("nocNoches"));
@@ -183,9 +179,8 @@ export const METODOLOGIAS_FAUNA: Metodologia[] = [
       { clave: "shermanNoches", etiqueta: "N° de noches", ejemplo: "3", numero: true },
       { clave: "shermanHorario", etiqueta: "Horario de activación", ejemplo: "19:00 a 08:00 h" },
       { clave: "shermanCebo", etiqueta: "Cebo", ejemplo: "avena con esencia de vainilla" },
-      { clave: "shermanAutorizacion", etiqueta: "Autorización de captura", ejemplo: "Resolución SAG N° …", opcional: true },
+      { clave: "shermanAutorizacion", etiqueta: "Autorización de captura", ejemplo: "Resolución SAG N° …" },
     ],
-    pendiente: "N° de trampas, noches, horario de activación y cebo",
     esfuerzo: (v) => {
       const n = entero(v("shermanN"));
       const noches = entero(v("shermanNoches"));
@@ -213,9 +208,8 @@ export const METODOLOGIAS_FAUNA: Metodologia[] = [
     campos: [
       { clave: "camarasN", etiqueta: "N° de cámaras", ejemplo: "4", numero: true },
       { clave: "camarasTiempo", etiqueta: "Tiempo de funcionamiento", ejemplo: "5 días" },
-      { clave: "camarasCebo", etiqueta: "Cebo o atrayente", ejemplo: "sardina", opcional: true },
+      { clave: "camarasCebo", etiqueta: "Cebo o atrayente", ejemplo: "sardina" },
     ],
-    pendiente: "N° de cámaras y tiempo de funcionamiento",
     esfuerzo: (v) => {
       const n = entero(v("camarasN"));
       const tiempo = v("camarasTiempo");
@@ -236,7 +230,6 @@ export const METODOLOGIAS_FAUNA: Metodologia[] = [
       { clave: "reptilesHorario", etiqueta: "Horario", ejemplo: "11:00 a 16:00 h" },
       { clave: "reptilesEsfuerzo", etiqueta: "Esfuerzo de búsqueda", ejemplo: "30 minutos por transecto" },
     ],
-    pendiente: "horario y esfuerzo de búsqueda",
     esfuerzo: (v) => busqueda(v, "reptilesHorario", "reptilesEsfuerzo"),
   },
   {
@@ -249,7 +242,6 @@ export const METODOLOGIAS_FAUNA: Metodologia[] = [
       { clave: "anfibiosHorario", etiqueta: "Horario", ejemplo: "10:00 a 14:00 h" },
       { clave: "anfibiosEsfuerzo", etiqueta: "Esfuerzo de búsqueda", ejemplo: "30 minutos por sector húmedo" },
     ],
-    pendiente: "horario y esfuerzo de búsqueda",
     esfuerzo: (v) => busqueda(v, "anfibiosHorario", "anfibiosEsfuerzo"),
   },
   {
@@ -264,7 +256,6 @@ export const METODOLOGIAS_FAUNA: Metodologia[] = [
       { clave: "escuchaHorario", etiqueta: "Horario", ejemplo: "21:00 a 23:00 h" },
       { clave: "escuchaPlayback", etiqueta: "Duración del playback", ejemplo: "5 minutos por estación" },
     ],
-    pendiente: "N° de transectos o estaciones, noches, horario y duración del playback",
     esfuerzo: (v) => {
       const n = entero(v("escuchaN"));
       const noches = entero(v("escuchaNoches"));
@@ -284,42 +275,19 @@ export const METODOLOGIAS: Record<TipoReporte, Metodologia[]> = {
   FAUNA: METODOLOGIAS_FAUNA,
 };
 
-// Qué viene marcado al abrir el formulario, según lo que se hizo en las campañas.
-// Flora hidrófila y la escucha nocturna de anfibios nunca se marcan solas: dependen del área.
-export function metodologiasPorDefecto(
-  tipo: TipoReporte,
-  campanas: CampanaReporte[]
-): { metodologias: string[]; datosMetodologia: Record<string, string> } {
-  const usadas = new Set(campanas.map((c) => c.methodology));
+// Ninguna metodología viene marcada (las elige la usuaria). Sólo se adelantan los números que ya
+// están en las campañas, para que aparezcan escritos si marca esa metodología.
+export function datosMetodologiaDeCampanas(tipo: TipoReporte, campanas: CampanaReporte[]): Record<string, string> {
   const estacionesDe = (metodo: string) =>
     campanas.filter((c) => c.methodology === metodo).reduce((s, c) => s + c.stations.length, 0);
   const texto = (n: number) => (n > 0 ? String(n) : "");
 
-  if (tipo === "FLORA") {
-    const conParcelas = usadas.has("BRAUN_BLANQUET") || usadas.has("PARCELAS_FORESTALES");
-    return {
-      metodologias: [
-        "FOTOINTERPRETACION",
-        ...(conParcelas ? ["PARCELAS"] : []),
-        ...(usadas.has("BRAUN_BLANQUET") ? ["BRAUN_BLANQUET"] : []),
-        "INVENTARIO",
-      ],
-      // Los transectos de grilla son los de delimitación de humedales
-      datosMetodologia: { hidrofilaTransectos: texto(estacionesDe("GRILLA")) },
-    };
-  }
+  // Los transectos de grilla son los de delimitación de humedales
+  if (tipo === "FLORA") return { hidrofilaTransectos: texto(estacionesDe("GRILLA")) };
 
   const sherman = campanas.reduce((s, c) => s + (c.shermanTrapCount ?? 0), 0);
   const camaras = campanas.reduce((s, c) => s + (c.cameraTrapCount ?? 0), 0) || estacionesDe("TRAMPA_CAMARA");
-  return {
-    metodologias: [
-      "TRANSECTOS", "POA", "AVES_NOCTURNAS", "MAMIFEROS",
-      ...(sherman ? ["SHERMAN"] : []),
-      ...(camaras ? ["CAMARAS"] : []),
-      "REPTILES", "ANFIBIOS",
-    ],
-    datosMetodologia: { poaN: texto(estacionesDe("PUNTO_CONTEO")), shermanN: texto(sherman), camarasN: texto(camaras) },
-  };
+  return { poaN: texto(estacionesDe("PUNTO_CONTEO")), shermanN: texto(sherman), camarasN: texto(camaras) };
 }
 
 // Lo que va en el Word: las metodologías marcadas (en el orden de la lista) y, al final, "Otras metodologías"
@@ -333,11 +301,8 @@ export function metodologiasDelReporte(
   const lista = METODOLOGIAS[tipo]
     .filter((m) => marcadas.includes(m.id))
     .map((m) => {
-      const obligatorios = m.campos.filter((c) => !c.opcional);
-      const sinDatos = obligatorios.length > 0 && obligatorios.every((c) => !v(c.clave));
       const esfuerzo = m.esfuerzo?.(v) ?? "";
-      const cierre = juntar([esfuerzo, sinDatos && m.pendiente ? `[Completar: ${m.pendiente}]` : ""], " ");
-      return { titulo: m.titulo, parrafos: cierre ? [...m.parrafos, cierre] : m.parrafos };
+      return { titulo: m.titulo, parrafos: esfuerzo ? [...m.parrafos, esfuerzo] : m.parrafos };
     });
   const parrafosOtras = otras.split(/\n+/).map((p) => p.replace(/\s+/g, " ").trim()).filter(Boolean);
   if (parrafosOtras.length) lista.push({ titulo: "Otras metodologías", parrafos: parrafosOtras });

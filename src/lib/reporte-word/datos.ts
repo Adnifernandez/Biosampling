@@ -1,7 +1,7 @@
 // Arma los datos que llenan las plantillas Word de reporte (public/plantillas/*.docx).
 // Todo lo que sale de terreno se calcula aquí; lo que la app no guarda viene del formulario.
 import { MEDIDAS_FAUNA } from "./medidas";
-import { metodologiasDelReporte, metodologiasPorDefecto } from "./metodologias";
+import { datosMetodologiaDeCampanas, metodologiasDelReporte } from "./metodologias";
 
 export type TipoReporte = "FLORA" | "FAUNA";
 
@@ -322,7 +322,8 @@ export function valoresDeCampanas(tipo: TipoReporte, campanas: CampanaReporte[])
     epoca: estacion ? EPOCAS[estacion] : "",
     profesionales: profesionalesDe(campanas).map((nombre) => ({ nombre, profesion: "", rol: "" })),
     observaciones: campanas.map((c) => c.notes?.trim()).filter(Boolean).join("\n"),
-    ...metodologiasPorDefecto(tipo, campanas),
+    metodologias: [],
+    datosMetodologia: datosMetodologiaDeCampanas(tipo, campanas),
     otrasMetodologias: tipo === "FLORA" ? metodologiaPorDefecto(campanas) : "",
   };
 }

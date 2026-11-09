@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Bird, Check, FileText, ImageIcon, Leaf, Loader2, Plus, X } from "lucide-react";
+import { AlertTriangle, Bird, Check, FileText, ImageIcon, Leaf, Loader2, Plus, RotateCcw, X } from "lucide-react";
 import { getMethodologyById } from "@/lib/methodologies";
 import { getCampanasReporteWord } from "@/app/(app)/reportes/word/actions";
 import {
@@ -194,6 +194,7 @@ export function ReporteWordClient({
   const [figuras, setFiguras] = useState<Record<string, File | null>>({});
   const [generando, setGenerando] = useState(false);
   const [tipoOtro, setTipoOtro] = useState(false);
+  const [recarga, setRecarga] = useState(0); // al subirlo se vuelven a leer las campañas
 
   const proyecto = projects.find((p) => p.id === projectId);
   const region = proyecto?.region ?? "";
@@ -248,7 +249,7 @@ export function ReporteWordClient({
         if (!cancelado) setCargando(false);
       });
     return () => { cancelado = true; };
-  }, [claveSeleccion, projectId, tipo]);
+  }, [claveSeleccion, projectId, tipo, recarga]);
 
   // Campaña anterior para la comparación (sólo fauna)
   const idsContraste = contraste
@@ -286,6 +287,20 @@ export function ReporteWordClient({
     setTipoOtro(false);
     setListo(false);
     setCargando(nuevaSeleccion.length > 0);
+  }
+
+  // Olvida lo que el formulario recordaba de este proyecto (flora y fauna) y lo vuelve a llenar
+  // sólo con los datos de terreno. No toca las campañas ni otros proyectos.
+  function borrarGuardado() {
+    if (!window.confirm("¿Borrar lo que el formulario recuerda de este proyecto (flora y fauna)? Los datos de terreno no se tocan.")) return;
+    for (const t of ["FLORA", "FAUNA"] as const) {
+      try {
+        localStorage.removeItem(claveProyecto(projectId, t));
+      } catch {}
+    }
+    reiniciar(seleccion);
+    setRecarga((n) => n + 1);
+    toast.success("Se borró lo guardado de este proyecto");
   }
 
   function elegirProyecto(id: string) {
@@ -430,6 +445,17 @@ export function ReporteWordClient({
               <span className="font-semibold">{resumen.enCategoria}</span> en categoría de conservación
               <span className="text-gray-400"> (CR, EN, VU, NT o LC vigente en la región del proyecto)</span>
             </p>
+          </div>
+        )}
+
+        {hayDatos && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2">
+            <p className="text-xs text-gray-500">
+              El formulario recuerda en este navegador algunos datos del proyecto (tipo de estudio, área, superficie…).
+            </p>
+            <Button type="button" variant="outline" size="sm" className="gap-1" onClick={borrarGuardado}>
+              <RotateCcw className="h-4 w-4" /> Borrar lo guardado de este proyecto
+            </Button>
           </div>
         )}
 
@@ -599,8 +625,8 @@ export function ReporteWordClient({
 
           <Seccion titulo="5. Diseño de muestreo">
             <p className="text-xs text-gray-500">
-              Toca las metodologías que se aplicaron. Cada una se agrega al Word con su texto estándar; debajo completa los datos de esta campaña.
-              Lo que quede vacío saldrá destacado en amarillo.
+              Toca las metodologías que se aplicaron. Cada una se agrega al Word con su texto estándar.
+              Los datos de abajo son opcionales: si los llenas, se agrega una frase con ellos al final de esa metodología.
             </p>
             <div className="grid gap-2">
               {METODOLOGIAS[tipo].map((m) => {
@@ -618,10 +644,7 @@ export function ReporteWordClient({
                     {m.campos.length > 0 ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {m.campos.map((c) => (
-                          <CampoChico
-                            key={c.clave}
-                            label={<>{c.etiqueta}{c.opcional && <span className="font-normal text-gray-400"> (opcional)</span>}</>}
-                          >
+                          <CampoChico key={c.clave} label={c.etiqueta}>
                             <Input
                               type={c.numero ? "number" : "text"}
                               min={c.numero ? 0 : undefined}
