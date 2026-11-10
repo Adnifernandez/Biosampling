@@ -16,8 +16,8 @@ import {
   datosFlora,
   especiesPorClasificar,
   formularioInicial,
+  muestreoDeTerreno,
   resumenCampanas,
-  resumenMuestreo,
   temporadaDe,
   valoresDeCampanas,
   type CampanaReporte,
@@ -27,7 +27,7 @@ import {
 } from "@/lib/reporte-word/datos";
 import { generarWord, prepararFigura } from "@/lib/reporte-word/generar";
 import { MEDIDAS_FAUNA } from "@/lib/reporte-word/medidas";
-import { METODOLOGIAS, type CampoMetodologia } from "@/lib/reporte-word/metodologias";
+import { MUESTREO, type CampoMuestreo } from "@/lib/reporte-word/muestreo";
 import { PROFESIONALES_DSS, buscarProfesional } from "@/lib/equipo-dss";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -167,61 +167,49 @@ function CampoChico({ label, children }: { label: React.ReactNode; children: Rea
   );
 }
 
-// Datos de una metodología: los Sí/No como casillas arriba y el resto como cuadros de texto.
-// Los que dependen de un Sí/No (p. ej. especies del playback) aparecen sólo si está marcado.
-function CamposMetodologia({
+// Datos del párrafo de diseño de muestreo. Los que la app ya sabe vienen escritos ("de la app");
+// si se cambian, manda lo escrito.
+function CamposMuestreo({
   campos,
-  valores,
+  valor,
+  deLaApp,
   onChange,
 }: {
-  campos: CampoMetodologia[];
-  valores: Record<string, string>;
+  campos: CampoMuestreo[];
+  valor: (clave: string) => string;
+  deLaApp: (clave: string) => boolean;
   onChange: (clave: string, valor: string) => void;
 }) {
-  const visibles = campos.filter((c) => !c.soloSi || valores[c.soloSi] === "si");
-  const casillas = visibles.filter((c) => c.tipo === "sino");
-  const cuadros = visibles.filter((c) => c.tipo !== "sino");
   return (
-    <>
-      {casillas.length > 0 && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1">
-          {casillas.map((c) => (
-            <label key={c.clave} className="flex items-center gap-2 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-teal-600"
-                checked={valores[c.clave] === "si"}
-                onChange={(e) => onChange(c.clave, e.target.checked ? "si" : "")}
-              />
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      {campos.map((c) => (
+        <CampoChico
+          key={c.clave}
+          label={
+            <>
               {c.etiqueta}
-            </label>
-          ))}
-        </div>
-      )}
-      {cuadros.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {cuadros.map((c) => (
-            <CampoChico key={c.clave} label={c.etiqueta}>
-              <Input
-                type={c.tipo === "numero" ? "number" : "text"}
-                min={c.tipo === "numero" ? 0 : undefined}
-                placeholder={c.ejemplo ? `Ej: ${c.ejemplo}` : undefined}
-                list={c.sugerencias ? `sugerencias-${c.clave}` : undefined}
-                value={valores[c.clave] ?? ""}
-                onChange={(e) => onChange(c.clave, e.target.value)}
-              />
-              {c.sugerencias && (
-                <datalist id={`sugerencias-${c.clave}`}>
-                  {c.sugerencias.map((s) => (
-                    <option key={s} value={s} />
-                  ))}
-                </datalist>
-              )}
-            </CampoChico>
-          ))}
-        </div>
-      )}
-    </>
+              {deLaApp(c.clave) && <span className="ml-1 font-normal text-teal-700">· de la app</span>}
+            </>
+          }
+        >
+          <Input
+            type={c.numero ? "number" : "text"}
+            min={c.numero ? 0 : undefined}
+            placeholder={c.ejemplo ? `Ej: ${c.ejemplo}` : undefined}
+            list={c.sugerencias ? `sugerencias-${c.clave}` : undefined}
+            value={valor(c.clave)}
+            onChange={(e) => onChange(c.clave, e.target.value)}
+          />
+          {c.sugerencias && (
+            <datalist id={`sugerencias-${c.clave}`}>
+              {c.sugerencias.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+          )}
+        </CampoChico>
+      ))}
+    </div>
   );
 }
 
@@ -281,7 +269,7 @@ export function ReporteWordClient({
         if (cancelado) return;
         const guardado = leerGuardado<Partial<FormularioReporte>>(claveProyecto(projectId, tipo)) ?? {};
         const profesiones = leerGuardado<Record<string, { profesion: string; rol: string }>>(CLAVE_PROFESIONES) ?? {};
-        const deCampanas = valoresDeCampanas(tipo, datos);
+        const deCampanas = valoresDeCampanas(datos);
         const delProyecto = Object.fromEntries(
           CAMPOS_PROYECTO.filter((k) => guardado[k] !== undefined).map((k) => [k, guardado[k]])
         );
@@ -384,7 +372,11 @@ export function ReporteWordClient({
 
   const porClasificar = especiesPorClasificar(campanas);
   const resumen = resumenCampanas(campanas, region);
-  const muestreoDeTerreno = resumenMuestreo(tipo, campanas);
+  // Diseño de muestreo: lo escrito manda; si no se tocó, vale lo que sabe la app
+  const automatico = muestreoDeTerreno(tipo, form, campanas);
+  const valorMuestreo = (clave: string) => form.muestreo[clave] ?? automatico[clave] ?? "";
+  const deLaApp = (clave: string) => form.muestreo[clave] === undefined && !!automatico[clave];
+  const cambiarMuestreo = (clave: string, valor: string) => set("muestreo", { ...form.muestreo, [clave]: valor });
   const temporadaActual = temporadasElegidas.join(" / ");
   const puedeGenerar =
     !!form.nombreProyecto.trim() && campanas.length > 0 && !cargando && porClasificar.length === 0 && !generando;
@@ -685,34 +677,27 @@ export function ReporteWordClient({
 
           <Seccion titulo="5. Diseño de muestreo">
             <p className="text-xs text-gray-500">
-              Toca las metodologías que se aplicaron. Cada una se agrega al Word con su texto estándar.
-              Los datos de abajo son opcionales: si los llenas, se agrega una frase con ellos al final de esa metodología.
+              Con estos datos se arma el párrafo del Word. Los marcados «de la app» ya vienen escritos y puedes cambiarlos;
+              los que dejes vacíos salen en amarillo para completarlos después. Las fechas son las de «Portada y fechas».
             </p>
-            {muestreoDeTerreno.length > 0 && (
-              <p className="text-xs text-gray-600 rounded-lg bg-gray-50 px-3 py-2">
-                <span className="font-semibold">Sale solo de terreno (no hay que escribirlo):</span> {muestreoDeTerreno.join(" · ")}.
-              </p>
-            )}
+            <CamposMuestreo campos={MUESTREO[tipo].campos} valor={valorMuestreo} deLaApp={deLaApp} onChange={cambiarMuestreo} />
+            <p className="text-xs text-gray-500">Marca lo que se hizo en la campaña. Lo que no marques no sale en el párrafo.</p>
             <div className="grid gap-2">
-              {METODOLOGIAS[tipo].map((m) => {
-                const marcada = form.metodologias.includes(m.id);
+              {MUESTREO[tipo].partes.map((p) => {
+                const marcada = form.partesMuestreo.includes(p.id);
                 return (
                   <OpcionMarcable
-                    key={m.id}
+                    key={p.id}
                     marcada={marcada}
-                    titulo={m.titulo}
+                    titulo={p.titulo}
                     color={esFauna ? "azul" : "verde"}
                     onClick={() =>
-                      set("metodologias", marcada ? form.metodologias.filter((id) => id !== m.id) : [...form.metodologias, m.id])
+                      set("partesMuestreo", marcada ? form.partesMuestreo.filter((id) => id !== p.id) : [...form.partesMuestreo, p.id])
                     }
                   >
-                    {m.campos.length > 0 ? (
-                      <CamposMetodologia
-                        campos={m.campos}
-                        valores={form.datosMetodologia}
-                        onChange={(clave, valor) => set("datosMetodologia", { ...form.datosMetodologia, [clave]: valor })}
-                      />
-                    ) : m.id === "COT" ? (
+                    {p.campos.length > 0 ? (
+                      <CamposMuestreo campos={p.campos} valor={valorMuestreo} deLaApp={deLaApp} onChange={cambiarMuestreo} />
+                    ) : p.id === "COT" ? (
                       // La COT trae además su sección de resultados en el Word
                       <>
                         <p className="text-xs text-gray-500">Agrega también la sección de resultados «Carta de Ocupación de Tierras (COT)».</p>
@@ -728,16 +713,6 @@ export function ReporteWordClient({
                 );
               })}
             </div>
-            <Campo
-              label="Otras metodologías (opcional)"
-              ayuda={
-                esFauna
-                  ? "Si se aplicó algo que no está en la lista. Cada línea es un párrafo."
-                  : "Viene con lo de las campañas que no está en la lista (parcelas forestales, grillas, microruteo); puedes editarla. Cada línea es un párrafo."
-              }
-            >
-              <Textarea rows={3} value={form.otrasMetodologias} onChange={(e) => set("otrasMetodologias", e.target.value)} />
-            </Campo>
           </Seccion>
 
           {!esFauna && (

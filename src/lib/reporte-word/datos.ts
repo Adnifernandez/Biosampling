@@ -1,7 +1,7 @@
 // Arma los datos que llenan las plantillas Word de reporte (public/plantillas/*.docx).
 // Todo lo que sale de terreno se calcula aquí; lo que la app no guarda viene del formulario.
 import { MEDIDAS_FAUNA } from "./medidas";
-import { datosMetodologiaDeCampanas, metodologiasDelReporte } from "./metodologias";
+import { muestreoAutomatico, parrafoMuestreo, valorMuestreo } from "./muestreo";
 
 export type TipoReporte = "FLORA" | "FAUNA";
 
@@ -65,10 +65,9 @@ export type FormularioReporte = {
   mostrarEquipo: boolean;
   profesionales: Profesional[];
   observaciones: string;
-  // Diseño de muestreo (ver metodologias.ts)
-  metodologias: string[]; // ids marcados
-  datosMetodologia: Record<string, string>; // N° de POA, horarios, cebos… (clave del campo → valor)
-  otrasMetodologias: string;
+  // Diseño de muestreo (ver muestreo.ts)
+  partesMuestreo: string[]; // partes del párrafo marcadas (POA, Sherman, COT…)
+  muestreo: Record<string, string>; // lo escrito a mano; lo que no se tocó sale de la app
   // Fauna
   antecedentesHabitat: string;
   medidas: string[]; // ids de MEDIDAS_FAUNA marcadas
@@ -76,7 +75,7 @@ export type FormularioReporte = {
   unidadesDominantes: string;
   antecedenteSitio: string;
   normaEC: string;
-  // La sección de resultados COT sale si se marcó la metodología "COT"
+  // La sección de resultados COT sale si se marcó la parte "COT" en Diseño de muestreo
   nUnidadesCot: string;
   descripcionCot: string;
   incluirConclusiones: boolean;
@@ -126,8 +125,6 @@ function unirLista(items: string[], conector = "y", separador = ", "): string {
   if (items.length <= 1) return items.join("");
   return `${items.slice(0, -1).join(separador)} ${conector} ${items[items.length - 1]}`;
 }
-
-const numero = (n: number) => n.toLocaleString("es-CL", { maximumFractionDigits: 2 });
 
 const nombreCientifico = (sp: EspecieReporte) => `${sp.genus} ${sp.species}`.trim();
 
@@ -271,21 +268,6 @@ export function profesionalesDe(campanas: CampanaReporte[]): string[] {
   return Array.from(new Set(nombres));
 }
 
-// Para "Otras metodologías" de flora. Braun-Blanquet no va: ya está en la lista de metodologías.
-const METODOLOGIA_TEXTO: Record<string, string> = {
-  PARCELAS_FORESTALES:
-    "En cada parcela forestal se midió, para cada individuo, el diámetro a la altura del tocón (DAT), el diámetro a la altura del pecho (DAP) y la altura total.",
-  GRILLA:
-    "En cada transecto se dispusieron grillas de 16 puntos de intersección, registrando la especie presente en cada punto, para estimar la proporción de especies hidrófitas en la delimitación de humedales.",
-  MICRORUTEO:
-    "Adicionalmente, se realizaron recorridos de microruteo, registrando la ubicación georreferenciada de los individuos de las especies de interés.",
-};
-
-export function metodologiaPorDefecto(campanas: CampanaReporte[]): string {
-  const ids = Array.from(new Set(campanas.map((c) => c.methodology)));
-  return ids.map((id) => METODOLOGIA_TEXTO[id]).filter(Boolean).join("\n");
-}
-
 export function formularioInicial(): FormularioReporte {
   return {
     nombreProyecto: "",
@@ -299,9 +281,8 @@ export function formularioInicial(): FormularioReporte {
     mostrarEquipo: true,
     profesionales: [],
     observaciones: "",
-    metodologias: [],
-    datosMetodologia: {},
-    otrasMetodologias: "",
+    partesMuestreo: [],
+    muestreo: {},
     antecedentesHabitat: "",
     medidas: [],
     unidadesDominantes: "",
@@ -313,8 +294,9 @@ export function formularioInicial(): FormularioReporte {
   };
 }
 
-// Lo que se puede sacar de las campañas: fechas, época, equipo, comentarios, metodologías y trampas.
-export function valoresDeCampanas(tipo: TipoReporte, campanas: CampanaReporte[]): Partial<FormularioReporte> {
+// Lo que se puede sacar de las campañas: fechas, época, equipo y comentarios.
+// Los números del diseño de muestreo se calculan aparte (muestreo.ts), siempre con lo último del formulario.
+export function valoresDeCampanas(campanas: CampanaReporte[]): Partial<FormularioReporte> {
   const inicios = campanas.map((c) => c.startDate).filter(Boolean).sort();
   const fines = campanas.map((c) => c.endDate).filter(Boolean).sort();
   const estacion = campanas.map((c) => estacionDelAnio(c.name)).find(Boolean);
@@ -324,23 +306,32 @@ export function valoresDeCampanas(tipo: TipoReporte, campanas: CampanaReporte[])
     epoca: estacion ? EPOCAS[estacion] : "",
     profesionales: profesionalesDe(campanas).map((nombre) => ({ nombre, profesion: "", rol: "" })),
     observaciones: campanas.map((c) => c.notes?.trim()).filter(Boolean).join("\n"),
-    metodologias: [],
-    datosMetodologia: datosMetodologiaDeCampanas(tipo, campanas),
-    otrasMetodologias: tipo === "FLORA" ? metodologiaPorDefecto(campanas) : "",
   };
 }
 
-// Las metodologías marcadas, como subtítulos de "Diseño de Muestreo", y la frase que anuncia
-// la tabla de puntos y las metodologías al final del primer párrafo
-function datosMuestreo(tipo: TipoReporte, form: FormularioReporte, base: { hayPuntos: boolean; tabPuntos: number }) {
-  const metodologias = metodologiasDelReporte(tipo, form.metodologias, form.datosMetodologia, form.otrasMetodologias);
-  const tabla = base.hayPuntos ? `la ubicación de los puntos de muestreo se presenta en la Tabla ${base.tabPuntos}` : "";
-  const metodos = metodologias.length ? "las metodologías aplicadas se describen a continuación" : "";
-  const frase = [tabla, metodos].filter(Boolean).join(" y ");
-  return {
-    metodologias,
-    introMetodologias: frase ? ` ${frase.charAt(0).toUpperCase()}${frase.slice(1)}.` : "",
-  };
+// Los números de "Diseño de Muestreo" que ya sabe la app, para mostrarlos escritos en el formulario
+export function muestreoDeTerreno(tipo: TipoReporte, form: FormularioReporte, campanas: CampanaReporte[]) {
+  return muestreoAutomatico(tipo, campanas, form.fechaInicio, form.fechaFin, profesionalesConNombre(form).length);
+}
+
+// El párrafo de "Diseño de Muestreo" y, si hay tabla de coordenadas, la frase que la anuncia
+function datosMuestreo(
+  tipo: TipoReporte,
+  form: FormularioReporte,
+  campanas: CampanaReporte[],
+  base: { hayPuntos: boolean; tabPuntos: number }
+) {
+  const automatico = muestreoDeTerreno(tipo, form, campanas);
+  const parrafo = parrafoMuestreo(
+    tipo,
+    form.partesMuestreo,
+    (clave) => valorMuestreo(form.muestreo, automatico, clave),
+    form.fechaInicio,
+    form.fechaFin,
+    form.nUnidadesCot
+  );
+  const tabla = base.hayPuntos ? ` La ubicación de los puntos de muestreo se presenta en la Tabla ${base.tabPuntos}.` : "";
+  return { parrafoMuestreo: parrafo + tabla };
 }
 
 // ── Tabla de puntos de muestreo (coordenadas UTM, Datum WGS84) ──
@@ -419,22 +410,6 @@ export function puntosMuestreo(campanas: CampanaReporte[]) {
     .sort((x, y) => x.tipo.localeCompare(y.tipo, "es") || x.punto.localeCompare(y.punto, "es", { numeric: true }));
 
   return { hayPuntos: true, puntos, husoPuntos: `${huso}${sur ? "S" : "N"}`, nConUbicacion: ubicadas.length };
-}
-
-// Lo que sale solo de terreno en "Diseño de Muestreo", para mostrarlo en el formulario
-export function resumenMuestreo(tipo: TipoReporte, campanas: CampanaReporte[]): string[] {
-  const partes: string[] = [];
-  if (tipo === "FLORA") {
-    const unidades = unidadesMuestreo(campanas);
-    if (!unidades.startsWith("[")) partes.push(unidades);
-  } else {
-    const n = campanas.reduce((s, c) => s + c.stations.length, 0);
-    const dim = dimensionTransectos(campanas);
-    if (n > 0) partes.push(`${plural(n, "transecto", "transectos")}${dim.startsWith("[") ? "" : ` de ${dim}`}`);
-  }
-  const { nConUbicacion } = puntosMuestreo(campanas);
-  if (nConUbicacion > 0) partes.push(`tabla de coordenadas de ${plural(nConUbicacion, "punto", "puntos")}`);
-  return partes;
 }
 
 // ── Datos comunes a ambos reportes ──
@@ -550,15 +525,6 @@ function sintesisResultadosFauna(filas: FilaEspecie[]): string {
   return frases.join(" ");
 }
 
-function dimensionTransectos(campanas: CampanaReporte[]): string {
-  const medidas = new Set<string>();
-  for (const st of campanas.flatMap((c) => c.stations)) {
-    if (st.length && st.width) medidas.add(`${numero(st.length)} × ${numero(st.width)} m`);
-  }
-  if (medidas.size === 0) return completar("", "largo × ancho de los transectos");
-  return unirLista(Array.from(medidas).slice(0, 3));
-}
-
 function cambio(antes: number, despues: number): string {
   const d = despues - antes;
   if (d > 0) return `Aumenta (+${d})`;
@@ -587,7 +553,6 @@ export function datosFauna(
   const ec = filas.filter((f) => esEC(f.sp, region));
   const base = datosComunes(form, filas, profesionales, ec, campanas);
   const abundanciaTotal = filas.reduce((s, f) => s + f.abundancia, 0);
-  const nTransectos = campanas.reduce((s, c) => s + c.stations.length, 0);
 
   let comparacion: Record<string, string | number> | false = false;
   if (contraste && contraste.campanas.length > 0) {
@@ -625,9 +590,7 @@ export function datosFauna(
           ? " En dichas actividades participó 1 profesional del Equipo de Medio Biótico de DSS S.A."
           : ` En dichas actividades participaron ${profesionales.length} profesionales del Equipo de Medio Biótico de DSS S.A.`,
     antecedentesHabitat: linea(form.antecedentesHabitat),
-    nTransectos: nTransectos || completar("", "número de transectos"),
-    dimensionTransectos: dimensionTransectos(campanas),
-    ...datosMuestreo("FAUNA", form, base),
+    ...datosMuestreo("FAUNA", form, campanas, base),
     abundanciaTotal: abundanciaTotal || "",
     fraseGrupos: fraseGrupos(filas),
     sintesisResultados: sintesisResultadosFauna(filas),
@@ -660,43 +623,6 @@ export function datosFauna(
 
 // ── FLORA ──
 
-function dimensionesTexto(estaciones: EstacionReporte[]): string {
-  const areas = new Set(estaciones.map((s) => s.area).filter((a): a is number => !!a));
-  if (areas.size === 1) return ` de ${numero([...areas][0])} m²`;
-  const medidas = new Set(
-    estaciones.filter((s) => s.length && s.width).map((s) => `${numero(s.length!)} × ${numero(s.width!)} m`)
-  );
-  if (medidas.size === 1) return ` de ${[...medidas][0]}`;
-  return "";
-}
-
-function unidadesMuestreo(campanas: CampanaReporte[]): string {
-  const porMetodo = new Map<string, EstacionReporte[]>();
-  for (const c of campanas) porMetodo.set(c.methodology, [...(porMetodo.get(c.methodology) ?? []), ...c.stations]);
-
-  const partes: string[] = [];
-  for (const [metodo, est] of porMetodo) {
-    const n = est.length;
-    if (n === 0) continue;
-    if (metodo === "BRAUN_BLANQUET") {
-      partes.push(`${plural(n, "parcela", "parcelas")} de inventario florístico${dimensionesTexto(est)}`);
-    } else if (metodo === "PARCELAS_FORESTALES") {
-      partes.push(`${plural(n, "parcela forestal", "parcelas forestales")}${dimensionesTexto(est)}`);
-    } else if (metodo === "GRILLA") {
-      const grillas = est.reduce((s, t) => s + t.children.length, 0);
-      partes.push(
-        `${plural(n, "transecto", "transectos")} de delimitación de humedales` +
-          (grillas ? ` con ${plural(grillas, "grilla", "grillas")} de 16 puntos de intersección` : "")
-      );
-    } else if (metodo === "MICRORUTEO") {
-      partes.push(`${plural(n, "recorrido", "recorridos")} de microruteo`);
-    } else {
-      partes.push(plural(n, "unidad de muestreo", "unidades de muestreo"));
-    }
-  }
-  return partes.length ? unirLista(partes) : completar("", "unidades de muestreo");
-}
-
 function sintesisFamilias(filas: FilaEspecie[]): string {
   const porFamilia = new Map<string, number>();
   for (const { sp } of filas) if (sp.family) porFamilia.set(sp.family, (porFamilia.get(sp.family) ?? 0) + 1);
@@ -722,13 +648,12 @@ export function datosFlora(form: FormularioReporte, region: string, campanas: Ca
       : `Dentro del área de estudio se registraron ${ec.length} especies clasificadas en alguna categoría de conservación vigente. Estas corresponden a `) +
     `${listaEC(ec)}.`;
 
-  const cot = form.metodologias.includes("COT");
+  const cot = form.partesMuestreo.includes("COT");
   return {
     ...base,
     unidadesDominantes: completar(form.unidadesDominantes, "unidades vegetacionales dominantes"),
     antecedenteSitio: linea(form.antecedenteSitio),
-    unidadesMuestreo: unidadesMuestreo(campanas),
-    ...datosMuestreo("FLORA", form, base),
+    ...datosMuestreo("FLORA", form, campanas, base),
     familiasTexto: nFamilias === 1 ? "1 familia" : `${nFamilias} familias diferentes`,
     sintesisFamilias: sintesisFamilias(filas),
     especies: filas.map(({ sp }) => ({
