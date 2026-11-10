@@ -616,30 +616,7 @@ export function ReporteWordClient({
             </div>
           </Seccion>
 
-          <Seccion titulo="3. Área de influencia">
-            <Campo label="¿Cómo se definió el área?" ayuda="Completa la frase «El área de influencia se definió considerando…».">
-              <Textarea value={form.descripcionArea} onChange={(e) => set("descripcionArea", e.target.value)} placeholder="Ej: el polígono del proyecto más un buffer de 500 m" />
-            </Campo>
-            <Campo label="Superficie (ha)">
-              <Input value={form.superficieHa} onChange={(e) => set("superficieHa", e.target.value)} placeholder="Ej: 120,5" className="max-w-40" />
-            </Campo>
-            {esFauna ? (
-              <Campo label="Antecedentes del hábitat (opcional)">
-                <Textarea value={form.antecedentesHabitat} onChange={(e) => set("antecedentesHabitat", e.target.value)} />
-              </Campo>
-            ) : (
-              <>
-                <Campo label="Unidades vegetacionales dominantes" ayuda="Completa la frase «…dominada principalmente por…».">
-                  <Input value={form.unidadesDominantes} onChange={(e) => set("unidadesDominantes", e.target.value)} placeholder="Ej: matorral esclerófilo y praderas anuales" />
-                </Campo>
-                <Campo label="Antecedente específico del sitio (opcional)">
-                  <Textarea value={form.antecedenteSitio} onChange={(e) => set("antecedenteSitio", e.target.value)} />
-                </Campo>
-              </>
-            )}
-          </Seccion>
-
-          <Seccion titulo="4. Equipo de profesionales">
+          <Seccion titulo="3. Equipo de profesionales">
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input type="checkbox" className="h-4 w-4 accent-teal-600" checked={form.mostrarEquipo} onChange={(e) => set("mostrarEquipo", e.target.checked)} />
               Incluir la tabla del equipo en el reporte
@@ -681,6 +658,29 @@ export function ReporteWordClient({
             >
               <Plus className="h-4 w-4" /> Agregar persona
             </Button>
+          </Seccion>
+
+          <Seccion titulo="4. Área de influencia">
+            <Campo label="¿Cómo se definió el área?" ayuda="Completa la frase «El área de influencia se definió considerando…».">
+              <Textarea value={form.descripcionArea} onChange={(e) => set("descripcionArea", e.target.value)} placeholder="Ej: el polígono del proyecto más un buffer de 500 m" />
+            </Campo>
+            <Campo label="Superficie (ha)">
+              <Input value={form.superficieHa} onChange={(e) => set("superficieHa", e.target.value)} placeholder="Ej: 120,5" className="max-w-40" />
+            </Campo>
+            {esFauna ? (
+              <Campo label="Antecedentes del hábitat (opcional)">
+                <Textarea value={form.antecedentesHabitat} onChange={(e) => set("antecedentesHabitat", e.target.value)} />
+              </Campo>
+            ) : (
+              <>
+                <Campo label="Unidades vegetacionales dominantes" ayuda="Completa la frase «…dominada principalmente por…».">
+                  <Input value={form.unidadesDominantes} onChange={(e) => set("unidadesDominantes", e.target.value)} placeholder="Ej: matorral esclerófilo y praderas anuales" />
+                </Campo>
+                <Campo label="Antecedente específico del sitio (opcional)">
+                  <Textarea value={form.antecedenteSitio} onChange={(e) => set("antecedenteSitio", e.target.value)} />
+                </Campo>
+              </>
+            )}
           </Seccion>
 
           <Seccion titulo="5. Diseño de muestreo">
