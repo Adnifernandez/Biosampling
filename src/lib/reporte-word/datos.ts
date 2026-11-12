@@ -455,8 +455,9 @@ function parrafoInicio(form: FormularioReporte, nProfesionales: number, tabEquip
   };
 }
 
-// Las tablas se numeran en orden de aparición; las condicionales no ocupan número si no salen
-function numerosDeTabla(conEquipo: boolean, conPuntos: boolean, conEC: boolean) {
+// Las tablas se numeran en orden de aparición; las condicionales no ocupan número si no salen.
+// El formulario también lo usa para mostrar los mismos números que el Word.
+export function numerosDeTabla(conEquipo: boolean, conPuntos: boolean, conEC: boolean) {
   let n = 0;
   const tabEquipo = conEquipo ? ++n : 0;
   const tabPuntos = conPuntos ? ++n : 0;

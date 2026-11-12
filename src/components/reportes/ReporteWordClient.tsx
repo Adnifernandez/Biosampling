@@ -16,6 +16,8 @@ import {
   datosFlora,
   especiesPorClasificar,
   formularioInicial,
+  numerosDeTabla,
+  puntosMuestreo,
   resumenCampanas,
   temporadaDe,
   valoresDeCampanas,
@@ -51,19 +53,6 @@ const TIPOS_ESTUDIO = [
   "Consulta de Pertinencia",
   "Estudio Medio Biótico",
 ];
-
-// Una sola figura antes de resultados: el área de influencia con el muestreo
-const FIGURAS: Record<TipoReporte, { clave: string; nombre: string }[]> = {
-  FAUNA: [
-    { clave: "figMuestreo", nombre: "Figura 1 · Área de influencia con transectos y puntos de muestreo" },
-    { clave: "figEC", nombre: "Figura 2 · Especies en categoría de conservación" },
-  ],
-  FLORA: [
-    { clave: "figMuestreo", nombre: "Figura 1 · Área de influencia con puntos de muestreo" },
-    { clave: "figEC", nombre: "Figura 2 · Especies en categoría de conservación" },
-    { clave: "figCot", nombre: "Figura 3 · Carta de Ocupación de Tierras (COT)" },
-  ],
-};
 
 // Lo que se recuerda entre reportes del mismo proyecto (en este navegador).
 // El nombre del proyecto no: se escribe cada vez.
@@ -104,14 +93,59 @@ function Campo({ label, ayuda, children, className }: { label: string; ayuda?: s
   );
 }
 
-function Seccion({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+// nota: aclaración junto al título, p. ej. "no sale en el Word"
+function Seccion({ titulo, nota, children }: { titulo: string; nota?: string; children: React.ReactNode }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">{titulo}</CardTitle>
+        <CardTitle className="text-base">
+          {titulo}
+          {nota && <span className="ml-2 text-xs font-normal text-gray-400">· {nota}</span>}
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">{children}</CardContent>
     </Card>
+  );
+}
+
+// Lo que el Word llena solo con los datos de terreno (no hay nada que escribir)
+function Automatico({ children }: { children: React.ReactNode }) {
+  return <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">{children}</p>;
+}
+
+const etiquetaTabla = (n: number, texto: string) => (n ? `Tabla ${n}. ${texto}` : texto);
+
+// Figura del Word, en la misma sección donde aparece en el reporte
+function SubirFigura({
+  nombre,
+  archivo,
+  onChange,
+}: {
+  nombre: string;
+  archivo: File | null | undefined;
+  onChange: (archivo: File | null) => void;
+}) {
+  return (
+    <Campo
+      label={nombre}
+      ayuda={archivo ? undefined : "Opcional (PNG o JPG). Si no la subes, el Word queda con un aviso amarillo para pegarla después."}
+    >
+      {archivo ? (
+        // Con imagen elegida: se muestra el nombre y se puede quitar si fue un error
+        <div className="flex items-center gap-2 rounded-lg border border-input bg-gray-50 px-2.5 py-1.5">
+          <ImageIcon className="h-4 w-4 text-teal-600 shrink-0" />
+          <span className="text-sm text-gray-700 truncate flex-1" title={archivo.name}>{archivo.name}</span>
+          <Button
+            type="button" variant="ghost" size="sm" className="gap-1 text-red-600 hover:text-red-700 shrink-0"
+            onClick={() => onChange(null)}
+          >
+            <X className="h-4 w-4" /> Quitar
+          </Button>
+        </div>
+      ) : (
+        <Input type="file" accept="image/png,image/jpeg" onChange={(e) => onChange(e.target.files?.[0] ?? null)} />
+      )}
+    </Campo>
   );
 }
 
@@ -416,9 +450,26 @@ export function ReporteWordClient({
   const esFauna = tipo === "FAUNA";
   const hayDatos = campanas.length > 0 && !cargando;
 
+  // Los títulos del Word se numeran solos y los que no salen no llevan número: el formulario muestra lo mismo
+  const conCot = form.partesMuestreo.includes("COT");
+  const hayEC = resumen.enCategoria > 0;
+  const titulosWord: [string, boolean][] = esFauna
+    ? [["muestreo", true], ["resultados", true], ["ec", true], ["observaciones", !!form.observaciones.trim()],
+       ["comparacion", !!contraste], ["medidas", form.medidas.length > 0]]
+    : [["muestreo", true], ["resultados", true], ["ec", true], ["cot", conCot],
+       ["observaciones", !!form.observaciones.trim()], ["conclusiones", form.incluirConclusiones]];
+  const numeroDe: Record<string, number> = Object.fromEntries(
+    titulosWord.filter(([, sale]) => sale).map(([id], i) => [id, i + 1])
+  );
+  const tituloWord = (id: string, texto: string) => (numeroDe[id] ? `${numeroDe[id]}. ${texto}` : texto);
+  const notaWord = (id: string) => (numeroDe[id] ? undefined : "no sale en el Word");
+  const hayPuntos = puntosMuestreo(campanas).hayPuntos;
+  const tablas = numerosDeTabla(form.mostrarEquipo && form.profesionales.some((p) => p.nombre.trim()), hayPuntos, hayEC);
+  const elegirFigura = (clave: string) => (archivo: File | null) => setFiguras((f) => ({ ...f, [clave]: archivo }));
+
   return (
     <div className="space-y-4">
-      <Seccion titulo="1. ¿Qué reporte?">
+      <Seccion titulo="¿Qué reporte?">
         <Campo label="Proyecto">
           <SearchableSelect
             value={projectId}
@@ -528,32 +579,12 @@ export function ReporteWordClient({
           </div>
         )}
 
-        {esFauna && opcionesContraste.length > 0 && hayDatos && (
-          <Campo label="Comparar con otra campaña (opcional)" ayuda="Agrega la sección «Comparación entre campañas».">
-            <Select
-              value={contraste || "ninguna"}
-              onValueChange={(v) => {
-                setCampanasContraste([]);
-                setContraste(!v || v === "ninguna" ? "" : v);
-              }}
-            >
-              <SelectTrigger className={TRIGGER_COMPLETO}>
-                <SelectValue>{contraste || "Sin comparación"}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ninguna">Sin comparación</SelectItem>
-                {opcionesContraste.map((t) => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Campo>
-        )}
       </Seccion>
 
       {hayDatos && (
         <>
-          <Seccion titulo="2. Portada y fechas">
+          {/* Desde aquí, el formulario sigue el Word: mismos títulos, mismo orden y misma numeración */}
+          <Seccion titulo="Portada">
             <Campo label="Nombre del proyecto *" ayuda="Como debe aparecer en la portada (no el código).">
               <Input value={form.nombreProyecto} onChange={(e) => set("nombreProyecto", e.target.value)} placeholder="Ej: Parque Fotovoltaico Los Andes" />
             </Campo>
@@ -585,11 +616,21 @@ export function ReporteWordClient({
                 />
               )}
             </Campo>
+            <Campo label="Mes y año" className="max-w-60">
+              <Input value={form.mesAnio} onChange={(e) => set("mesAnio", e.target.value)} />
+            </Campo>
+          </Seccion>
+
+          {/* En el Word este párrafo y la tabla del equipo van sin título, antes de "Diseño de Muestreo" */}
+          <Seccion titulo="Párrafo de inicio" nota="va sin título en el Word">
+            <Automatico>
+              «Se realizó el levantamiento de información de {esFauna ? "fauna vertebrada terrestre" : "flora y vegetación"}, en
+              época ___, desde el ___ al ___{esFauna ? "" : ", en el marco de ___"}. En dichas actividades participaron ___ profesionales
+              del Equipo de Medio Biótico de DSS S.A. En base a la superficie evaluada de las instalaciones del proyecto «___», se
+              considera como área de influencia ___, la sumatoria de todas estas superficies conforma un total de ___ ha.»
+            </Automatico>
             <div className="grid grid-cols-2 gap-3">
-              <Campo label="Mes y año de la portada">
-                <Input value={form.mesAnio} onChange={(e) => set("mesAnio", e.target.value)} />
-              </Campo>
-              <Campo label="Época" ayuda="Según la temporada de la campaña.">
+              <Campo label="Época" ayuda="Según la temporada de la campaña." className="col-span-2 max-w-60">
                 <p className="h-8 flex items-center px-2.5 rounded-lg border border-input bg-gray-50 text-sm text-gray-700">
                   {form.epoca || <span className="text-gray-400">La campaña no indica temporada</span>}
                 </p>
@@ -601,66 +642,61 @@ export function ReporteWordClient({
                 <Input type="date" value={form.fechaFin} onChange={(e) => set("fechaFin", e.target.value)} />
               </Campo>
             </div>
-          </Seccion>
-
-          <Seccion titulo="3. Equipo de profesionales">
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="checkbox" className="h-4 w-4 accent-teal-600" checked={form.mostrarEquipo} onChange={(e) => set("mostrarEquipo", e.target.checked)} />
-              Incluir la tabla del equipo en el reporte
-            </label>
-            {form.profesionales.map((p, i) => {
-              const cambiar = (cambios: Partial<Profesional>) =>
-                set("profesionales", form.profesionales.map((x, j) => (j === i ? { ...x, ...cambios } : x)));
-              return (
-                <div key={i} className="grid grid-cols-1 sm:grid-cols-[2fr_1.6fr_1fr_auto] gap-2 items-center">
-                  {/* Se elige del equipo DSS (la profesión se llena sola); "Otra persona…" permite escribirla */}
-                  {p.libre ? (
-                    <Input value={p.nombre} placeholder="Nombre" onChange={(e) => cambiar({ nombre: e.target.value })} />
-                  ) : (
-                    <SearchableSelect
-                      value={p.nombre}
-                      options={OPCIONES_EQUIPO}
-                      placeholder="Elegir profesional..."
-                      onChange={(v) =>
-                        v === OTRA_PERSONA
-                          ? cambiar({ nombre: "", profesion: "", libre: true })
-                          : cambiar({ nombre: v, profesion: buscarProfesional(v)?.profesion ?? "" })
-                      }
-                    />
-                  )}
-                  <Input value={p.profesion} placeholder="Profesión" onChange={(e) => cambiar({ profesion: e.target.value })} />
-                  <Input value={p.rol} placeholder="Rol" onChange={(e) => cambiar({ rol: e.target.value })} />
-                  <Button
-                    type="button" variant="ghost" size="icon" aria-label="Quitar persona"
-                    onClick={() => set("profesionales", form.profesionales.filter((_, j) => j !== i))}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              );
-            })}
-            <Button
-              type="button" variant="outline" size="sm" className="gap-1"
-              onClick={() => set("profesionales", [...form.profesionales, { nombre: "", profesion: "", rol: "" }])}
-            >
-              <Plus className="h-4 w-4" /> Agregar persona
-            </Button>
-          </Seccion>
-
-          {/* En el Word no lleva título: va en el párrafo de inicio, después de las fechas y el equipo */}
-          <Seccion titulo="4. Área de influencia">
-            <Campo
-              label="¿Cómo se definió el área?"
-              ayuda="Completa la frase «…se considera como área de influencia ___, la sumatoria de todas estas superficies conforma un total de X ha»."
-            >
+            <Campo label="Área de influencia" ayuda="Lo que va en «…se considera como área de influencia ___, la sumatoria…».">
               <Textarea value={form.descripcionArea} onChange={(e) => set("descripcionArea", e.target.value)} placeholder="Ej: los sectores de intervención del proyecto más una zona buffer proyectada al norte y sur" />
             </Campo>
             <Campo label="Superficie total (ha)">
               <Input value={form.superficieHa} onChange={(e) => set("superficieHa", e.target.value)} placeholder="Ej: 73" className="max-w-40" />
             </Campo>
+
+            <div className="space-y-2 border-t border-gray-100 pt-4">
+              <Label>{etiquetaTabla(tablas.tabEquipo, "Equipo de profesionales de la campaña")}</Label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" className="h-4 w-4 accent-teal-600" checked={form.mostrarEquipo} onChange={(e) => set("mostrarEquipo", e.target.checked)} />
+                Incluir la tabla en el reporte
+              </label>
+              <p className="text-xs text-gray-400">El N° de profesionales del párrafo sale de esta lista.</p>
+              {form.profesionales.map((p, i) => {
+                const cambiar = (cambios: Partial<Profesional>) =>
+                  set("profesionales", form.profesionales.map((x, j) => (j === i ? { ...x, ...cambios } : x)));
+                return (
+                  <div key={i} className="grid grid-cols-1 sm:grid-cols-[2fr_1.6fr_1fr_auto] gap-2 items-center">
+                    {/* Se elige del equipo DSS (la profesión se llena sola); "Otra persona…" permite escribirla */}
+                    {p.libre ? (
+                      <Input value={p.nombre} placeholder="Nombre" onChange={(e) => cambiar({ nombre: e.target.value })} />
+                    ) : (
+                      <SearchableSelect
+                        value={p.nombre}
+                        options={OPCIONES_EQUIPO}
+                        placeholder="Elegir profesional..."
+                        onChange={(v) =>
+                          v === OTRA_PERSONA
+                            ? cambiar({ nombre: "", profesion: "", libre: true })
+                            : cambiar({ nombre: v, profesion: buscarProfesional(v)?.profesion ?? "" })
+                        }
+                      />
+                    )}
+                    <Input value={p.profesion} placeholder="Profesión" onChange={(e) => cambiar({ profesion: e.target.value })} />
+                    <Input value={p.rol} placeholder="Rol" onChange={(e) => cambiar({ rol: e.target.value })} />
+                    <Button
+                      type="button" variant="ghost" size="icon" aria-label="Quitar persona"
+                      onClick={() => set("profesionales", form.profesionales.filter((_, j) => j !== i))}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                );
+              })}
+              <Button
+                type="button" variant="outline" size="sm" className="gap-1"
+                onClick={() => set("profesionales", [...form.profesionales, { nombre: "", profesion: "", rol: "" }])}
+              >
+                <Plus className="h-4 w-4" /> Agregar persona
+              </Button>
+            </div>
           </Seccion>
 
-          <Seccion titulo="5. Diseño de muestreo">
+          <Seccion titulo={tituloWord("muestreo", "Diseño de Muestreo")}>
             <p className="text-xs text-gray-500">
               Con estos datos se arma el párrafo del Word. Los marcados «de la app» ya vienen escritos y puedes cambiarlos;
               los que dejes vacíos salen en amarillo para completarlos después.
@@ -683,45 +719,129 @@ export function ReporteWordClient({
                     {p.campos.length > 0 ? (
                       <CamposMuestreo campos={p.campos} valor={valorMuestreo} deLaApp={deLaApp} onChange={cambiarMuestreo} />
                     ) : p.id === "COT" ? (
-                      // La COT trae además su sección de resultados en el Word
-                      <>
-                        <p className="text-xs text-gray-500">Agrega también la sección de resultados «Carta de Ocupación de Tierras (COT)».</p>
-                        <CampoChico label="N° de unidades o formaciones">
-                          <Input type="number" min={0} value={form.nUnidadesCot} onChange={(e) => set("nUnidadesCot", e.target.value)} className="max-w-40" />
-                        </CampoChico>
-                        <CampoChico label="Descripción de los resultados">
-                          <Textarea value={form.descripcionCot} onChange={(e) => set("descripcionCot", e.target.value)} />
-                        </CampoChico>
-                      </>
+                      <p className="text-xs text-gray-500">
+                        Agrega también la sección «Carta de Ocupación de Tierras (COT)». Sus datos se llenan en esa sección, más abajo.
+                      </p>
                     ) : null}
                   </OpcionMarcable>
                 );
               })}
             </div>
+            {hayPuntos && (
+              <Automatico>
+                {etiquetaTabla(tablas.tabPuntos, "Ubicación de los puntos de muestreo")}: se llena sola con las coordenadas de terreno.
+              </Automatico>
+            )}
+            <SubirFigura
+              nombre={esFauna ? "Figura 1. Área de influencia y distribución de transectos y puntos de muestreo" : "Figura 1. Área de influencia y muestreo"}
+              archivo={figuras.figMuestreo}
+              onChange={elegirFigura("figMuestreo")}
+            />
+          </Seccion>
+
+          <Seccion titulo={tituloWord("resultados", esFauna ? "Resultados" : "Listado Florístico")}>
+            <Automatico>
+              Se llena solo con los datos de terreno: riqueza, {esFauna ? "abundancia, grupos de fauna" : "familias"} y la{" "}
+              {etiquetaTabla(tablas.tabEspecies, esFauna ? "Listado de especies" : "Listado florístico")}.
+            </Automatico>
+          </Seccion>
+
+          <Seccion titulo={tituloWord("ec", esFauna ? "Especies con Categoría de Conservación" : "Especies con Estado de Conservación")}>
+            <Automatico>
+              {hayEC
+                ? `Se llena solo: ${resumen.enCategoria} ${resumen.enCategoria === 1 ? "especie" : "especies"} en categoría y la ${etiquetaTabla(tablas.tabEC, "Especies en categoría de conservación")}.`
+                : "No hay especies en categoría: el Word dirá que no se registraron."}
+            </Automatico>
+            {hayEC && !esFauna && (
+              <Campo label="Norma o decreto de conservación (opcional)" ayuda="Se agrega junto a la categoría en la tabla. Ej: RCE.">
+                <Input value={form.normaEC} onChange={(e) => set("normaEC", e.target.value)} className="max-w-60" />
+              </Campo>
+            )}
+            {hayEC && (
+              <SubirFigura
+                nombre="Figura 2. Registros de especies en categoría de conservación"
+                archivo={figuras.figEC}
+                onChange={elegirFigura("figEC")}
+              />
+            )}
           </Seccion>
 
           {!esFauna && (
-            <Seccion titulo="6. Conservación y conclusiones">
-              <Campo label="Norma o decreto de conservación (opcional)" ayuda="Se agrega junto a la categoría en la tabla de especies en categoría. Ej: RCE.">
-                <Input value={form.normaEC} onChange={(e) => set("normaEC", e.target.value)} className="max-w-60" />
-              </Campo>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="checkbox" className="h-4 w-4 accent-teal-600" checked={form.incluirConclusiones} onChange={(e) => set("incluirConclusiones", e.target.checked)} />
-                Incluir conclusiones
-              </label>
+            <Seccion titulo={tituloWord("cot", "Carta de Ocupación de Tierras (COT) / Formaciones Vegetacionales")} nota={notaWord("cot")}>
+              {conCot ? (
+                <>
+                  <Campo label="N° de unidades o formaciones">
+                    <Input type="number" min={0} value={form.nUnidadesCot} onChange={(e) => set("nUnidadesCot", e.target.value)} className="max-w-40" />
+                  </Campo>
+                  <Campo label="Descripción de los resultados">
+                    <Textarea value={form.descripcionCot} onChange={(e) => set("descripcionCot", e.target.value)} />
+                  </Campo>
+                  <SubirFigura
+                    nombre={`Figura ${hayEC ? 3 : 2}. Carta de Ocupación de Tierras / formaciones vegetacionales`}
+                    archivo={figuras.figCot}
+                    onChange={elegirFigura("figCot")}
+                  />
+                </>
+              ) : (
+                <Automatico>Sale si marcas «Carta de Ocupación de Tierras (COT)» en Diseño de Muestreo.</Automatico>
+              )}
             </Seccion>
           )}
 
-          <Seccion titulo={`${esFauna ? 6 : 7}. Observaciones`}>
+          <Seccion titulo={tituloWord("observaciones", esFauna ? "Observaciones Relevantes en Terreno" : "Observaciones")} nota={notaWord("observaciones")}>
             <Campo label="Observaciones de terreno" ayuda="Viene con los comentarios de las campañas. Si queda vacío, la sección no aparece.">
               <Textarea rows={4} value={form.observaciones} onChange={(e) => set("observaciones", e.target.value)} />
             </Campo>
           </Seccion>
 
+          {!esFauna && (
+            <Seccion titulo={tituloWord("conclusiones", "Conclusiones")} nota={notaWord("conclusiones")}>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" className="h-4 w-4 accent-teal-600" checked={form.incluirConclusiones} onChange={(e) => set("incluirConclusiones", e.target.checked)} />
+                Incluir conclusiones
+              </label>
+              <Automatico>Se escriben solas con la riqueza, las familias, las especies en categoría y las formaciones de la COT.</Automatico>
+            </Seccion>
+          )}
+
           {esFauna && (
-            <Seccion titulo="7. Requerimientos ambientales asociados a los hallazgos">
+            <Seccion titulo={tituloWord("comparacion", "Comparación entre Campañas")} nota={notaWord("comparacion")}>
+              {opcionesContraste.length > 0 ? (
+                <Campo label="Comparar con (opcional)">
+                  <Select
+                    value={contraste || "ninguna"}
+                    onValueChange={(v) => {
+                      setCampanasContraste([]);
+                      setContraste(!v || v === "ninguna" ? "" : v);
+                    }}
+                  >
+                    <SelectTrigger className={TRIGGER_COMPLETO}>
+                      <SelectValue>{contraste || "Sin comparación"}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ninguna">Sin comparación</SelectItem>
+                      {opcionesContraste.map((t) => (
+                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Campo>
+              ) : (
+                <Automatico>Este proyecto no tiene otra temporada de fauna para comparar.</Automatico>
+              )}
+              {contraste && (
+                <Automatico>
+                  Se llena sola: riqueza, abundancia y especies en categoría de ambas campañas, con la{" "}
+                  {etiquetaTabla(tablas.tabSiguiente, "Síntesis comparativa entre campañas")}.
+                </Automatico>
+              )}
+            </Seccion>
+          )}
+
+          {esFauna && (
+            <Seccion titulo={tituloWord("medidas", "Requerimientos Ambientales Asociados a los Hallazgos")} nota={notaWord("medidas")}>
               <p className="text-xs text-gray-500">
-                Toca las medidas recomendadas. Cada una se agrega al final del reporte con su texto completo; si no marcas ninguna, la sección no aparece.
+                Toca las medidas recomendadas. Cada una se agrega con su texto completo; si no marcas ninguna, la sección no aparece.
               </p>
               <div className="grid gap-2">
                 {MEDIDAS_FAUNA.map((m) => {
@@ -741,38 +861,6 @@ export function ReporteWordClient({
               </div>
             </Seccion>
           )}
-
-          <Seccion titulo="8. Figuras (opcional)">
-            <p className="text-xs text-gray-500">
-              Sube los mapas como imagen (PNG o JPG). Si no subes una, el Word queda con un aviso destacado para pegarla después.
-            </p>
-            {FIGURAS[tipo].map(({ clave, nombre }) => {
-              const archivo = figuras[clave];
-              return (
-                <Campo key={clave} label={nombre}>
-                  {archivo ? (
-                    // Con imagen elegida: se muestra el nombre y se puede quitar si fue un error
-                    <div className="flex items-center gap-2 rounded-lg border border-input bg-gray-50 px-2.5 py-1.5">
-                      <ImageIcon className="h-4 w-4 text-teal-600 shrink-0" />
-                      <span className="text-sm text-gray-700 truncate flex-1" title={archivo.name}>{archivo.name}</span>
-                      <Button
-                        type="button" variant="ghost" size="sm" className="gap-1 text-red-600 hover:text-red-700 shrink-0"
-                        onClick={() => setFiguras((f) => ({ ...f, [clave]: null }))}
-                      >
-                        <X className="h-4 w-4" /> Quitar
-                      </Button>
-                    </div>
-                  ) : (
-                    <Input
-                      type="file"
-                      accept="image/png,image/jpeg"
-                      onChange={(e) => setFiguras((f) => ({ ...f, [clave]: e.target.files?.[0] ?? null }))}
-                    />
-                  )}
-                </Campo>
-              );
-            })}
-          </Seccion>
 
           <div className="flex flex-col items-end gap-1 pb-4">
             <Button onClick={descargar} disabled={!puedeGenerar} className="gap-2">
