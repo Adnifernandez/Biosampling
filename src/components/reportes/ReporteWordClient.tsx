@@ -16,7 +16,6 @@ import {
   datosFlora,
   especiesPorClasificar,
   formularioInicial,
-  muestreoDeTerreno,
   resumenCampanas,
   temporadaDe,
   valoresDeCampanas,
@@ -27,7 +26,7 @@ import {
 } from "@/lib/reporte-word/datos";
 import { generarWord, prepararFigura } from "@/lib/reporte-word/generar";
 import { MEDIDAS_FAUNA } from "@/lib/reporte-word/medidas";
-import { MUESTREO, type CampoMuestreo } from "@/lib/reporte-word/muestreo";
+import { MUESTREO, muestreoAutomatico, type CampoMuestreo } from "@/lib/reporte-word/muestreo";
 import { PROFESIONALES_DSS, buscarProfesional } from "@/lib/equipo-dss";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -53,26 +52,22 @@ const TIPOS_ESTUDIO = [
   "Estudio Medio Biótico",
 ];
 
+// Una sola figura antes de resultados: el área de influencia con el muestreo
 const FIGURAS: Record<TipoReporte, { clave: string; nombre: string }[]> = {
   FAUNA: [
-    { clave: "figArea", nombre: "Figura 1 · Área de influencia" },
-    { clave: "figMuestreo", nombre: "Figura 2 · Transectos y puntos de muestreo" },
-    { clave: "figEC", nombre: "Figura 3 · Especies en categoría de conservación" },
+    { clave: "figMuestreo", nombre: "Figura 1 · Área de influencia con transectos y puntos de muestreo" },
+    { clave: "figEC", nombre: "Figura 2 · Especies en categoría de conservación" },
   ],
   FLORA: [
-    { clave: "figArea", nombre: "Figura 1 · Área de estudio" },
-    { clave: "figMuestreo", nombre: "Figura 2 · Muestreo" },
-    { clave: "figEC", nombre: "Figura 3 · Especies en categoría de conservación" },
-    { clave: "figCot", nombre: "Figura 4 · Carta de Ocupación de Tierras (COT)" },
+    { clave: "figMuestreo", nombre: "Figura 1 · Área de influencia con puntos de muestreo" },
+    { clave: "figEC", nombre: "Figura 2 · Especies en categoría de conservación" },
+    { clave: "figCot", nombre: "Figura 3 · Carta de Ocupación de Tierras (COT)" },
   ],
 };
 
 // Lo que se recuerda entre reportes del mismo proyecto (en este navegador).
 // El nombre del proyecto no: se escribe cada vez.
-const CAMPOS_PROYECTO = [
-  "tipoEstudio", "descripcionArea", "superficieHa", "antecedentesHabitat",
-  "unidadesDominantes", "antecedenteSitio", "normaEC",
-] as const;
+const CAMPOS_PROYECTO = ["tipoEstudio", "descripcionArea", "superficieHa", "normaEC"] as const;
 const claveProyecto = (projectId: string, tipo: TipoReporte) => `biosampling:reporte-word:${projectId}:${tipo}`;
 const CLAVE_PROFESIONES = "biosampling:reporte-word:profesiones";
 
@@ -373,7 +368,7 @@ export function ReporteWordClient({
   const porClasificar = especiesPorClasificar(campanas);
   const resumen = resumenCampanas(campanas, region);
   // Diseño de muestreo: lo escrito manda; si no se tocó, vale lo que sabe la app
-  const automatico = muestreoDeTerreno(tipo, form, campanas);
+  const automatico = muestreoAutomatico(tipo, campanas);
   const valorMuestreo = (clave: string) => form.muestreo[clave] ?? automatico[clave] ?? "";
   const deLaApp = (clave: string) => form.muestreo[clave] === undefined && !!automatico[clave];
   const cambiarMuestreo = (clave: string, valor: string) => set("muestreo", { ...form.muestreo, [clave]: valor });
@@ -652,33 +647,23 @@ export function ReporteWordClient({
             </Button>
           </Seccion>
 
+          {/* En el Word no lleva título: va en el párrafo de inicio, después de las fechas y el equipo */}
           <Seccion titulo="4. Área de influencia">
-            <Campo label="¿Cómo se definió el área?" ayuda="Completa la frase «El área de influencia se definió considerando…».">
-              <Textarea value={form.descripcionArea} onChange={(e) => set("descripcionArea", e.target.value)} placeholder="Ej: el polígono del proyecto más un buffer de 500 m" />
+            <Campo
+              label="¿Cómo se definió el área?"
+              ayuda="Completa la frase «…se considera como área de influencia ___, la sumatoria de todas estas superficies conforma un total de X ha»."
+            >
+              <Textarea value={form.descripcionArea} onChange={(e) => set("descripcionArea", e.target.value)} placeholder="Ej: los sectores de intervención del proyecto más una zona buffer proyectada al norte y sur" />
             </Campo>
-            <Campo label="Superficie (ha)">
-              <Input value={form.superficieHa} onChange={(e) => set("superficieHa", e.target.value)} placeholder="Ej: 120,5" className="max-w-40" />
+            <Campo label="Superficie total (ha)">
+              <Input value={form.superficieHa} onChange={(e) => set("superficieHa", e.target.value)} placeholder="Ej: 73" className="max-w-40" />
             </Campo>
-            {esFauna ? (
-              <Campo label="Antecedentes del hábitat (opcional)">
-                <Textarea value={form.antecedentesHabitat} onChange={(e) => set("antecedentesHabitat", e.target.value)} />
-              </Campo>
-            ) : (
-              <>
-                <Campo label="Unidades vegetacionales dominantes" ayuda="Completa la frase «…dominada principalmente por…».">
-                  <Input value={form.unidadesDominantes} onChange={(e) => set("unidadesDominantes", e.target.value)} placeholder="Ej: matorral esclerófilo y praderas anuales" />
-                </Campo>
-                <Campo label="Antecedente específico del sitio (opcional)">
-                  <Textarea value={form.antecedenteSitio} onChange={(e) => set("antecedenteSitio", e.target.value)} />
-                </Campo>
-              </>
-            )}
           </Seccion>
 
           <Seccion titulo="5. Diseño de muestreo">
             <p className="text-xs text-gray-500">
               Con estos datos se arma el párrafo del Word. Los marcados «de la app» ya vienen escritos y puedes cambiarlos;
-              los que dejes vacíos salen en amarillo para completarlos después. Las fechas son las de «Portada y fechas».
+              los que dejes vacíos salen en amarillo para completarlos después.
             </p>
             <CamposMuestreo campos={MUESTREO[tipo].campos} valor={valorMuestreo} deLaApp={deLaApp} onChange={cambiarMuestreo} />
             <p className="text-xs text-gray-500">Marca lo que se hizo en la campaña. Lo que no marques no sale en el párrafo.</p>

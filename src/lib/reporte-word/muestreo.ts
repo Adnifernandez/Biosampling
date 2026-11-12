@@ -1,7 +1,8 @@
 // "Diseño de Muestreo": un solo párrafo con el texto que dio la usuaria (2026-11-10), según sea flora o fauna.
-// Lo que la app ya sabe (fechas, días, N° de profesionales, puntos, parcelas, transectos, trampas) viene
-// escrito en el formulario y se puede cambiar; lo demás se completa a mano. Si queda vacío, sale
-// "[Completar: …]" en amarillo. Las partes que no siempre aplican tienen casilla y vienen sin marcar.
+// Época, fechas y N° de profesionales van en el párrafo de inicio del Word (2026-11-12), no aquí.
+// Lo que la app ya sabe (puntos, parcelas, transectos, trampas) viene escrito en el formulario y se
+// puede cambiar; lo demás se completa a mano. Si queda vacío, sale "[Completar: …]" en amarillo.
+// Las partes que no siempre aplican tienen casilla y vienen sin marcar.
 import type { CampanaReporte, EstacionReporte, TipoReporte } from "./datos";
 
 export type CampoMuestreo = {
@@ -19,12 +20,9 @@ type Plantilla = { campos: CampoMuestreo[]; partes: ParteMuestreo[] };
 const n = (clave: string, etiqueta: string, ejemplo: string): CampoMuestreo => ({ clave, etiqueta, ejemplo, numero: true });
 const t = (clave: string, etiqueta: string, ejemplo: string, sugerencias?: string[]): CampoMuestreo => ({ clave, etiqueta, ejemplo, sugerencias });
 
-const DIAS = n("dias", "N° de días", "5");
-const PROFESIONALES = n("profesionales", "N° de profesionales", "3");
-
 export const MUESTREO: Record<TipoReporte, Plantilla> = {
   FLORA: {
-    campos: [DIAS, PROFESIONALES, n("puntos", "N° de puntos de muestreo", "30")],
+    campos: [n("puntos", "N° de puntos de muestreo", "30")],
     partes: [
       {
         id: "PARCELAS",
@@ -47,8 +45,6 @@ export const MUESTREO: Record<TipoReporte, Plantilla> = {
   },
   FAUNA: {
     campos: [
-      DIAS,
-      PROFESIONALES,
       n("transectos", "N° de transectos", "5"),
       t("medidasTransectos", "Largo × ancho de los transectos (m)", "100 × 10"),
       t("horario", "Horario de los recorridos", "08:00 y 13:00 h"),
@@ -83,11 +79,6 @@ export const MUESTREO: Record<TipoReporte, Plantilla> = {
   },
 };
 
-const MESES = [
-  "enero", "febrero", "marzo", "abril", "mayo", "junio",
-  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-];
-
 const numero = (x: number) => x.toLocaleString("es-CL", { maximumFractionDigits: 2 });
 const limpio = (s: string | undefined) => (s ?? "").replace(/\s+/g, " ").trim();
 const pendiente = (que: string) => `[Completar: ${que}]`;
@@ -97,7 +88,7 @@ function unir(items: string[]): string {
   return `${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}`;
 }
 
-// "5" → "5 días", "1" → "1 día", vacío → "[Completar: N° de días] días"
+// "5" → "5 noches", "1" → "1 noche", vacío → "[Completar: N° de noches] noches"
 function cantidad(valor: string, singular: string, plural: string, que: string): string {
   if (!valor) return `${pendiente(que)} ${plural}`;
   return `${valor} ${valor === "1" ? singular : plural}`;
@@ -117,29 +108,14 @@ function estacionesDe(campanas: CampanaReporte[], metodos: string[]): EstacionRe
 
 const siHay = (x: number) => (x > 0 ? String(x) : "");
 
-function diasEntre(inicio: string, fin: string): string {
-  if (!inicio || !fin) return "";
-  const dias = Math.round((Date.parse(fin) - Date.parse(inicio)) / 86_400_000) + 1;
-  return dias > 0 ? String(dias) : "";
-}
-
 // Lo que viene escrito en el formulario porque la app ya lo sabe
-export function muestreoAutomatico(
-  tipo: TipoReporte,
-  campanas: CampanaReporte[],
-  fechaInicio: string,
-  fechaFin: string,
-  nProfesionales: number
-): Record<string, string> {
-  const comunes = { dias: diasEntre(fechaInicio, fechaFin), profesionales: siHay(nProfesionales) };
-
+export function muestreoAutomatico(tipo: TipoReporte, campanas: CampanaReporte[]): Record<string, string> {
   if (tipo === "FLORA") {
     const todas = estacionesDe(campanas, campanas.map((c) => c.methodology));
     const parcelas = estacionesDe(campanas, ["BRAUN_BLANQUET", "PARCELAS_FORESTALES"]);
     const areas = new Set(parcelas.map((s) => s.area).filter((a): a is number => !!a));
     const grillas = estacionesDe(campanas, ["GRILLA"]);
     return {
-      ...comunes,
       puntos: siHay(todas.length),
       parcelas: siHay(parcelas.length),
       superficieParcelas: areas.size === 1 ? numero([...areas][0]) : "",
@@ -155,7 +131,6 @@ export function muestreoAutomatico(
   const camaras =
     campanas.reduce((s, c) => s + (c.cameraTrapCount ?? 0), 0) || estacionesDe(campanas, ["TRAMPA_CAMARA"]).length;
   return {
-    ...comunes,
     transectos: siHay(transectos.length),
     medidasTransectos: unir([...medidas].slice(0, 3)),
     poa: siHay(estacionesDe(campanas, ["PUNTO_CONTEO"]).length),
@@ -169,36 +144,23 @@ export function valorMuestreo(escrito: Record<string, string>, automatico: Recor
   return escrito[clave] !== undefined ? escrito[clave] : automatico[clave] ?? "";
 }
 
-// "entre el 28 de septiembre y el 2 de octubre de 2026"
-function entreFechas(inicio: string, fin: string): string {
-  if (!inicio || !fin) return `entre ${pendiente("fechas")}`;
-  const [y1, m1, d1] = inicio.split("-").map(Number);
-  const [y2, m2, d2] = fin.split("-").map(Number);
-  if (inicio === fin) return `el ${d1} de ${MESES[m1 - 1]} de ${y1}`;
-  const desde = y1 !== y2 ? `${d1} de ${MESES[m1 - 1]} de ${y1}` : m1 !== m2 ? `${d1} de ${MESES[m1 - 1]}` : String(d1);
-  return `entre el ${desde} y el ${d2} de ${MESES[m2 - 1]} de ${y2}`;
-}
-
+// La figura del área de influencia con el muestreo es la única antes de resultados: siempre la Figura 1
 export function parrafoMuestreo(
   tipo: TipoReporte,
   partes: string[],
   valor: (clave: string) => string,
-  fechaInicio: string,
-  fechaFin: string,
   nUnidadesCot: string
 ): string {
   const v = (clave: string) => limpio(valor(clave));
   const hay = (id: string) => partes.includes(id);
-  const cuando = `${entreFechas(fechaInicio, fechaFin)}, durante ${cantidad(v("dias"), "día", "días", "N° de días")}, por ${cantidad(v("profesionales"), "profesional", "profesionales", "N° de profesionales")}`;
   const frases: string[] = [];
 
   if (tipo === "FLORA") {
-    frases.push(`La caracterización de flora y vegetación se realizó ${cuando}.`);
     const puntos = v("puntos");
     frases.push(
       esUno(puntos)
-        ? "A partir de una fotointerpretación previa se definió 1 punto de muestreo en el área de estudio."
-        : `A partir de una fotointerpretación previa se definieron ${cantidad(puntos, "punto", "puntos", "N° de puntos")} de muestreo distribuidos en las distintas unidades vegetacionales del área de estudio.`
+        ? "A partir de una fotointerpretación previa se definió 1 punto de muestreo en el área de estudio (Figura 1)."
+        : `A partir de una fotointerpretación previa se definieron ${cantidad(puntos, "punto", "puntos", "N° de puntos")} de muestreo distribuidos en las distintas unidades vegetacionales del área de estudio (Figura 1).`
     );
 
     const enTerreno: string[] = [];
@@ -228,14 +190,15 @@ export function parrafoMuestreo(
     return frases.join(" ");
   }
 
-  frases.push(`La caracterización de fauna se realizó ${cuando}.`);
+  // Texto del ejemplo de la usuaria (2026-11-12): "Para esto se definieron 16 transectos de largo y ancho fijo (200x10; Figura 1‑1)…"
   const transectos = v("transectos");
   const medidas = (v("medidasTransectos").replace(/\s*m$/i, "") || pendiente("largo × ancho")) + " m";
   const horario = v("horario") || pendiente("horario");
   frases.push(
     esUno(transectos)
-      ? `Se recorrió 1 transecto de ${medidas} en el área de estudio, entre ${horario}.`
-      : `Se recorrieron ${cantidad(transectos, "transecto", "transectos", "N° de transectos")} de ${medidas}, distribuidos en los distintos ambientes presentes en el área de estudio, entre ${horario}.`
+      ? `Para esto se definió 1 transecto de largo y ancho fijo (${medidas}; Figura 1), en el que se realizó un recorrido pedestre abarcando un muestreo a lo largo de toda el área de estudio, entre ${horario}.`
+      : `Para esto se definieron ${cantidad(transectos, "transecto", "transectos", "N° de transectos")} de largo y ancho fijo (${medidas}; Figura 1), distribuidos en los distintos ambientes presentes en el área de estudio. ` +
+          `Dentro de todos los transectos se realizó un recorrido pedestre abarcando un muestreo a lo largo de toda el área de estudio, entre ${horario}.`
   );
   if (hay("POA")) {
     const poa = v("poa");

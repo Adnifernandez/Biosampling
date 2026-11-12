@@ -69,11 +69,8 @@ export type FormularioReporte = {
   partesMuestreo: string[]; // partes del párrafo marcadas (POA, Sherman, COT…)
   muestreo: Record<string, string>; // lo escrito a mano; lo que no se tocó sale de la app
   // Fauna
-  antecedentesHabitat: string;
   medidas: string[]; // ids de MEDIDAS_FAUNA marcadas
   // Flora
-  unidadesDominantes: string;
-  antecedenteSitio: string;
   normaEC: string;
   // La sección de resultados COT sale si se marcó la parte "COT" en Diseño de muestreo
   nUnidadesCot: string;
@@ -283,10 +280,7 @@ export function formularioInicial(): FormularioReporte {
     observaciones: "",
     partesMuestreo: [],
     muestreo: {},
-    antecedentesHabitat: "",
     medidas: [],
-    unidadesDominantes: "",
-    antecedenteSitio: "",
     normaEC: "",
     nUnidadesCot: "",
     descripcionCot: "",
@@ -309,11 +303,6 @@ export function valoresDeCampanas(campanas: CampanaReporte[]): Partial<Formulari
   };
 }
 
-// Los números de "Diseño de Muestreo" que ya sabe la app, para mostrarlos escritos en el formulario
-export function muestreoDeTerreno(tipo: TipoReporte, form: FormularioReporte, campanas: CampanaReporte[]) {
-  return muestreoAutomatico(tipo, campanas, form.fechaInicio, form.fechaFin, profesionalesConNombre(form).length);
-}
-
 // El párrafo de "Diseño de Muestreo" y, si hay tabla de coordenadas, la frase que la anuncia
 function datosMuestreo(
   tipo: TipoReporte,
@@ -321,13 +310,11 @@ function datosMuestreo(
   campanas: CampanaReporte[],
   base: { hayPuntos: boolean; tabPuntos: number }
 ) {
-  const automatico = muestreoDeTerreno(tipo, form, campanas);
+  const automatico = muestreoAutomatico(tipo, campanas);
   const parrafo = parrafoMuestreo(
     tipo,
     form.partesMuestreo,
     (clave) => valorMuestreo(form.muestreo, automatico, clave),
-    form.fechaInicio,
-    form.fechaFin,
     form.nUnidadesCot
   );
   const tabla = base.hayPuntos ? ` La ubicación de los puntos de muestreo se presenta en la Tabla ${base.tabPuntos}.` : "";
@@ -423,7 +410,10 @@ function datosComunes(
 ) {
   const puntos = puntosMuestreo(campanas);
   const conEquipo = form.mostrarEquipo && profesionales.length > 0;
+  const tablas = numerosDeTabla(conEquipo, puntos.hayPuntos, ec.length > 0);
   return {
+    ...tablas,
+    ...parrafoInicio(form, profesionales.length, conEquipo ? tablas.tabEquipo : 0),
     nombreProyecto: form.nombreProyecto.trim(),
     tipoEstudio: completar(form.tipoEstudio, "tipo de estudio"),
     // "en el marco de la Declaración…" / "en el marco del Estudio…"
@@ -431,9 +421,7 @@ function datosComunes(
     mesAnio: form.mesAnio.trim(),
     epoca: completar(form.epoca, "época"),
     ...fechasTexto(form.fechaInicio, form.fechaFin),
-    descripcionArea: completar(form.descripcionArea, "descripción del área de influencia"),
-    superficieHa: completar(form.superficieHa, "superficie"),
-    mostrarEquipo: form.mostrarEquipo && profesionales.length > 0,
+    mostrarEquipo: conEquipo,
     profesionales: profesionales.map((p) => ({
       nombre: p.nombre.trim(),
       profesion: p.profesion.trim() || "—",
@@ -447,7 +435,23 @@ function datosComunes(
     hayPuntos: puntos.hayPuntos,
     puntos: puntos.puntos,
     husoPuntos: puntos.husoPuntos,
-    ...numerosDeTabla(conEquipo, puntos.hayPuntos, ec.length > 0),
+  };
+}
+
+// Párrafo de inicio (sin título "Área de influencia", 2026-11-12): "…En dichas actividades participaron
+// 2 profesionales del Equipo de Medio Biótico de DSS S.A. (Tabla 1). En base a la superficie evaluada…,
+// se considera como área de influencia {descripcionArea}, la sumatoria… conforma un total de {superficieHa} ha."
+function parrafoInicio(form: FormularioReporte, nProfesionales: number, tabEquipo: number) {
+  const tabla = tabEquipo ? ` (Tabla ${tabEquipo}).` : "";
+  const equipo = "del Equipo de Medio Biótico de DSS S.A.";
+  return {
+    fraseEquipo:
+      nProfesionales === 1
+        ? ` En dichas actividades participó 1 profesional ${equipo}${tabla}`
+        : ` En dichas actividades participaron ${nProfesionales || completar("", "N° de profesionales")} profesionales ${equipo}${tabla}`,
+    // Va seguido de ", la sumatoria…" y de " ha.": se quitan el punto final y las "ha" escritas de más
+    descripcionArea: completar(linea(form.descripcionArea).replace(/[\s.,;]+$/, ""), "descripción del área de influencia"),
+    superficieHa: completar(linea(form.superficieHa).replace(/\s*(ha|hect[aá]reas?)\.?$/i, ""), "superficie"),
   };
 }
 
@@ -583,13 +587,6 @@ export function datosFauna(
 
   return {
     ...base,
-    fraseEquipo:
-      profesionales.length === 0
-        ? ""
-        : profesionales.length === 1
-          ? " En dichas actividades participó 1 profesional del Equipo de Medio Biótico de DSS S.A."
-          : ` En dichas actividades participaron ${profesionales.length} profesionales del Equipo de Medio Biótico de DSS S.A.`,
-    antecedentesHabitat: linea(form.antecedentesHabitat),
     ...datosMuestreo("FAUNA", form, campanas, base),
     abundanciaTotal: abundanciaTotal || "",
     fraseGrupos: fraseGrupos(filas),
@@ -651,8 +648,6 @@ export function datosFlora(form: FormularioReporte, region: string, campanas: Ca
   const cot = form.partesMuestreo.includes("COT");
   return {
     ...base,
-    unidadesDominantes: completar(form.unidadesDominantes, "unidades vegetacionales dominantes"),
-    antecedenteSitio: linea(form.antecedenteSitio),
     ...datosMuestreo("FLORA", form, campanas, base),
     familiasTexto: nFamilias === 1 ? "1 familia" : `${nFamilias} familias diferentes`,
     sintesisFamilias: sintesisFamilias(filas),
@@ -676,7 +671,8 @@ export function datosFlora(form: FormularioReporte, region: string, campanas: Ca
     incluirCot: cot,
     nUnidadesCot: completar(form.nUnidadesCot, "N° de unidades"),
     descripcionCot: linea(form.descripcionCot),
-    figCotNum: ec.length > 0 ? 4 : 3,
+    // Figura 1: área de influencia y muestreo; Figura 2: especies en categoría (sólo si hay)
+    figCotNum: ec.length > 0 ? 3 : 2,
     incluirConclusiones: form.incluirConclusiones,
     sintesisConservacion:
       ec.length === 0
