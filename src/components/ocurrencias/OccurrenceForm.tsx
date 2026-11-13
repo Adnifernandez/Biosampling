@@ -124,13 +124,18 @@ interface OccurrenceFormProps {
   onRegistered?: (label: string, payload: OccurrencePayload, localId: number) => void; // terreno wizard callback
   // Transecto Fauna dedup: list of already-registered species this session/station
   // key = String(localId) in Terreno mode, occurrenceId in regular tab
-  existingRegistrations?: { speciesId: string; abundance?: string; key: string }[];
+  // conCoordenadas: sólo lo usa el modo admin del aviso amarillo
+  existingRegistrations?: { speciesId: string; abundance?: string; key: string; conCoordenadas?: boolean }[];
   onAdjustAbundance?: (key: string, newAbundance: string) => Promise<void>;
   // Sólo ADMIN (2026-11-13): en el aviso amarillo se pueden capturar coordenadas nuevas. Los individuos
-  // de más se guardan como otro registro de la misma especie en ese punto, y se confirma lo que se hizo.
+  // de más se guardan como otro registro de la misma especie (con esas coordenadas o sin coordenadas)
+  // y se confirma lo que se hizo.
   onAddSighting?: (
     baseKey: string,
-    data: { abundance: string; latitude: number; longitude: number; date: string; time?: string; detectionMethod?: string; notes?: string }
+    data: {
+      abundance: string; latitude?: number | null; longitude?: number | null;
+      date: string; time?: string; detectionMethod?: string; notes?: string;
+    }
   ) => Promise<{ error?: string; id?: string }>;
   // BB dedup: speciesIds already registered in this station (from server or session)
   existingBBSpeciesIds?: string[];
@@ -476,10 +481,12 @@ export function OccurrenceForm({
     );
   }
 
-  // Aviso amarillo (modo admin). La "nueva cantidad" es el total de la especie en el transecto:
-  // - con coordenadas nuevas, los individuos de más se guardan como otro registro en ese punto;
-  // - sin coordenadas, se ajusta el registro existente.
-  // En ambos casos se confirma lo que se hizo.
+  // Aviso amarillo (modo admin). La "nueva cantidad" es el total de la especie en el transecto.
+  // Los individuos de más nunca heredan las coordenadas de otro registro (decisión de la usuaria, 2026-11-13):
+  // - con coordenadas nuevas, se guardan como otro registro en ese punto;
+  // - sin coordenadas, se suman al registro sin coordenadas de la especie o, si no hay, a uno nuevo sin coordenadas.
+  // Para bajar la cantidad se descuenta del registro sin coordenadas si lo hay; si no, del registro del aviso.
+  // En todos los casos se confirma lo que se hizo.
   async function actualizarComoAdmin(entry: { speciesId: string; abundance?: string; key: string }) {
     const nuevo = parseInt(adjustAbundance);
     if (!Number.isInteger(nuevo) || nuevo < 1) { toast.error("Ingresa una cantidad válida"); return; }
@@ -487,6 +494,7 @@ export function OccurrenceForm({
     const individuos = (n: number) => `${n} individuo${n === 1 ? "" : "s"}`;
     const diferencia = nuevo - totalEspecie;
     const conCoordenadas = ajusteLat !== null && ajusteLng !== null;
+    const sinCoordenadas = localRegistrations.find(r => r.speciesId === entry.speciesId && !r.conCoordenadas);
 
     if (conCoordenadas && diferencia < 1) {
       toast.error("La nueva cantidad debe ser mayor que la actual", {
@@ -494,9 +502,11 @@ export function OccurrenceForm({
       });
       return;
     }
-    if (!conCoordenadas && diferencia === 0) { toast.info("La cantidad no cambió"); return; }
-    const base = Number(entry.abundance) || 0;
-    if (!conCoordenadas && base + diferencia < 1) {
+    if (diferencia === 0) { toast.info("La cantidad no cambió"); return; }
+    // Registro que se ajusta (si no se crea uno nuevo)
+    const destino = sinCoordenadas ?? entry;
+    const cantidadDestino = Number(destino.abundance) || 0;
+    if (diferencia < 0 && cantidadDestino + diferencia < 1) {
       toast.error("No se puede bajar tanto desde aquí", {
         description: "La especie tiene varios registros en el transecto. Corrígelos uno por uno en Ocurrencias.",
       });
@@ -506,25 +516,38 @@ export function OccurrenceForm({
     setAjustando(true);
     try {
       let mensaje: string;
-      if (conCoordenadas) {
+      const agregarRegistro = async (lat: number | null, lng: number | null) => {
         const r = await onAddSighting!(entry.key, {
           abundance: String(diferencia),
-          latitude: ajusteLat!,
-          longitude: ajusteLng!,
+          latitude: lat,
+          longitude: lng,
           date: date || format(new Date(), "yyyy-MM-dd"),
           time: tfTime || undefined,
           detectionMethod: tfDetectionMethod || undefined,
           notes: notes || undefined,
         });
-        if (r.error || !r.id) { toast.error(r.error ?? "No se pudo guardar el registro"); return; }
+        if (r.error || !r.id) { toast.error(r.error ?? "No se pudo guardar el registro"); return false; }
         const id = r.id;
-        setLocalRegistrations(prev => [...prev, { speciesId: entry.speciesId, abundance: String(diferencia), key: id }]);
+        setLocalRegistrations(prev => [
+          ...prev,
+          { speciesId: entry.speciesId, abundance: String(diferencia), key: id, conCoordenadas: lat !== null },
+        ]);
+        return true;
+      };
+
+      if (conCoordenadas) {
+        if (!(await agregarRegistro(ajusteLat, ajusteLng))) return;
         mensaje = `${nombre}: se agregó ${individuos(diferencia)} con coordenadas nuevas. Total en el transecto: ${nuevo}.`;
+      } else if (diferencia > 0 && !sinCoordenadas) {
+        if (!(await agregarRegistro(null, null))) return;
+        mensaje = `${nombre}: se agregó ${individuos(diferencia)} sin coordenadas. Total en el transecto: ${nuevo}.`;
       } else {
-        const nuevoBase = String(base + diferencia);
-        await onAdjustAbundance!(entry.key, nuevoBase);
-        setLocalRegistrations(prev => prev.map(r => r.key === entry.key ? { ...r, abundance: nuevoBase } : r));
-        mensaje = `${nombre}: cantidad actualizada. Total en el transecto: ${individuos(nuevo)}.`;
+        const nuevaCantidad = String(cantidadDestino + diferencia);
+        await onAdjustAbundance!(destino.key, nuevaCantidad);
+        setLocalRegistrations(prev => prev.map(r => r.key === destino.key ? { ...r, abundance: nuevaCantidad } : r));
+        mensaje = diferencia > 0
+          ? `${nombre}: se agregó ${individuos(diferencia)} sin coordenadas. Total en el transecto: ${nuevo}.`
+          : `${nombre}: cantidad actualizada. Total en el transecto: ${individuos(nuevo)}.`;
       }
       toast.success("Registro guardado", { description: mensaje });
       setUltimoCambio(mensaje);
@@ -1031,7 +1054,7 @@ export function OccurrenceForm({
                   <p className="text-xs text-amber-600">
                     {ajusteLat !== null
                       ? "Los individuos de más se guardan como otro registro en este punto. El registro anterior no cambia."
-                      : "Si los nuevos individuos están en otro punto del transecto, captura sus coordenadas antes de actualizar."}
+                      : "Si no capturas coordenadas, los individuos de más quedan sin coordenadas. El registro anterior conserva las suyas."}
                   </p>
                 </div>
               )}

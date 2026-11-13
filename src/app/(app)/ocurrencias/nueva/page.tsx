@@ -46,7 +46,7 @@ export default async function NuevaOcurrenciaPage({
       ? prisma.occurrence.findMany({
           where: { stationId },
           select: {
-            id: true, speciesId: true, abundance: true,
+            id: true, speciesId: true, abundance: true, latitude: true, longitude: true,
             species: { select: { id: true, genus: true, species: true, commonName: true, family: true, conservationStatus: true } },
           },
         })
@@ -76,6 +76,7 @@ export default async function NuevaOcurrenciaPage({
     speciesId: o.speciesId,
     abundance: o.abundance != null ? String(o.abundance) : undefined,
     key: o.id,
+    conCoordenadas: !!(o.latitude && o.longitude),
   }));
 
   // Species already seen at this station — any trap, any previous day

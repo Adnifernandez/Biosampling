@@ -289,14 +289,15 @@ export async function updateTransectoOccurrenceAbundance(
   revalidatePath("/ocurrencias");
 }
 
-// Sólo ADMIN (2026-11-13): más individuos de una especie ya registrada en el transecto, vistos en otro punto.
-// Se guardan como otro registro de la misma especie con sus coordenadas; el registro anterior no se toca.
+// Sólo ADMIN (2026-11-13): más individuos de una especie ya registrada en el transecto.
+// Se guardan como otro registro de la misma especie, con las coordenadas nuevas o sin coordenadas;
+// el registro anterior (y sus coordenadas) no se toca.
 export async function addTransectoSighting(
   baseOccurrenceId: string,
   data: {
     abundance: string;
-    latitude: number;
-    longitude: number;
+    latitude?: number | null;
+    longitude?: number | null;
     date: string;
     time?: string;
     detectionMethod?: string;
@@ -309,7 +310,10 @@ export async function addTransectoSighting(
 
   const abundance = parseInt(data.abundance);
   if (!Number.isInteger(abundance) || abundance < 1) return { error: "Cantidad no válida" };
-  if (!Number.isFinite(data.latitude) || !Number.isFinite(data.longitude)) return { error: "Coordenadas no válidas" };
+  const conCoordenadas = data.latitude != null && data.longitude != null;
+  if (conCoordenadas && (!Number.isFinite(data.latitude) || !Number.isFinite(data.longitude))) {
+    return { error: "Coordenadas no válidas" };
+  }
 
   const base = await prisma.occurrence.findUnique({
     where: { id: baseOccurrenceId },
@@ -329,8 +333,8 @@ export async function addTransectoSighting(
       speciesId: base.speciesId,
       userId: session.user.id,
       date: data.date ? new Date(data.date) : new Date(),
-      latitude: data.latitude,
-      longitude: data.longitude,
+      latitude: conCoordenadas ? data.latitude : null,
+      longitude: conCoordenadas ? data.longitude : null,
       abundance,
       detectionMethod: data.detectionMethod || base.detectionMethod,
       notes: data.notes || null,
