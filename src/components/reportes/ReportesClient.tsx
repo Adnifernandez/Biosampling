@@ -53,6 +53,8 @@ type OccurrenceRow = {
 type StationRow = {
   id: string;
   name: string;
+  latitude: number | null;
+  longitude: number | null;
   occurrences: OccurrenceRow[];
   children: { id: string; name: string; occurrences: OccurrenceRow[] }[];
 };
@@ -251,6 +253,31 @@ export function ReportesClient({ projects, isAdmin }: { projects: ProjectRow[]; 
   const incompleteSpecies = (stats?.speciesList ?? [])
     .map(({ sp }) => sp)
     .filter((sp) => sp.family === "Por clasificar");
+
+  // ── Conservación (FAUNA): cada especie en categoría con las coordenadas UTM donde se registró ──
+  // La coordenada es la del GPS del registro; si no tiene, la de su estación (transecto o punto).
+  // Una fila por coordenada distinta; si la especie no tiene ninguna, una fila con las coordenadas vacías.
+  const conservacionFauna = (() => {
+    if (!stats || !isFauna || stats.enCategoria.length === 0) return null;
+    type Utm = { east: number; north: number; zone: string };
+    const porEspecie = new Map<string, Map<string, Utm>>();
+    for (const station of stations) {
+      for (const occ of station.occurrences) {
+        const utm =
+          occ.latitude && occ.longitude ? latLngToUTM(occ.latitude, occ.longitude)
+          : station.latitude && station.longitude ? latLngToUTM(station.latitude, station.longitude)
+          : null;
+        if (!utm) continue;
+        const coords = porEspecie.get(occ.species.id) ?? new Map<string, Utm>();
+        coords.set(`${utm.zone}|${utm.east}|${utm.north}`, utm);
+        porEspecie.set(occ.species.id, coords);
+      }
+    }
+    return stats.enCategoria.flatMap(({ sp }) => {
+      const coords = Array.from(porEspecie.get(sp.id)?.values() ?? []).sort((a, b) => a.east - b.east || a.north - b.north);
+      return coords.length > 0 ? coords.map((utm) => ({ sp, utm })) : [{ sp, utm: null as Utm | null }];
+    });
+  })();
 
   // ── Parcelas (Braun-Blanquet) matrix ──
   const bbData = (() => {
@@ -689,7 +716,16 @@ export function ReportesClient({ projects, isAdmin }: { projects: ProjectRow[]; 
       ]);
     }
 
-    if (stats.enCategoria.length > 0) {
+    // Fauna: con las coordenadas UTM (WGS84) donde se registró cada especie
+    if (conservacionFauna) {
+      addSheet("Conservación", [
+        ["Familia","Especie","Nombre Común","Estado Conservación","Este (m)","Norte (m)","Huso"],
+        ...conservacionFauna.map(({sp,utm})=>[
+          sp.family,`${sp.genus} ${sp.species}`,sp.commonName??"",allStatusesText(sp.conservationStatus),
+          utm?.east??"",utm?.north??"",utm?.zone??"",
+        ]),
+      ]);
+    } else if (stats.enCategoria.length > 0) {
       addSheet("Conservación", [
         ["Familia","Especie","Nombre Común","Estado Conservación"],
         ...stats.enCategoria.map(({sp})=>[
