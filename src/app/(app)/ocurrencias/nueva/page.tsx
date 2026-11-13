@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { OccurrenceForm } from "@/components/ocurrencias/OccurrenceForm";
+import { auth } from "@/auth";
+import { addTransectoSighting } from "@/app/(app)/proyectos/[id]/campanas/[cid]/estaciones/[sid]/ocurrencias/actions";
 
 export default async function NuevaOcurrenciaPage({
   searchParams,
@@ -26,6 +28,9 @@ export default async function NuevaOcurrenciaPage({
   const isGrilla = station.campaign.methodology === "GRILLA";
   const isBB = station.campaign.methodology === "BRAUN_BLANQUET";
   const isTransectoFauna = station.campaign.methodology === "TRANSECTO_LINEAL_FAUNA";
+  // Coordenadas nuevas en el aviso amarillo y confirmación al actualizar: por ahora sólo ADMIN (2026-11-13)
+  const session = await auth();
+  const esAdmin = session?.user?.role === "ADMIN";
 
   const [transectoStation, bbOccurrences, transectoOccurrences, rawCampaignSpecies] = await Promise.all([
     isGrilla && station.parentId
@@ -121,6 +126,7 @@ export default async function NuevaOcurrenciaPage({
         existingBBSpeciesIds={existingBBSpeciesIds.length > 0 ? existingBBSpeciesIds : undefined}
         existingRegistrations={existingTransectoRegistrations.length > 0 ? existingTransectoRegistrations : undefined}
         onAdjustAbundance={existingTransectoRegistrations.length > 0 ? adjustTransectoAbundance : undefined}
+        onAddSighting={esAdmin && existingTransectoRegistrations.length > 0 ? addTransectoSighting : undefined}
         campaignSpecies={campaignSpecies.length > 0 ? campaignSpecies : undefined}
         stationSpecies={stationSpecies.length > 0 ? stationSpecies : undefined}
       />

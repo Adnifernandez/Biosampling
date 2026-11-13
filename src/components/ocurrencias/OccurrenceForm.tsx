@@ -126,6 +126,12 @@ interface OccurrenceFormProps {
   // key = String(localId) in Terreno mode, occurrenceId in regular tab
   existingRegistrations?: { speciesId: string; abundance?: string; key: string }[];
   onAdjustAbundance?: (key: string, newAbundance: string) => Promise<void>;
+  // Sólo ADMIN (2026-11-13): en el aviso amarillo se pueden capturar coordenadas nuevas. Los individuos
+  // de más se guardan como otro registro de la misma especie en ese punto, y se confirma lo que se hizo.
+  onAddSighting?: (
+    baseKey: string,
+    data: { abundance: string; latitude: number; longitude: number; date: string; time?: string; detectionMethod?: string; notes?: string }
+  ) => Promise<{ error?: string; id?: string }>;
   // BB dedup: speciesIds already registered in this station (from server or session)
   existingBBSpeciesIds?: string[];
   // Campaign-wide species suggestions (sorted by frequency across all stations in campaign)
@@ -159,6 +165,7 @@ export function OccurrenceForm({
   onRegistered,
   existingRegistrations,
   onAdjustAbundance,
+  onAddSighting,
   existingBBSpeciesIds,
   campaignSpecies,
   stationSpecies,
@@ -188,6 +195,20 @@ export function OccurrenceForm({
       ? localRegistrations.find(r => r.speciesId === selectedSpecies.id)
       : undefined;
   const isDuplicate = !!duplicateEntry;
+
+  // Modo admin del aviso amarillo: la especie puede tener varios registros en el transecto (uno por punto),
+  // así que se muestra y se ajusta el total de todos ellos
+  const modoAdmin = !!onAddSighting;
+  const totalEspecie = duplicateEntry
+    ? localRegistrations
+        .filter(r => r.speciesId === duplicateEntry.speciesId)
+        .reduce((s, r) => s + (Number(r.abundance) || 0), 0)
+    : 0;
+  const [ajusteLat, setAjusteLat] = useState<number | null>(null);
+  const [ajusteLng, setAjusteLng] = useState<number | null>(null);
+  const [ajusteGps, setAjusteGps] = useState(false);
+  const [ajustando, setAjustando] = useState(false);
+  const [ultimoCambio, setUltimoCambio] = useState("");
 
   // BB dedup: species already registered in this station (blocks new registration)
   const isBBDuplicate =
@@ -316,7 +337,9 @@ export function OccurrenceForm({
 
   // Sync abundance adjuster when duplicate entry changes
   useEffect(() => {
-    setAdjustAbundance(duplicateEntry?.abundance ?? "");
+    setAdjustAbundance(modoAdmin && duplicateEntry ? String(totalEspecie) : duplicateEntry?.abundance ?? "");
+    setAjusteLat(null);
+    setAjusteLng(null);
   }, [duplicateEntry?.key]);
 
   // Pre-populate UTM from transecto station coordinates (GRILLA)
@@ -437,6 +460,82 @@ export function OccurrenceForm({
       () => { toast.error("No se pudo obtener ubicación GPS"); setGpsLoading(false); },
       { enableHighAccuracy: true, timeout: 10000 }
     );
+  }
+
+  // Aviso amarillo (modo admin): coordenadas del punto donde se vieron los individuos de más
+  function capturarGpsAjuste() {
+    setAjusteGps(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setAjusteLat(pos.coords.latitude);
+        setAjusteLng(pos.coords.longitude);
+        setAjusteGps(false);
+      },
+      () => { toast.error("No se pudo obtener ubicación GPS"); setAjusteGps(false); },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  // Aviso amarillo (modo admin). La "nueva cantidad" es el total de la especie en el transecto:
+  // - con coordenadas nuevas, los individuos de más se guardan como otro registro en ese punto;
+  // - sin coordenadas, se ajusta el registro existente.
+  // En ambos casos se confirma lo que se hizo.
+  async function actualizarComoAdmin(entry: { speciesId: string; abundance?: string; key: string }) {
+    const nuevo = parseInt(adjustAbundance);
+    if (!Number.isInteger(nuevo) || nuevo < 1) { toast.error("Ingresa una cantidad válida"); return; }
+    const nombre = selectedSpecies ? `${selectedSpecies.genus} ${selectedSpecies.species}` : "La especie";
+    const individuos = (n: number) => `${n} individuo${n === 1 ? "" : "s"}`;
+    const diferencia = nuevo - totalEspecie;
+    const conCoordenadas = ajusteLat !== null && ajusteLng !== null;
+
+    if (conCoordenadas && diferencia < 1) {
+      toast.error("La nueva cantidad debe ser mayor que la actual", {
+        description: `Hoy hay ${individuos(totalEspecie)}. Los individuos de más se guardan en el punto nuevo.`,
+      });
+      return;
+    }
+    if (!conCoordenadas && diferencia === 0) { toast.info("La cantidad no cambió"); return; }
+    const base = Number(entry.abundance) || 0;
+    if (!conCoordenadas && base + diferencia < 1) {
+      toast.error("No se puede bajar tanto desde aquí", {
+        description: "La especie tiene varios registros en el transecto. Corrígelos uno por uno en Ocurrencias.",
+      });
+      return;
+    }
+
+    setAjustando(true);
+    try {
+      let mensaje: string;
+      if (conCoordenadas) {
+        const r = await onAddSighting!(entry.key, {
+          abundance: String(diferencia),
+          latitude: ajusteLat!,
+          longitude: ajusteLng!,
+          date: date || format(new Date(), "yyyy-MM-dd"),
+          time: tfTime || undefined,
+          detectionMethod: tfDetectionMethod || undefined,
+          notes: notes || undefined,
+        });
+        if (r.error || !r.id) { toast.error(r.error ?? "No se pudo guardar el registro"); return; }
+        const id = r.id;
+        setLocalRegistrations(prev => [...prev, { speciesId: entry.speciesId, abundance: String(diferencia), key: id }]);
+        mensaje = `${nombre}: se agregó ${individuos(diferencia)} con coordenadas nuevas. Total en el transecto: ${nuevo}.`;
+      } else {
+        const nuevoBase = String(base + diferencia);
+        await onAdjustAbundance!(entry.key, nuevoBase);
+        setLocalRegistrations(prev => prev.map(r => r.key === entry.key ? { ...r, abundance: nuevoBase } : r));
+        mensaje = `${nombre}: cantidad actualizada. Total en el transecto: ${individuos(nuevo)}.`;
+      }
+      toast.success("Registro guardado", { description: mensaje });
+      setUltimoCambio(mensaje);
+      setSelectedSpecies(null);
+      setSpeciesQuery("");
+      setSpeciesList([]);
+    } catch {
+      toast.error("No se pudo guardar el cambio");
+    } finally {
+      setAjustando(false);
+    }
   }
 
   function addShermanCapture() {
@@ -847,9 +946,15 @@ export function OccurrenceForm({
                 <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
                 <div>
                   <p className="text-sm font-medium text-amber-800">Esta especie ya está registrada</p>
-                  <p className="text-xs text-amber-600">
-                    Actualmente: <span className="font-semibold">{duplicateEntry.abundance ?? "—"} individuo{Number(duplicateEntry.abundance) !== 1 ? "s" : ""}</span>
-                  </p>
+                  {modoAdmin ? (
+                    <p className="text-xs text-amber-600">
+                      Actualmente: <span className="font-semibold">{totalEspecie} individuo{totalEspecie !== 1 ? "s" : ""}</span> en este transecto
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-600">
+                      Actualmente: <span className="font-semibold">{duplicateEntry.abundance ?? "—"} individuo{Number(duplicateEntry.abundance) !== 1 ? "s" : ""}</span>
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -875,9 +980,10 @@ export function OccurrenceForm({
                 </div>
                 <button
                   type="button"
-                  disabled={!adjustAbundance || !onAdjustAbundance}
+                  disabled={!adjustAbundance || !onAdjustAbundance || ajustando}
                   onClick={async () => {
                     if (!adjustAbundance || !onAdjustAbundance) return;
+                    if (modoAdmin) { await actualizarComoAdmin(duplicateEntry); return; }
                     await onAdjustAbundance(duplicateEntry.key, adjustAbundance);
                     // Update local state so banner reflects new quantity immediately
                     setLocalRegistrations(prev =>
@@ -889,9 +995,54 @@ export function OccurrenceForm({
                   }}
                   className="ml-auto px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold disabled:opacity-40"
                 >
-                  Actualizar
+                  {ajustando ? "Guardando..." : "Actualizar"}
                 </button>
               </div>
+              {/* Modo admin: los individuos de más pueden haberse visto en otro punto del mismo transecto */}
+              {modoAdmin && (
+                <div className="space-y-1.5 border-t border-amber-200 pt-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-amber-700 font-medium">
+                      Coordenadas nuevas <span className="font-normal text-amber-600">(opcional)</span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={capturarGpsAjuste}
+                      disabled={ajusteGps}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-amber-300 bg-white text-amber-700 text-xs font-medium disabled:opacity-50"
+                    >
+                      {ajusteGps
+                        ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Obteniendo...</>
+                        : <><MapPin className="h-3.5 w-3.5" /> Capturar GPS</>}
+                    </button>
+                  </div>
+                  {ajusteLat !== null && ajusteLng !== null ? (
+                    <div className="flex items-center justify-between gap-2 rounded bg-white px-2.5 py-1.5">
+                      <span className="text-xs text-teal-700 font-mono">{ajusteLat.toFixed(6)}, {ajusteLng.toFixed(6)}</span>
+                      <button
+                        type="button"
+                        onClick={() => { setAjusteLat(null); setAjusteLng(null); }}
+                        className="text-xs text-red-600"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  ) : null}
+                  <p className="text-xs text-amber-600">
+                    {ajusteLat !== null
+                      ? "Los individuos de más se guardan como otro registro en este punto. El registro anterior no cambia."
+                      : "Si los nuevos individuos están en otro punto del transecto, captura sus coordenadas antes de actualizar."}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Modo admin: confirmación de lo último que se actualizó en el aviso amarillo */}
+          {modoAdmin && ultimoCambio && !selectedSpecies && (
+            <div className="flex items-start gap-2 text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <span>{ultimoCambio}</span>
             </div>
           )}
 

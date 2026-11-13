@@ -289,6 +289,60 @@ export async function updateTransectoOccurrenceAbundance(
   revalidatePath("/ocurrencias");
 }
 
+// Sólo ADMIN (2026-11-13): más individuos de una especie ya registrada en el transecto, vistos en otro punto.
+// Se guardan como otro registro de la misma especie con sus coordenadas; el registro anterior no se toca.
+export async function addTransectoSighting(
+  baseOccurrenceId: string,
+  data: {
+    abundance: string;
+    latitude: number;
+    longitude: number;
+    date: string;
+    time?: string;
+    detectionMethod?: string;
+    notes?: string;
+  }
+): Promise<{ error?: string; id?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "No autorizado" };
+  if (session.user.role !== "ADMIN") return { error: "Solo disponible para administradores" };
+
+  const abundance = parseInt(data.abundance);
+  if (!Number.isInteger(abundance) || abundance < 1) return { error: "Cantidad no válida" };
+  if (!Number.isFinite(data.latitude) || !Number.isFinite(data.longitude)) return { error: "Coordenadas no válidas" };
+
+  const base = await prisma.occurrence.findUnique({
+    where: { id: baseOccurrenceId },
+    select: {
+      stationId: true,
+      speciesId: true,
+      detectionMethod: true,
+      station: { select: { campaignId: true, campaign: { select: { projectId: true, project: { select: { status: true } } } } } },
+    },
+  });
+  if (!base) return { error: "No se encontró el registro anterior" };
+  if (base.station.campaign.project.status === "COMPLETED") return { error: "El proyecto está cerrado y no permite cambios" };
+
+  const nueva = await prisma.occurrence.create({
+    data: {
+      stationId: base.stationId,
+      speciesId: base.speciesId,
+      userId: session.user.id,
+      date: data.date ? new Date(data.date) : new Date(),
+      latitude: data.latitude,
+      longitude: data.longitude,
+      abundance,
+      detectionMethod: data.detectionMethod || base.detectionMethod,
+      notes: data.notes || null,
+      methodologyData: data.time ? JSON.stringify({ time: data.time }) : null,
+    },
+  });
+
+  revalidatePath(`/proyectos/${base.station.campaign.projectId}/campanas/${base.station.campaignId}/estaciones/${base.stationId}`);
+  revalidatePath("/ocurrencias");
+  return { id: nueva.id };
+}
+
 export async function getCampaignSpecies(campaignId: string): Promise<{
   id: string; genus: string; species: string;
   commonName: string | null; family: string; conservationStatus: string | null;
