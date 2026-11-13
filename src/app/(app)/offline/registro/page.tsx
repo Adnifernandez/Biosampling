@@ -93,7 +93,8 @@ function sessionOccurrenceToDefaultValues(occ: SessionOccurrence): Record<string
 // ── Step types ──
 type Step = "project" | "campaign" | "station" | "occurrence";
 
-type TfReg = { speciesId: string; abundance?: string; key: string };
+// conCoordenadas / detectionMethod: para el aviso amarillo (los registros guardados antes no los traen)
+type TfReg = { speciesId: string; abundance?: string; key: string; conCoordenadas?: boolean; detectionMethod?: string | null };
 
 interface SelectedCampaignMeta {
   id?: string;          // real server ID
@@ -501,7 +502,10 @@ export default function OfflineRegistroPage() {
       .filter(o => o.payload.kind === "single")
       .map(o => {
         const d = o.payload.data as SingleOccurrenceData;
-        return { speciesId: d.speciesId, abundance: d.abundance, key: String(o.localId) };
+        return {
+          speciesId: d.speciesId, abundance: d.abundance, key: String(o.localId),
+          conCoordenadas: !!(d.latitude && d.longitude), detectionMethod: d.detectionMethod ?? null,
+        };
       }),
     [sessionOccurrences]
   );
@@ -549,6 +553,9 @@ export default function OfflineRegistroPage() {
   // Cached in localStorage so dedup works when going offline mid-session
   // key = "srv-{occurrenceId}" for server entries; numeric string for session entries
   const [serverTransectoRegistrations, setServerTransectoRegistrations] = useState<TfReg[]>([]);
+  // localIds of this visit's records, read when the server list arrives (see below)
+  const sessionLocalIdsRef = useRef<number[]>([]);
+  useEffect(() => { sessionLocalIdsRef.current = sessionOccurrences.map(o => o.localId); }, [sessionOccurrences]);
   useEffect(() => {
     if (step !== "occurrence" || selectedCampaign?.methodology !== "TRANSECTO_LINEAL_FAUNA" || !selectedStation?.id) {
       setServerTransectoRegistrations([]);
@@ -560,24 +567,48 @@ export default function OfflineRegistroPage() {
       if (cached) setServerTransectoRegistrations(JSON.parse(cached));
     } catch {}
     getStationTransectoRegistrations(selectedStation.id)
-      .then(rows => {
+      .then(async rows => {
         const regs: TfReg[] = rows.map(r => ({
           speciesId: r.speciesId,
           abundance: r.abundance ?? undefined,
           key: `srv-${r.id}`,
+          conCoordenadas: r.conCoordenadas,
+          detectionMethod: r.detectionMethod,
         }));
-        setServerTransectoRegistrations(regs);
+        // With weak signal the list can arrive after a record of this visit was already uploaded: that record
+        // is in the session list, so it is left out here to not count it twice (the cache keeps every row)
+        const subidosEnEstaVisita = new Set<string>();
+        const db = getDb();
+        if (db && sessionLocalIdsRef.current.length > 0) {
+          try {
+            const locales = await db.pendingOccurrences.bulkGet(sessionLocalIdsRef.current);
+            for (const o of locales) for (const id of o?.clientIds ?? []) subidosEnEstaVisita.add(`srv-${id}`);
+          } catch {}
+        }
+        setServerTransectoRegistrations(regs.filter(r => !subidosEnEstaVisita.has(r.key)));
         try { localStorage.setItem(cacheKey, JSON.stringify(regs)); } catch {}
       })
       .catch(() => {});
   }, [step, selectedCampaign?.methodology, selectedStation?.id]);
 
-  // Combined: session first (they take precedence), then server ones not already in session
-  const allTransectoRegistrations = useMemo<TfReg[]>(() => {
-    const sessionSpeciesIds = new Set(existingRegistrations.map(r => r.speciesId));
-    const serverOnly = serverTransectoRegistrations.filter(r => !sessionSpeciesIds.has(r.speciesId));
-    return [...existingRegistrations, ...serverOnly];
-  }, [existingRegistrations, serverTransectoRegistrations]);
+  // A phone record that was deleted or replaced by an edit leaves the Transecto Fauna cache
+  function quitarRegistroTf(localId: number) {
+    if (!selectedStation?.id) return;
+    try {
+      const cacheKey = `tf-regs-${selectedStation.id}`;
+      const cached: TfReg[] = JSON.parse(localStorage.getItem(cacheKey) ?? "[]");
+      localStorage.setItem(cacheKey, JSON.stringify(cached.filter(r => r.key !== String(localId))));
+    } catch {}
+  }
+
+  // Combined: session first (the yellow banner adjusts those, they can change without signal), then all the
+  // server ones. The banner shows the species total across every record (one per point since 2026-11-13).
+  // The server list is read when entering the station and the session starts empty there, so a record is
+  // not counted twice.
+  const allTransectoRegistrations = useMemo<TfReg[]>(
+    () => [...existingRegistrations, ...serverTransectoRegistrations],
+    [existingRegistrations, serverTransectoRegistrations]
+  );
 
   // Campaign-wide species suggestions (sorted by frequency) — fetched once per campaign, cached in localStorage
   type CampaignSp = { id: string; genus: string; species: string; commonName: string | null; family: string; conservationStatus: string | null };
@@ -981,36 +1012,40 @@ export default function OfflineRegistroPage() {
             campaignSpecies={campaignSpeciesSuggestions.length > 0 ? campaignSpeciesSuggestions : undefined}
             stationSpecies={stationSpeciesSuggestions.length > 0 ? stationSpeciesSuggestions : undefined}
             onAdjustAbundance={async (key, newAbundance) => {
-              // Server-registered occurrence (key = "srv-{occurrenceId}")
-              if (key.startsWith("srv-")) {
-                const occurrenceId = key.slice(4);
-                try {
-                  await updateTransectoOccurrenceAbundance(occurrenceId, newAbundance);
-                  // Update localStorage cache
-                  if (selectedStation?.id) {
-                    try {
-                      const cacheKey = `tf-regs-${selectedStation.id}`;
-                      const cached: TfReg[] = JSON.parse(localStorage.getItem(cacheKey) ?? "[]");
-                      localStorage.setItem(cacheKey, JSON.stringify(
-                        cached.map(r => r.key === key ? { ...r, abundance: newAbundance } : r)
-                      ));
-                    } catch {}
-                  }
-                  setServerTransectoRegistrations(prev =>
-                    prev.map(r => r.key === key ? { ...r, abundance: newAbundance } : r)
-                  );
-                  toast.success("Cantidad actualizada");
-                } catch (e) {
-                  toast.error("Sin conexión — no se puede actualizar este registro");
-                  throw e;
+              // The form confirms or explains the result (errors are thrown back to it).
+              // Keeps the phone cache and the server list in step with the new quantity
+              const reflejar = () => {
+                if (selectedStation?.id) {
+                  try {
+                    const cacheKey = `tf-regs-${selectedStation.id}`;
+                    const cached: TfReg[] = JSON.parse(localStorage.getItem(cacheKey) ?? "[]");
+                    localStorage.setItem(cacheKey, JSON.stringify(
+                      cached.map(r => r.key === key ? { ...r, abundance: newAbundance } : r)
+                    ));
+                  } catch {}
                 }
+                setServerTransectoRegistrations(prev =>
+                  prev.map(r => r.key === key ? { ...r, abundance: newAbundance } : r)
+                );
+              };
+              // Server-registered occurrence (key = "srv-{occurrenceId}"): needs signal
+              if (key.startsWith("srv-")) {
+                await updateTransectoOccurrenceAbundance(key.slice(4), newAbundance);
+                reflejar();
                 return;
               }
-              // Session/Dexie-registered occurrence (key = String(localId))
+              // Phone record (key = String(localId))
               const localId = parseInt(key);
               const db = getDb();
               const existing = await db?.pendingOccurrences.get(localId);
               if (existing && existing.payload.kind === "single") {
+                // Already uploaded: the phone copy is not sent again, so the change goes to the server
+                // record (before, it stayed only on the phone). Without signal this throws.
+                if (existing.status === "synced") {
+                  const serverId = existing.clientIds?.[0];
+                  if (!serverId) throw new Error("Registro subido sin id del servidor");
+                  await updateTransectoOccurrenceAbundance(serverId, newAbundance);
+                }
                 const updatedPayload: OccurrencePayload = {
                   kind: "single",
                   data: { ...(existing.payload.data as SingleOccurrenceData), abundance: newAbundance },
@@ -1024,13 +1059,14 @@ export default function OfflineRegistroPage() {
                   payload: { kind: "single", data: { ...(o.payload.data as SingleOccurrenceData), abundance: newAbundance } },
                 };
               }));
-              toast.success("Cantidad actualizada");
+              reflejar();
             }}
             onRegistered={async (label, payload, localId) => {
               if (editingOccurrence) {
                 // Edit flow: replace old item, delete old Dexie record
                 const db = getDb();
                 try { await db?.pendingOccurrences.delete(editingOccurrence.localId); } catch {}
+                quitarRegistroTf(editingOccurrence.localId);
                 setSessionOccurrences(prev => [
                   { localId, speciesLabel: label, payload },
                   ...prev.filter(o => o.localId !== editingOccurrence.localId),
@@ -1052,16 +1088,19 @@ export default function OfflineRegistroPage() {
                 } catch {}
               }
               // Keep Transecto Fauna localStorage cache fresh (same principle as BB)
+              // Every record is kept (a species can have one record per point since 2026-11-13)
               if (selectedCampaign.methodology === "TRANSECTO_LINEAL_FAUNA" && selectedStation?.id && payload.kind === "single") {
-                const speciesId = (payload.data as SingleOccurrenceData).speciesId;
-                const abundance = (payload.data as SingleOccurrenceData).abundance;
+                const d = payload.data as SingleOccurrenceData;
                 try {
                   const cacheKey = `tf-regs-${selectedStation.id}`;
                   const cached: TfReg[] = JSON.parse(localStorage.getItem(cacheKey) ?? "[]");
-                  if (!cached.some(r => r.speciesId === speciesId)) {
+                  if (!cached.some(r => r.key === String(localId))) {
                     localStorage.setItem(cacheKey, JSON.stringify([
                       ...cached,
-                      { speciesId, abundance, key: String(localId) },
+                      {
+                        speciesId: d.speciesId, abundance: d.abundance, key: String(localId),
+                        conCoordenadas: !!(d.latitude && d.longitude), detectionMethod: d.detectionMethod ?? null,
+                      },
                     ]));
                   }
                 } catch {}
@@ -1115,6 +1154,7 @@ export default function OfflineRegistroPage() {
                         if (!confirm(`¿Eliminar el registro de "${occ.speciesLabel}"?`)) return;
                         const db = getDb();
                         try { await db?.pendingOccurrences.delete(occ.localId); } catch {}
+                        quitarRegistroTf(occ.localId);
                         if (editingOccurrence?.localId === occ.localId) setEditingOccurrence(null);
                         setSessionOccurrences(prev => prev.filter(o => o.localId !== occ.localId));
                       }}

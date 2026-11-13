@@ -124,12 +124,14 @@ interface OccurrenceFormProps {
   onRegistered?: (label: string, payload: OccurrencePayload, localId: number) => void; // terreno wizard callback
   // Transecto Fauna dedup: list of already-registered species this session/station
   // key = String(localId) in Terreno mode, occurrenceId in regular tab
-  // conCoordenadas: sólo lo usa el modo admin del aviso amarillo
-  existingRegistrations?: { speciesId: string; abundance?: string; key: string; conCoordenadas?: boolean }[];
+  // conCoordenadas / detectionMethod: los usa el aviso amarillo al agregar individuos
+  existingRegistrations?: {
+    speciesId: string; abundance?: string; key: string; conCoordenadas?: boolean; detectionMethod?: string | null;
+  }[];
   onAdjustAbundance?: (key: string, newAbundance: string) => Promise<void>;
-  // Sólo ADMIN (2026-11-13): en el aviso amarillo se pueden capturar coordenadas nuevas. Los individuos
-  // de más se guardan como otro registro de la misma especie (con esas coordenadas o sin coordenadas)
-  // y se confirma lo que se hizo.
+  // Aviso amarillo (2026-11-13): en la pantalla normal, guarda en el servidor los individuos de más como
+  // otro registro de la misma especie (con las coordenadas nuevas o sin coordenadas). En modo terreno no
+  // se pasa: el registro nuevo se guarda en el teléfono y se sube después.
   onAddSighting?: (
     baseKey: string,
     data: {
@@ -201,9 +203,11 @@ export function OccurrenceForm({
       : undefined;
   const isDuplicate = !!duplicateEntry;
 
-  // Modo admin del aviso amarillo: la especie puede tener varios registros en el transecto (uno por punto),
-  // así que se muestra y se ajusta el total de todos ellos
-  const modoAdmin = !!onAddSighting;
+  // Aviso amarillo con coordenadas (para todos desde 2026-11-13): pantalla normal (onAddSighting) y modo
+  // terreno (guarda en el teléfono). La especie puede tener varios registros en el transecto (uno por punto),
+  // así que se muestra y se ajusta el total de todos ellos.
+  const enTerreno = !!stationLocalKey || !!forceOffline;
+  const avisoCompleto = isTransectoFauna && (!!onAddSighting || enTerreno);
   const totalEspecie = duplicateEntry
     ? localRegistrations
         .filter(r => r.speciesId === duplicateEntry.speciesId)
@@ -342,7 +346,7 @@ export function OccurrenceForm({
 
   // Sync abundance adjuster when duplicate entry changes
   useEffect(() => {
-    setAdjustAbundance(modoAdmin && duplicateEntry ? String(totalEspecie) : duplicateEntry?.abundance ?? "");
+    setAdjustAbundance(avisoCompleto && duplicateEntry ? String(totalEspecie) : duplicateEntry?.abundance ?? "");
     setAjusteLat(null);
     setAjusteLng(null);
   }, [duplicateEntry?.key]);
@@ -467,7 +471,7 @@ export function OccurrenceForm({
     );
   }
 
-  // Aviso amarillo (modo admin): coordenadas del punto donde se vieron los individuos de más
+  // Aviso amarillo: coordenadas del punto donde se vieron los individuos de más
   function capturarGpsAjuste() {
     setAjusteGps(true);
     navigator.geolocation.getCurrentPosition(
@@ -481,20 +485,26 @@ export function OccurrenceForm({
     );
   }
 
-  // Aviso amarillo (modo admin). La "nueva cantidad" es el total de la especie en el transecto.
-  // Los individuos de más nunca heredan las coordenadas de otro registro (decisión de la usuaria, 2026-11-13):
+  // Aviso amarillo (para todos desde 2026-11-13). La "nueva cantidad" es el total de la especie en el transecto.
+  // Los individuos de más nunca heredan las coordenadas de otro registro (decisión de la usuaria):
   // - con coordenadas nuevas, se guardan como otro registro en ese punto;
-  // - sin coordenadas, se suman al registro sin coordenadas de la especie o, si no hay, a uno nuevo sin coordenadas.
+  // - sin coordenadas, se suman al registro sin coordenadas de la especie o, si no hay (o en terreno no se
+  //   puede cambiar sin señal), van en un registro nuevo sin coordenadas.
   // Para bajar la cantidad se descuenta del registro sin coordenadas si lo hay; si no, del registro del aviso.
-  // En todos los casos se confirma lo que se hizo.
-  async function actualizarComoAdmin(entry: { speciesId: string; abundance?: string; key: string }) {
+  // Pantalla normal: se guarda en el servidor. Modo terreno: el registro nuevo queda en el teléfono y se sube
+  // con la sincronización. En todos los casos se confirma lo que se hizo.
+  async function actualizarCantidad(entry: { speciesId: string; abundance?: string; key: string; detectionMethod?: string | null }) {
     const nuevo = parseInt(adjustAbundance);
     if (!Number.isInteger(nuevo) || nuevo < 1) { toast.error("Ingresa una cantidad válida"); return; }
     const nombre = selectedSpecies ? `${selectedSpecies.genus} ${selectedSpecies.species}` : "La especie";
     const individuos = (n: number) => `${n} individuo${n === 1 ? "" : "s"}`;
     const diferencia = nuevo - totalEspecie;
     const conCoordenadas = ajusteLat !== null && ajusteLng !== null;
-    const sinCoordenadas = localRegistrations.find(r => r.speciesId === entry.speciesId && !r.conCoordenadas);
+    // En terreno se prefiere uno del teléfono ("srv-" = ya está en el servidor), que se puede cambiar sin señal
+    const candidatos = localRegistrations.filter(r => r.speciesId === entry.speciesId && !r.conCoordenadas);
+    const sinCoordenadas = candidatos.find(r => !r.key.startsWith("srv-")) ?? candidatos[0];
+    const metodo = tfDetectionMethod || entry.detectionMethod || undefined;
+    const fecha = date || format(new Date(), "yyyy-MM-dd");
 
     if (conCoordenadas && diferencia < 1) {
       toast.error("La nueva cantidad debe ser mayor que la actual", {
@@ -516,37 +526,66 @@ export function OccurrenceForm({
     setAjustando(true);
     try {
       let mensaje: string;
-      const agregarRegistro = async (lat: number | null, lng: number | null) => {
-        const r = await onAddSighting!(entry.key, {
-          abundance: String(diferencia),
-          latitude: lat,
-          longitude: lng,
-          date: date || format(new Date(), "yyyy-MM-dd"),
-          time: tfTime || undefined,
-          detectionMethod: tfDetectionMethod || undefined,
-          notes: notes || undefined,
-        });
-        if (r.error || !r.id) { toast.error(r.error ?? "No se pudo guardar el registro"); return false; }
-        const id = r.id;
-        setLocalRegistrations(prev => [
-          ...prev,
-          { speciesId: entry.speciesId, abundance: String(diferencia), key: id, conCoordenadas: lat !== null },
-        ]);
+      const agregados = (con: string) =>
+        `${nombre}: se agregó ${individuos(diferencia)} ${con}. Total en el transecto: ${nuevo}.`;
+      const agregarRegistro = async (lat: number | null, lng: number | null): Promise<boolean> => {
+        if (onAddSighting) {
+          const r = await onAddSighting(entry.key, {
+            abundance: String(diferencia),
+            latitude: lat,
+            longitude: lng,
+            date: fecha,
+            time: tfTime || undefined,
+            detectionMethod: metodo,
+            notes: notes || undefined,
+          });
+          if (r.error || !r.id) { toast.error(r.error ?? "No se pudo guardar el registro"); return false; }
+          const id = r.id;
+          setLocalRegistrations(prev => [
+            ...prev,
+            { speciesId: entry.speciesId, abundance: String(diferencia), key: id, conCoordenadas: lat !== null, detectionMethod: metodo },
+          ]);
+          return true;
+        }
+        // Modo terreno: queda en el teléfono y se sube con la sincronización, como cualquier registro
+        const payload: OccurrencePayload = {
+          kind: "single",
+          data: {
+            speciesId: entry.speciesId,
+            date: fecha,
+            abundance: String(diferencia),
+            detectionMethod: metodo,
+            latitude: lat !== null ? String(lat) : undefined,
+            longitude: lng !== null ? String(lng) : undefined,
+            notes: notes || undefined,
+            methodologyData: tfTime ? JSON.stringify({ time: tfTime }) : undefined,
+          },
+        };
+        const localId = await queueOffline(payload, nombre);
+        if (localId === null) return false;
+        onRegistered?.(nombre, payload, localId);
         return true;
       };
 
       if (conCoordenadas) {
         if (!(await agregarRegistro(ajusteLat, ajusteLng))) return;
-        mensaje = `${nombre}: se agregó ${individuos(diferencia)} con coordenadas nuevas. Total en el transecto: ${nuevo}.`;
+        mensaje = agregados("con coordenadas nuevas");
       } else if (diferencia > 0 && !sinCoordenadas) {
         if (!(await agregarRegistro(null, null))) return;
-        mensaje = `${nombre}: se agregó ${individuos(diferencia)} sin coordenadas. Total en el transecto: ${nuevo}.`;
+        mensaje = agregados("sin coordenadas");
       } else {
         const nuevaCantidad = String(cantidadDestino + diferencia);
-        await onAdjustAbundance!(destino.key, nuevaCantidad);
-        setLocalRegistrations(prev => prev.map(r => r.key === destino.key ? { ...r, abundance: nuevaCantidad } : r));
+        try {
+          await onAdjustAbundance!(destino.key, nuevaCantidad);
+          setLocalRegistrations(prev => prev.map(r => r.key === destino.key ? { ...r, abundance: nuevaCantidad } : r));
+        } catch (e) {
+          // En terreno y sin señal no se puede cambiar un registro que ya se subió:
+          // los individuos de más van en un registro nuevo del teléfono, sin coordenadas
+          if (!(enTerreno && diferencia > 0)) throw e;
+          if (!(await agregarRegistro(null, null))) return;
+        }
         mensaje = diferencia > 0
-          ? `${nombre}: se agregó ${individuos(diferencia)} sin coordenadas. Total en el transecto: ${nuevo}.`
+          ? agregados("sin coordenadas")
           : `${nombre}: cantidad actualizada. Total en el transecto: ${individuos(nuevo)}.`;
       }
       toast.success("Registro guardado", { description: mensaje });
@@ -555,7 +594,11 @@ export function OccurrenceForm({
       setSpeciesQuery("");
       setSpeciesList([]);
     } catch {
-      toast.error("No se pudo guardar el cambio");
+      toast.error("No se pudo guardar el cambio", {
+        description: enTerreno
+          ? "Sin señal no se puede bajar la cantidad de un registro que ya se subió. Inténtalo cuando tengas conexión."
+          : "Revisa tu conexión e inténtalo de nuevo.",
+      });
     } finally {
       setAjustando(false);
     }
@@ -969,7 +1012,7 @@ export function OccurrenceForm({
                 <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
                 <div>
                   <p className="text-sm font-medium text-amber-800">Esta especie ya está registrada</p>
-                  {modoAdmin ? (
+                  {avisoCompleto ? (
                     <p className="text-xs text-amber-600">
                       Actualmente: <span className="font-semibold">{totalEspecie} individuo{totalEspecie !== 1 ? "s" : ""}</span> en este transecto
                     </p>
@@ -1006,7 +1049,7 @@ export function OccurrenceForm({
                   disabled={!adjustAbundance || !onAdjustAbundance || ajustando}
                   onClick={async () => {
                     if (!adjustAbundance || !onAdjustAbundance) return;
-                    if (modoAdmin) { await actualizarComoAdmin(duplicateEntry); return; }
+                    if (avisoCompleto) { await actualizarCantidad(duplicateEntry); return; }
                     await onAdjustAbundance(duplicateEntry.key, adjustAbundance);
                     // Update local state so banner reflects new quantity immediately
                     setLocalRegistrations(prev =>
@@ -1021,8 +1064,8 @@ export function OccurrenceForm({
                   {ajustando ? "Guardando..." : "Actualizar"}
                 </button>
               </div>
-              {/* Modo admin: los individuos de más pueden haberse visto en otro punto del mismo transecto */}
-              {modoAdmin && (
+              {/* Los individuos de más pueden haberse visto en otro punto del mismo transecto */}
+              {avisoCompleto && (
                 <div className="space-y-1.5 border-t border-amber-200 pt-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs text-amber-700 font-medium">
@@ -1061,8 +1104,8 @@ export function OccurrenceForm({
             </div>
           )}
 
-          {/* Modo admin: confirmación de lo último que se actualizó en el aviso amarillo */}
-          {modoAdmin && ultimoCambio && !selectedSpecies && (
+          {/* Confirmación de lo último que se actualizó en el aviso amarillo */}
+          {avisoCompleto && ultimoCambio && !selectedSpecies && (
             <div className="flex items-start gap-2 text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
               <span>{ultimoCambio}</span>

@@ -264,17 +264,19 @@ export async function getStationBBSpeciesIds(stationId: string): Promise<string[
   return rows.map(r => r.speciesId);
 }
 
-export async function getStationTransectoRegistrations(
-  stationId: string
-): Promise<{ id: string; speciesId: string; abundance: string | null }[]> {
+export async function getStationTransectoRegistrations(stationId: string): Promise<{
+  id: string; speciesId: string; abundance: string | null; conCoordenadas: boolean; detectionMethod: string | null;
+}[]> {
   const rows = await prisma.occurrence.findMany({
     where: { stationId },
-    select: { id: true, speciesId: true, abundance: true },
+    select: { id: true, speciesId: true, abundance: true, latitude: true, longitude: true, detectionMethod: true },
   });
   return rows.map(r => ({
     id: r.id,
     speciesId: r.speciesId,
     abundance: r.abundance != null ? String(r.abundance) : null,
+    conCoordenadas: !!(r.latitude && r.longitude),
+    detectionMethod: r.detectionMethod,
   }));
 }
 
@@ -282,6 +284,8 @@ export async function updateTransectoOccurrenceAbundance(
   id: string,
   newAbundance: string
 ): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("No autorizado");
   await prisma.occurrence.update({
     where: { id },
     data: { abundance: newAbundance ? parseInt(newAbundance) : null },
@@ -289,9 +293,9 @@ export async function updateTransectoOccurrenceAbundance(
   revalidatePath("/ocurrencias");
 }
 
-// Sólo ADMIN (2026-11-13): más individuos de una especie ya registrada en el transecto.
-// Se guardan como otro registro de la misma especie, con las coordenadas nuevas o sin coordenadas;
-// el registro anterior (y sus coordenadas) no se toca.
+// Aviso amarillo del transecto de fauna (2026-11-13; primero sólo ADMIN, luego para todos):
+// más individuos de una especie ya registrada en el transecto. Se guardan como otro registro de la
+// misma especie, con las coordenadas nuevas o sin coordenadas; el registro anterior no se toca.
 export async function addTransectoSighting(
   baseOccurrenceId: string,
   data: {
@@ -306,7 +310,6 @@ export async function addTransectoSighting(
 ): Promise<{ error?: string; id?: string }> {
   const session = await auth();
   if (!session?.user?.id) return { error: "No autorizado" };
-  if (session.user.role !== "ADMIN") return { error: "Solo disponible para administradores" };
 
   const abundance = parseInt(data.abundance);
   if (!Number.isInteger(abundance) || abundance < 1) return { error: "Cantidad no válida" };
