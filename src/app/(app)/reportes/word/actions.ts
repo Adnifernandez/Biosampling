@@ -23,10 +23,10 @@ const OCCURRENCE_SELECT = {
   },
 } as const;
 
-// Datos de terreno de las campañas elegidas para el reporte Word (sólo administradores)
+// Datos de terreno de las campañas elegidas para el reporte Word (cualquier usuario con sesión)
 export async function getCampanasReporteWord(campaignIds: string[]): Promise<CampanaReporte[]> {
   const session = await auth();
-  if (session?.user?.role !== "ADMIN") throw new Error("Sólo los administradores pueden generar el reporte Word");
+  if (!session?.user) throw new Error("Inicia sesión para generar el reporte Word");
   if (campaignIds.length === 0) return [];
 
   const campaigns = await prisma.campaign.findMany({

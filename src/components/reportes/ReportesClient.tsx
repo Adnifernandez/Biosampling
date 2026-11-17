@@ -165,7 +165,7 @@ function statusBadge(raw: string | null) {
   );
 }
 
-export function ReportesClient({ projects, isAdmin }: { projects: ProjectRow[]; isAdmin: boolean }) {
+export function ReportesClient({ projects }: { projects: ProjectRow[] }) {
   const [projectId, setProjectId] = useState<string>("");
   const [campaignId, setCampaignId] = useState<string>("");
   const [stations, setStations] = useState<StationRow[]>([]);
@@ -1145,19 +1145,17 @@ export function ReportesClient({ projects, isAdmin }: { projects: ProjectRow[]; 
               </Select>
             </div>
           </div>
-          {/* Reporte Word (plantillas DSS) — sólo administradores */}
-          {isAdmin && (
-            <div className="flex justify-end mt-3">
-              <ButtonLink
-                href={`/reportes/word?proyecto=${encodeURIComponent(projectId)}&campana=${encodeURIComponent(campaignId)}`}
-                variant="outline"
-                size="sm"
-                className="gap-2"
-              >
-                <FileText className="h-4 w-4" /> Generar reporte Word
-              </ButtonLink>
-            </div>
-          )}
+          {/* Reporte Word (plantillas DSS) — para todos los usuarios desde 2026-11-17 */}
+          <div className="flex justify-end mt-3">
+            <ButtonLink
+              href={`/reportes/word?proyecto=${encodeURIComponent(projectId)}&campana=${encodeURIComponent(campaignId)}`}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <FileText className="h-4 w-4" /> Generar reporte Word
+            </ButtonLink>
+          </div>
         </CardContent>
       </Card>
 

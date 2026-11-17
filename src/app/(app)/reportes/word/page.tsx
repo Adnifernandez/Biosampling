@@ -1,5 +1,3 @@
-import { auth } from "@/auth";
-import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ReporteWordClient } from "@/components/reportes/ReporteWordClient";
 
@@ -8,9 +6,7 @@ export default async function ReporteWordPage({
 }: {
   searchParams: Promise<{ proyecto?: string; campana?: string }>;
 }) {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") redirect("/reportes");
-
+  // Para todos los usuarios con sesión (el layout de (app) ya exige iniciar sesión)
   const { proyecto, campana } = await searchParams;
 
   const projects = await prisma.project.findMany({
