@@ -1,6 +1,6 @@
 // Arma los datos que llenan las plantillas Word de reporte (public/plantillas/*.docx).
 // Todo lo que sale de terreno se calcula aquí; lo que la app no guarda viene del formulario.
-import { MEDIDAS_FAUNA } from "./medidas";
+import { MEDIDAS_FAUNA, parrafoMedidas } from "./medidas";
 import { muestreoAutomatico, parrafoMuestreo, valorMuestreo } from "./muestreo";
 
 export type TipoReporte = "FLORA" | "FAUNA";
@@ -70,6 +70,7 @@ export type FormularioReporte = {
   muestreo: Record<string, string>; // lo escrito a mano; lo que no se tocó sale de la app
   // Fauna
   medidas: string[]; // ids de MEDIDAS_FAUNA marcadas
+  gruposMedidas: Record<string, string>; // grupo de fauna de cada medida ("reptiles"), por id
   // Flora
   normaEC: string;
   // La sección de resultados COT sale si se marcó la parte "COT" en Diseño de muestreo
@@ -281,6 +282,7 @@ export function formularioInicial(): FormularioReporte {
     partesMuestreo: [],
     muestreo: {},
     medidas: [],
+    gruposMedidas: {},
     normaEC: "",
     nUnidadesCot: "",
     descripcionCot: "",
@@ -580,6 +582,8 @@ export function datosFauna(
       `${cambioFrase("el número de especies en categoría de conservación", ec1, ec2)}.`;
   }
 
+  const medidasMarcadas = MEDIDAS_FAUNA.filter((m) => form.medidas.includes(m.id));
+
   const ecParrafo =
     (ec.length === 1
       ? "Durante la campaña se registró 1 especie clasificada en alguna categoría de conservación vigente. Esta corresponde a "
@@ -613,9 +617,10 @@ export function datosFauna(
     })),
     comparacion,
     tabComp: base.tabSiguiente,
-    // En el orden de la lista, no en el que se marcaron
-    medidas: MEDIDAS_FAUNA.filter((m) => form.medidas.includes(m.id)).map(({ titulo, parrafos }) => ({ titulo, parrafos })),
-    hayMedidas: form.medidas.length > 0,
+    // La sección de recomendaciones sale siempre: con las medidas marcadas o diciendo que no se necesitan.
+    // En el orden de la lista, no en el que se marcaron.
+    parrafoMedidas: parrafoMedidas(medidasMarcadas, form.gruposMedidas ?? {}),
+    medidas: medidasMarcadas.map(({ titulo, parrafos }) => ({ titulo, parrafos })),
   };
 }
 

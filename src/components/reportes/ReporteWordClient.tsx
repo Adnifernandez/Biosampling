@@ -27,7 +27,7 @@ import {
   type TipoReporte,
 } from "@/lib/reporte-word/datos";
 import { generarWord, prepararFigura } from "@/lib/reporte-word/generar";
-import { MEDIDAS_FAUNA } from "@/lib/reporte-word/medidas";
+import { GRUPOS_FAUNA, MEDIDAS_FAUNA, parrafoMedidas } from "@/lib/reporte-word/medidas";
 import { MUESTREO, muestreoAutomatico, type CampoMuestreo } from "@/lib/reporte-word/muestreo";
 import { PROFESIONALES_DSS, buscarProfesional } from "@/lib/equipo-dss";
 import { cn } from "@/lib/utils";
@@ -455,7 +455,7 @@ export function ReporteWordClient({
   const hayEC = resumen.enCategoria > 0;
   const titulosWord: [string, boolean][] = esFauna
     ? [["muestreo", true], ["resultados", true], ["ec", true], ["observaciones", !!form.observaciones.trim()],
-       ["comparacion", !!contraste], ["medidas", form.medidas.length > 0]]
+       ["comparacion", !!contraste], ["medidas", true]]
     : [["muestreo", true], ["resultados", true], ["ec", true], ["cot", conCot],
        ["observaciones", !!form.observaciones.trim()], ["conclusiones", form.incluirConclusiones]];
   const numeroDe: Record<string, number> = Object.fromEntries(
@@ -839,9 +839,10 @@ export function ReporteWordClient({
           )}
 
           {esFauna && (
-            <Seccion titulo={tituloWord("medidas", "Requerimientos Ambientales Asociados a los Hallazgos")} nota={notaWord("medidas")}>
+            <Seccion titulo={tituloWord("medidas", "Recomendaciones Ambientales Asociadas a los Hallazgos")}>
               <p className="text-xs text-gray-500">
-                Toca las medidas recomendadas. Cada una se agrega con su texto completo; si no marcas ninguna, la sección no aparece.
+                Toca las medidas recomendadas y escribe a qué grupo de fauna se asocia cada una. Cada medida se agrega con su
+                texto completo. Si no marcas ninguna, el Word dice que no se considera necesaria ninguna medida.
               </p>
               <div className="grid gap-2">
                 {MEDIDAS_FAUNA.map((m) => {
@@ -855,10 +856,28 @@ export function ReporteWordClient({
                       onClick={() =>
                         set("medidas", marcada ? form.medidas.filter((id) => id !== m.id) : [...form.medidas, m.id])
                       }
-                    />
+                    >
+                      <CampoChico label="Grupo de fauna (… asociada al grupo de ___)">
+                        <Input
+                          placeholder="Ej: reptiles"
+                          list="sugerencias-grupo-fauna"
+                          value={form.gruposMedidas[m.id] ?? ""}
+                          onChange={(e) => set("gruposMedidas", { ...form.gruposMedidas, [m.id]: e.target.value })}
+                        />
+                      </CampoChico>
+                    </OpcionMarcable>
                   );
                 })}
               </div>
+              <datalist id="sugerencias-grupo-fauna">
+                {GRUPOS_FAUNA.map((g) => (
+                  <option key={g} value={g} />
+                ))}
+              </datalist>
+              <Automatico>
+                Texto de inicio de la sección:{" "}
+                {parrafoMedidas(MEDIDAS_FAUNA.filter((m) => form.medidas.includes(m.id)), form.gruposMedidas)}
+              </Automatico>
             </Seccion>
           )}
 

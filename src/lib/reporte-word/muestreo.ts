@@ -43,37 +43,21 @@ export const MUESTREO: Record<TipoReporte, Plantilla> = {
       },
     ],
   },
+  // 2026-11-16: la usuaria quitó el horario, el radio y minutos de los POA, la búsqueda activa,
+  // las noches de Sherman, la duración de las cámaras y los minutos/playback de las estaciones nocturnas.
   FAUNA: {
     campos: [
       n("transectos", "N° de transectos", "5"),
       t("medidasTransectos", "Largo × ancho de los transectos (m)", "100 × 10"),
-      t("horario", "Horario de los recorridos", "08:00 y 13:00 h"),
     ],
     partes: [
-      {
-        id: "POA",
-        titulo: "Puntos de observación de aves (POA)",
-        campos: [
-          n("poa", "N° de POA", "8"),
-          t("radioPoa", "Radio (m)", "50"),
-          t("tiempoPoa", "Minutos por punto", "10"),
-        ],
-      },
-      { id: "BUSQUEDA", titulo: "Búsqueda activa de mamíferos, reptiles y anfibios", campos: [] },
-      {
-        id: "SHERMAN",
-        titulo: "Trampas Sherman",
-        campos: [n("sherman", "N° de trampas Sherman", "40"), n("nochesSherman", "N° de noches", "3")],
-      },
-      {
-        id: "CAMARAS",
-        titulo: "Cámaras trampa",
-        campos: [n("camaras", "N° de cámaras trampa", "4"), t("duracionCamaras", "Duración (horas o días)", "72 horas")],
-      },
+      { id: "POA", titulo: "Puntos de observación de aves (POA)", campos: [n("poa", "N° de POA", "8")] },
+      { id: "SHERMAN", titulo: "Trampas Sherman", campos: [n("sherman", "N° de trampas Sherman", "40")] },
+      { id: "CAMARAS", titulo: "Cámaras trampa", campos: [n("camaras", "N° de cámaras trampa", "4")] },
       {
         id: "NOCTURNAS",
         titulo: "Estaciones nocturnas para aves y anfibios",
-        campos: [n("estaciones", "N° de estaciones nocturnas", "5"), t("tiempoEstaciones", "Minutos por estación", "20")],
+        campos: [n("estaciones", "N° de estaciones nocturnas", "5")],
       },
     ],
   },
@@ -193,36 +177,24 @@ export function parrafoMuestreo(
   // Texto del ejemplo de la usuaria (2026-11-12): "Para esto se definieron 16 transectos de largo y ancho fijo (200x10; Figura 1‑1)…"
   const transectos = v("transectos");
   const medidas = (v("medidasTransectos").replace(/\s*m$/i, "") || pendiente("largo × ancho")) + " m";
-  const horario = v("horario") || pendiente("horario");
   frases.push(
     esUno(transectos)
-      ? `Para esto se definió 1 transecto de largo y ancho fijo (${medidas}; Figura 1), en el que se realizó un recorrido pedestre abarcando un muestreo a lo largo de toda el área de estudio, entre ${horario}.`
+      ? `Para esto se definió 1 transecto de largo y ancho fijo (${medidas}; Figura 1), en el que se realizó un recorrido pedestre abarcando un muestreo a lo largo de toda el área de estudio.`
       : `Para esto se definieron ${cantidad(transectos, "transecto", "transectos", "N° de transectos")} de largo y ancho fijo (${medidas}; Figura 1), distribuidos en los distintos ambientes presentes en el área de estudio. ` +
-          `Dentro de todos los transectos se realizó un recorrido pedestre abarcando un muestreo a lo largo de toda el área de estudio, entre ${horario}.`
+          `Dentro de todos los transectos se realizó un recorrido pedestre abarcando un muestreo a lo largo de toda el área de estudio.`
   );
   if (hay("POA")) {
     const poa = v("poa");
     frases.push(
-      `Para aves se ${esUno(poa) ? "estableció" : "establecieron"} ${cantidad(poa, "punto de observación", "puntos de observación", "N° de POA")} de ${v("radioPoa").replace(/\s*m$/i, "") || pendiente("radio")} m y ${v("tiempoPoa").replace(/\s*minutos?$/i, "") || pendiente("tiempo")} minutos por punto.`
+      `Para aves se ${esUno(poa) ? "estableció" : "establecieron"} ${cantidad(poa, "punto de observación", "puntos de observación", "N° de POA")}.`
     );
-  }
-  if (hay("BUSQUEDA")) {
-    frases.push("Para mamíferos, reptiles y anfibios se efectuaron búsquedas activas y registros directos e indirectos.");
   }
   const complementos: string[] = [];
-  if (hay("SHERMAN")) {
-    complementos.push(
-      `${cantidad(v("sherman"), "trampa Sherman", "trampas Sherman", "N° de trampas")} durante ${cantidad(v("nochesSherman"), "noche", "noches", "N° de noches")}`
-    );
-  }
-  if (hay("CAMARAS")) {
-    complementos.push(
-      `${cantidad(v("camaras"), "cámara trampa", "cámaras trampa", "N° de cámaras")} durante ${v("duracionCamaras") || pendiente("horas o días")}`
-    );
-  }
+  if (hay("SHERMAN")) complementos.push(cantidad(v("sherman"), "trampa Sherman", "trampas Sherman", "N° de trampas"));
+  if (hay("CAMARAS")) complementos.push(cantidad(v("camaras"), "cámara trampa", "cámaras trampa", "N° de cámaras"));
   if (hay("NOCTURNAS")) {
     complementos.push(
-      `${cantidad(v("estaciones"), "estación nocturna", "estaciones nocturnas", "N° de estaciones")} para aves y anfibios, con ${v("tiempoEstaciones").replace(/\s*minutos?$/i, "") || pendiente("tiempo")} minutos por estación y uso de playback cuando correspondió`
+      `${cantidad(v("estaciones"), "estación nocturna", "estaciones nocturnas", "N° de estaciones")} para aves y anfibios`
     );
   }
   if (complementos.length) frases.push(`El muestreo se complementó con ${unir(complementos)}.`);
