@@ -126,6 +126,25 @@ function unirLista(items: string[], conector = "y", separador = ", "): string {
 
 const nombreCientifico = (sp: EspecieReporte) => `${sp.genus} ${sp.species}`.trim();
 
+// Especies cuyo primer nombre común en la base no es el más usado (pedido de la usuaria, 2026-11-17).
+// Para los demás casos basta con cambiar el orden de los nombres en Especies (el primero es el que sale).
+const NOMBRE_COMUN_PREFERIDO: Record<string, string> = {
+  "Lycalopex culpaeus": "Zorro culpeo", // en la base: "Zorro colorado, Zorro culpeo, …"
+};
+
+// En el Word va un solo nombre común, el principal: el primero de la lista.
+// "Olivillo, teque, tique" → "Olivillo"; "Zorro chilla o gris" → "Zorro chilla";
+// "Alstroemeria (genérico)" → "Alstroemeria"; "No tiene, se propone \"pulgón del Ruíl\"" → "pulgón del Ruíl".
+export function nombreComunPrincipal(sp: Pick<EspecieReporte, "genus" | "species" | "commonName">): string {
+  const preferido = NOMBRE_COMUN_PREFERIDO[nombreCientifico(sp as EspecieReporte)];
+  if (preferido) return preferido;
+  const texto = linea(sp.commonName ?? "");
+  if (!texto) return "";
+  if (/^no tiene\b/i.test(texto)) return texto.match(/["“]([^"”]+)["”]/)?.[1]?.trim() ?? "";
+  const primero = texto.split(/[,;]/)[0];
+  return linea(primero.split(/\s+o\s+/)[0].replace(/\s*\([^)]*\)\s*/g, " "));
+}
+
 const normalizarOrigen = (origen: string | null) =>
   !origen ? "—" : origen === "Endemico" ? "Endémico" : origen;
 
@@ -250,8 +269,8 @@ export function resumenCampanas(campanas: CampanaReporte[], region: string) {
 function listaEC(filas: FilaEspecie[]): string {
   return unirLista(
     filas.map(({ sp }) => {
-      // Sólo el primer nombre común: "Olivillo, teque, tique…" → "Olivillo"
-      const comun = sp.commonName ? ` (${sp.commonName.split(",")[0].trim()})` : "";
+      const nombre = nombreComunPrincipal(sp);
+      const comun = nombre ? ` (${nombre})` : "";
       return `${nombreCientifico(sp)}${comun}, en categoría ${estadoCompleto(sp)}`;
     }),
     "y",
@@ -525,7 +544,8 @@ function sintesisResultadosFauna(filas: FilaEspecie[]): string {
     frases.push(`El grupo con mayor riqueza fue el de ${g.articulo} ${g.plural}, con ${plural(n, "especie", "especies")}.`);
   }
   const masAbundante = [...filas].sort((a, b) => b.abundancia - a.abundancia)[0];
-  const comun = masAbundante.sp.commonName ? ` (${masAbundante.sp.commonName})` : "";
+  const nombreComun = nombreComunPrincipal(masAbundante.sp);
+  const comun = nombreComun ? ` (${nombreComun})` : "";
   frases.push(
     `La especie más abundante fue ${nombreCientifico(masAbundante.sp)}${comun}, con ${plural(masAbundante.abundancia, "individuo", "individuos")}.`
   );
@@ -601,7 +621,7 @@ export function datosFauna(
       orden: sp.orden || "—",
       familia: sp.family || "—",
       especie: nombreCientifico(sp),
-      nombreComun: sp.commonName || "—",
+      nombreComun: nombreComunPrincipal(sp) || "—",
       origen: normalizarOrigen(sp.origen),
       ec: estadoCompleto(sp),
       abundancia,
@@ -609,7 +629,7 @@ export function datosFauna(
     ecParrafo,
     especiesEC: ec.map(({ sp, abundancia, estaciones }) => ({
       especie: nombreCientifico(sp),
-      nombreComun: sp.commonName || "—",
+      nombreComun: nombreComunPrincipal(sp) || "—",
       origen: normalizarOrigen(sp.origen),
       categoria: estadoCompleto(sp),
       abundancia,
@@ -661,7 +681,7 @@ export function datosFlora(form: FormularioReporte, region: string, campanas: Ca
       clase: sp.clase || "—",
       familia: sp.family || "—",
       especie: nombreCientifico(sp),
-      nombreComun: sp.commonName || "—",
+      nombreComun: nombreComunPrincipal(sp) || "—",
       habito: sp.habito || "—",
       origen: normalizarOrigen(sp.origen),
       ec: estadoCompleto(sp),
@@ -669,7 +689,7 @@ export function datosFlora(form: FormularioReporte, region: string, campanas: Ca
     ecParrafo,
     especiesEC: ec.map(({ sp }) => ({
       especie: nombreCientifico(sp),
-      nombreComun: sp.commonName || "—",
+      nombreComun: nombreComunPrincipal(sp) || "—",
       habito: sp.habito || "—",
       origen: normalizarOrigen(sp.origen),
       categoria: norma ? `${estadoCompleto(sp)} – ${norma}` : estadoCompleto(sp),
